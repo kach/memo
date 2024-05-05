@@ -96,6 +96,7 @@ class SPass:
 
 @dataclass(frozen=True)
 class SChoose:
+    who: Name
     id: Id
     domain: list[float]
     wpp: Expr
@@ -143,11 +144,11 @@ def pprint_stmt(s: Stmt) -> str:
     match s:
         case SPass():
             return f""
-        case SChoose(id, dom, wpp):
+        case SChoose(who, id, dom, wpp):
             wpp_str = pprint_expr(wpp)
             if len(wpp_str) > 10:
                 wpp_str = "\n" + textwrap.indent(wpp_str, "  ")
-            return f"choose {id} among {dom} wpp {wpp_str}"
+            return f"{who} chooses {id} among {dom} wpp {wpp_str}"
         case SObserve(who, id):
             return f"observe {who}.{id}"
         case SWith(who, stmt):
@@ -186,13 +187,23 @@ def pprint_expr(e: Expr) -> str:
                 case Op.INV:
                     return f"(~{pprint_expr(args[0])})"
                 case Op.ITE:
-                    return f"(if {pprint_expr(args[0])} then {pprint_expr(args[1])} else {pprint_expr(args[2])})"
+                    c_str = pprint_expr(args[0])
+                    t_str = pprint_expr(args[1])
+                    f_str = pprint_expr(args[2])
+                    if len(t_str) + len(f_str) < 40:
+                        return f"(if {c_str} then {t_str} else {f_str})"
+                    return f"""\
+(if {c_str} then
+{textwrap.indent(t_str, '   ')}
+ else
+{textwrap.indent(f_str, '   ')})\
+"""
         case EChoice(id):
             return f"{id}"
         case EExpect(expr):
-            return f"E[{pprint_expr(expr)}]"
+            return f"E[ {pprint_expr(expr)} ]"
         case EWith(who, expr):
-            return f"{who}[{pprint_expr(expr)}]"
+            return f"{who}[ {pprint_expr(expr)} ]"
         case EImagine(do, then):
             stmts = "\n".join(
                 [pprint_stmt(s) for s in do] + ["return " + pprint_expr(then)]
@@ -399,50 +410,53 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 tag, idx, True, domain, set()
             )
 
-        case SChoose(id, domain, wpp):
-            # TODO: should take "who" as argument...
+        case SChoose(who, id, domain, wpp):
+            if who not in ctxt.frame.children:
+                ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
             idx = ctxt.next_idx
             ctxt.next_idx += 1
-            ctxt.idx_history.append(f"{ctxt.frame.name}.{id}")
-            tag = ctxt.sym(f"{ctxt.frame.name}_{id}")
-            ctxt.emit(f"""\n# {ctxt.frame.name} choose {id}""")
+            ctxt.idx_history.append(f"{who}.{id}")
+            tag = ctxt.sym(f"{who}_{id}")
+            ctxt.emit(f"""\n# {who} choose {id}""")
             ctxt.emit(
                 f"{tag} = torch.tensor({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
             )
+
+            # briefly enter child's frame
+            child_frame = ctxt.frame.children[who]
+            old_frame = ctxt.frame
+            ctxt.frame = child_frame
             ctxt.frame.choices[(Name("self"), id)] = Choice(
                 tag, idx, True, domain, set()
             )
-
             wpp_val = eval_expr(wpp, ctxt)
-            ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
             if not wpp_val.known:
                 raise Exception(
                     f"{ctxt.frame.name} does not know wpp when choosing {id}"
                 )
+            ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
+            ctxt.frame = old_frame
 
-            if ctxt.frame.parent is not None:
-                new_deps = set()
-                for who_, id_ in wpp_val.deps:
-                    if who_ == Name("self"):
-                        new_deps.add((ctxt.frame.name, id_))
-                    elif (who_, id_) in ctxt.frame.conditions:
-                        new_deps.add(ctxt.frame.conditions[(who_, id_)])
-                    else:
-                        raise Exception("choice??")  # should always be true
-                ctxt.frame.parent.choices[(Name(ctxt.frame.name), id)] = Choice(
-                    tag, idx, False, domain, new_deps
-                )
-                id_ll = ctxt.sym(f"{id}_ll")
-                ctxt.emit(
-                    f"{id_ll} = torch.ones_like({tag}, dtype=torch.float) * {wpp_val.tag}"
-                )
-                ctxt.emit(
-                    f"{id_ll} = torch.nan_to_num({id_ll} / {id_ll}.sum(axis=0, keepdims=True))"
-                )
-                if ctxt.frame.parent.ll is None:
-                    ctxt.frame.parent.ll = ctxt.sym(f"{ctxt.frame.parent.name}_ll")
-                    ctxt.emit(f"{ctxt.frame.parent.ll} = 1.0")
-                ctxt.emit(f"{ctxt.frame.parent.ll} = {id_ll} * {ctxt.frame.parent.ll}")
+            new_deps = set()
+            for who_, id_ in wpp_val.deps:
+                if who_ == Name("self"):
+                    new_deps.add((who, id_))
+                elif (who_, id_) in child_frame.conditions:
+                    new_deps.add(child_frame.conditions[(who_, id_)])
+                else:
+                    raise Exception("??")  # should always be true
+            ctxt.frame.choices[(who, id)] = Choice(tag, idx, False, domain, new_deps)
+            id_ll = ctxt.sym(f"{id}_ll")
+            ctxt.emit(
+                f"{id_ll} = torch.ones_like({tag}, dtype=torch.float) * {wpp_val.tag}"
+            )
+            ctxt.emit(
+                f"{id_ll} = torch.nan_to_num({id_ll} / {id_ll}.sum(axis=0, keepdims=True))"
+            )
+            if ctxt.frame.ll is None:
+                ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
+                ctxt.emit(f"{ctxt.frame.ll} = 1.0")
+            ctxt.emit(f"{ctxt.frame.ll} = {id_ll} * {ctxt.frame.ll}")
 
         case SObserve(who, id):
             if (who, id) not in ctxt.frame.choices:
@@ -519,17 +533,15 @@ def demo() -> None:
         do=[
             SWith(
                 Name("alice"),
-                SWith(Name("monty"), SChoose(Id("prize"), DOORS, wpp=ELit(1))),
+                SChoose(Name("monty"), Id("prize"), DOORS, wpp=ELit(1)),
             ),
             SPass(),
-            SWith(Name("alice"), SChoose(Id("initial_pick"), DOORS, wpp=ELit(1))),
+            SChoose(Name("alice"), Id("initial_pick"), DOORS, wpp=ELit(1)),
             SWith(
                 Name("alice"),
                 SWith(
                     Name("monty"),
-                    SWith(
-                        Name("alice"), SChoose(Id("initial_pick"), DOORS, wpp=ELit(1))
-                    ),
+                    SChoose(Name("alice"), Id("initial_pick"), DOORS, wpp=ELit(1)),
                 ),
             ),
             SWith(
@@ -546,86 +558,83 @@ def demo() -> None:
             SForAll(Id("open"), DOORS),
             SWith(
                 Name("alice"),
-                SWith(
-                    Name("monty"),
-                    SChoose(
-                        Id("open"),
-                        DOORS,
-                        wpp=EOp(
-                            Op.ITE,
-                            [
-                                EOp(
-                                    Op.OR,
-                                    [
-                                        EOp(
-                                            Op.EQ,
-                                            [
-                                                EChoice(Id("open")),
-                                                EWith(
-                                                    Name("alice"),
-                                                    EChoice(Id("initial_pick")),
-                                                ),
-                                            ],
-                                        ),
-                                        EOp(
-                                            Op.EQ,
-                                            [EChoice(Id("open")), EChoice(Id("prize"))],
-                                        ),
-                                    ],
-                                ),
-                                ELit(0),
-                                ELit(1),
-                            ],
-                        ),
-                    ),
-                ),
-            ),
-            SShow(Name("alice"), Name("monty"), Id("open"), Name("self"), Id("open")),
-            SPass(),
-            SWith(
-                Name("alice"),
                 SChoose(
-                    Id("final_pick"),
+                    Name("monty"),
+                    Id("open"),
                     DOORS,
                     wpp=EOp(
                         Op.ITE,
                         [
                             EOp(
-                                Op.EQ,
+                                Op.OR,
                                 [
-                                    EChoice(Id("final_pick")),
-                                    EWith(Name("monty"), EChoice(Id("open"))),
+                                    EOp(
+                                        Op.EQ,
+                                        [
+                                            EChoice(Id("open")),
+                                            EWith(
+                                                Name("alice"),
+                                                EChoice(Id("initial_pick")),
+                                            ),
+                                        ],
+                                    ),
+                                    EOp(
+                                        Op.EQ,
+                                        [EChoice(Id("open")), EChoice(Id("prize"))],
+                                    ),
                                 ],
                             ),
                             ELit(0),
-                            EOp(
-                                Op.EXP,
-                                [
-                                    EExpect(
-                                        EOp(
-                                            Op.ITE,
-                                            [
-                                                EOp(
-                                                    Op.EQ,
-                                                    [
-                                                        EChoice(Id("final_pick")),
-                                                        EWith(
-                                                            Name("monty"),
-                                                            EChoice(Id("prize")),
-                                                        ),
-                                                    ],
-                                                ),
-                                                ELit(5),
-                                                ELit(-5),
-                                            ],
-                                        )
-                                    )
-                                ],
-                            ),
+                            ELit(1),
                         ],
                     ),
                 ),
             ),
+            SShow(Name("alice"), Name("monty"), Id("open"), Name("self"), Id("open")),
+            SPass(),
+            SChoose(
+                Name("alice"),
+                Id("final_pick"),
+                DOORS,
+                wpp=EOp(
+                    Op.ITE,
+                    [
+                        EOp(
+                            Op.EQ,
+                            [
+                                EChoice(Id("final_pick")),
+                                EWith(Name("monty"), EChoice(Id("open"))),
+                            ],
+                        ),
+                        ELit(0),
+                        EOp(
+                            Op.EXP,
+                            [
+                                EExpect(
+                                    EOp(
+                                        Op.ITE,
+                                        [
+                                            EOp(
+                                                Op.EQ,
+                                                [
+                                                    EChoice(Id("final_pick")),
+                                                    EWith(
+                                                        Name("monty"),
+                                                        EChoice(Id("prize")),
+                                                    ),
+                                                ],
+                                            ),
+                                            ELit(5),
+                                            ELit(-5),
+                                        ],
+                                    )
+                                )
+                            ],
+                        ),
+                    ],
+                ),
+            ),
+            SPass(),
         ],
         then=
         # EWith(
@@ -671,6 +680,7 @@ def demo() -> None:
         eval_stmt(s, ctxt)
     val = eval_expr(e.then, ctxt)
     ctxt.emit(f"retval = {val.tag}")
+    assert val.known
 
     # print()
     # print('# Compiled code')
@@ -737,4 +747,3 @@ EXPR ->
 # TODO: env knows all
 # TODO: wpp_deps of E[...]
 # TODO: parse from python
-# TODO: make choose local to caller
