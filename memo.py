@@ -122,7 +122,13 @@ class SShow:
     source_id: Id
 
 
-Stmt = SPass | SChoose | SObserve | SWith | SShow
+@dataclass(frozen=True)
+class SForAll:
+    id: Id
+    domain: list[float]
+
+
+Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll
 
 HEADER = """\
 import torch
@@ -138,13 +144,18 @@ def pprint_stmt(s: Stmt) -> str:
         case SPass():
             return f""
         case SChoose(id, dom, wpp):
-            return f"choose {id} among {dom} wpp {pprint_expr(wpp)}"
+            wpp_str = pprint_expr(wpp)
+            if len(wpp_str) > 10:
+                wpp_str = "\n" + textwrap.indent(wpp_str, "  ")
+            return f"choose {id} among {dom} wpp {wpp_str}"
         case SObserve(who, id):
             return f"observe {who}.{id}"
         case SWith(who, stmt):
-            return f"{who} [ {pprint_stmt(stmt)} ]"
+            return f"{who} thinks {pprint_stmt(stmt)}"
         case SShow(who, target_who, target_id, source_who, source_id):
             return f"{who} observes {target_who}[{target_id}] to be {source_who}[{source_id}]"
+        case SForAll(id, domain):
+            return f"for each {id} among {domain}"
     raise NotImplementedError
 
 
@@ -194,30 +205,26 @@ imagine [
     raise NotImplementedError
 
 
-_sym: int = -1
-
-
-def sym(hint: str = "") -> str:
-    global _sym
-    _sym += 1
-    return f"{hint}_{_sym}"
-
-
 @dataclass
 class Context:
     next_idx: int
     frame: Frame
     io: StringIO
     idx_history: list[str]
+    _sym: int = -1
 
     def emit(self: Context, line: str) -> None:
         print(line, file=self.io)
+
+    def sym(self, hint: str = "") -> str:
+        self._sym += 1
+        return f"{hint}_{self._sym}"
 
 
 def eval_expr(e: Expr, ctxt: Context) -> Value:
     match e:
         case ELit(val):
-            out = sym("lit")
+            out = ctxt.sym("lit")
             ctxt.emit(f"{out} = torch.tensor({val})")
             return Value(tag=out, known=True, deps=set())
 
@@ -225,12 +232,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             if (Name("self"), id) not in ctxt.frame.choices:
                 raise Exception(f"{ctxt.frame.name} has not yet chosen {id}")
             ch = ctxt.frame.choices[(Name("self"), id)]
-            # out = sym("ch")
+            # out = ctxt.sym("ch")
             # ctxt.emit(f"{out} = {ch.tag}")
             return Value(tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]))
 
         case EOp(op, args):
-            out = sym(f"op_{op.name.lower()}")
+            out = ctxt.sym(f"op_{op.name.lower()}")
             if op in [Op.ADD, Op.SUB, Op.MUL, Op.DIV, Op.EQ, Op.AND, Op.OR]:
                 assert len(args) == 2
                 l = eval_expr(args[0], ctxt)
@@ -295,7 +302,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     f"Redundant expectation {pprint_expr(e)}, not marginalizing"
                 )
                 return val_
-            out = sym("exp")
+            out = ctxt.sym("exp")
             ctxt.emit(f"\n# {ctxt.frame.name} expectation")
             #             ctxt.emit(f'print({ctxt.frame.ll}, {ctxt.frame.ll}.shape)')
             #             ctxt.emit(f'print({val_.tag}, {val_.tag}.shape)')
@@ -357,12 +364,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
         case EImagine(do, then):
             ctxt.emit(f"\n# {ctxt.frame.name} imagines")
-            future_name = Name(sym(f"future_{ctxt.frame.name}"))
+            future_name = Name(ctxt.sym(f"future_{ctxt.frame.name}"))
             future_frame = copy.deepcopy(ctxt.frame)
             future_frame.name = future_name
             future_frame.parent = ctxt.frame
             if ctxt.frame.ll is not None:
-                ll = sym(f"{ctxt.frame.name}_ll")
+                ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ll} = {ctxt.frame.ll}")
                 future_frame.ll = ll
             ctxt.frame.children[future_name] = future_frame
@@ -379,12 +386,25 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
         case SPass():
             pass
 
+        case SForAll(id, domain):
+            assert ctxt.frame.name == "root"
+            idx = ctxt.next_idx
+            ctxt.next_idx += 1
+            ctxt.idx_history.append(f"forall {id}")
+            tag = ctxt.sym(f"forall_{id}")
+            ctxt.emit(
+                f"{tag} = torch.tensor({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
+            )
+            ctxt.frame.choices[(Name("self"), id)] = Choice(
+                tag, idx, True, domain, set()
+            )
+
         case SChoose(id, domain, wpp):
             # TODO: should take "who" as argument...
             idx = ctxt.next_idx
             ctxt.next_idx += 1
             ctxt.idx_history.append(f"{ctxt.frame.name}.{id}")
-            tag = sym(f"{ctxt.frame.name}_{id}")
+            tag = ctxt.sym(f"{ctxt.frame.name}_{id}")
             ctxt.emit(f"""\n# {ctxt.frame.name} choose {id}""")
             ctxt.emit(
                 f"{tag} = torch.tensor({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
@@ -412,7 +432,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 ctxt.frame.parent.choices[(Name(ctxt.frame.name), id)] = Choice(
                     tag, idx, False, domain, new_deps
                 )
-                id_ll = sym(f"{id}_ll")
+                id_ll = ctxt.sym(f"{id}_ll")
                 ctxt.emit(
                     f"{id_ll} = torch.ones_like({tag}, dtype=torch.float) * {wpp_val.tag}"
                 )
@@ -420,7 +440,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     f"{id_ll} = torch.nan_to_num({id_ll} / {id_ll}.sum(axis=0, keepdims=True))"
                 )
                 if ctxt.frame.parent.ll is None:
-                    ctxt.frame.parent.ll = sym(f"{ctxt.frame.parent.name}_ll")
+                    ctxt.frame.parent.ll = ctxt.sym(f"{ctxt.frame.parent.name}_ll")
                     ctxt.emit(f"{ctxt.frame.parent.ll} = 1.0")
                 ctxt.emit(f"{ctxt.frame.parent.ll} = {id_ll} * {ctxt.frame.parent.ll}")
 
@@ -523,7 +543,7 @@ def demo() -> None:
                 ),
             ),
             SPass(),
-            SChoose(Id("open"), DOORS, wpp=ELit(1)),
+            SForAll(Id("open"), DOORS),
             SWith(
                 Name("alice"),
                 SWith(
@@ -713,3 +733,8 @@ EXPR ->
 | self.reward        # TODO: in general, variables
 | computation_cost(EXPR)
 """
+
+# TODO: env knows all
+# TODO: wpp_deps of E[...]
+# TODO: parse from python
+# TODO: make choose local to caller
