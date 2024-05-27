@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import NewType, Any
 
+import itertools
 from enum import Enum
 import dataclasses
 from dataclasses import dataclass
@@ -154,9 +155,12 @@ def pprint_stmt(s: Stmt) -> str:
         case SWith(who, stmt):
             return f"{who} thinks {pprint_stmt(stmt)}"
         case SShow(who, target_who, target_id, source_who, source_id):
-            return f"{who} observes {target_who}[{target_id}] to be {source_who}[{source_id}]"
+            if source_who == Name('self'):
+                return f"{who} observes {target_who}[{target_id}] to be {source_id}"
+            else:
+                return f"{who} observes {target_who}[{target_id}] to be {source_who}[{source_id}]"
         case SForAll(id, domain):
-            return f"for each {id} among {domain}"
+            return f"given {id} in {domain}"
     raise NotImplementedError
 
 
@@ -313,7 +317,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     f"Redundant expectation {pprint_expr(e)}, not marginalizing"
                 )
                 return val_
-            out = ctxt.sym("exp")
             ctxt.emit(f"\n# {ctxt.frame.name} expectation")
             #             ctxt.emit(f'print({ctxt.frame.ll}, {ctxt.frame.ll}.shape)')
             #             ctxt.emit(f'print({val_.tag}, {val_.tag}.shape)')
@@ -326,6 +329,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             #             print(i, j, "|", k, {ctxt.frame.ll}[..., i, j, k], {val_.tag}[..., i, j, :])
             # ''')
 
+            out = ctxt.sym("exp")
             ctxt.emit(
                 f"{out} = marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize})"
             )
@@ -493,14 +497,15 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
 
         case SShow(who, target_who, target_id, source_who, source_id):
             ctxt.emit(f"\n# telling {who} about {target_who}.{target_id}")
-            assert who in ctxt.frame.children
-            assert (target_who, target_id) in ctxt.frame.children[who].choices
-            assert (source_who, source_id) in ctxt.frame.choices
-            # ctxt.emit(f'print("{who}")')
-            eval_stmt(SWith(who, SObserve(target_who, target_id)), ctxt)
-            # ctxt.emit(f'print({ctxt.frame.children[who].ll})')
-            # ctxt.emit(f'print({ctxt.frame.children[who].ll}.shape)')
+            if who not in ctxt.frame.children:
+                raise Exception(f'{ctxt.frame.name} is not yet modeling {who}')
+            if (target_who, target_id) not in ctxt.frame.children[who].choices:
+                raise Exception(f'{ctxt.frame.name} does not yet think {who} is modeling {target_who}.{target_id}')
+            if (source_who, source_id) not in ctxt.frame.choices:
+                raise Exception(f'{ctxt.frame.name} does not yet model {source_who}.{source_id}')
             # TODO: assert domains match
+
+            eval_stmt(SWith(who, SObserve(target_who, target_id)), ctxt)
             target_addr = (target_who, target_id)
             source_addr = (source_who, source_id)
             ctxt.frame.children[who].conditions[target_addr] = source_addr
@@ -515,10 +520,6 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
             )
-            # ctxt.emit(f'print({ctxt.frame.children[who].ll})')
-            # ctxt.emit(f'print({ctxt.frame.children[who].ll}.shape)')
-            # ctxt.emit(f'print({ctxt.idx_history})')
-            # raise NotImplementedError
 
         case _:
             raise NotImplementedError
@@ -555,7 +556,7 @@ def demo() -> None:
                 ),
             ),
             SPass(),
-            SForAll(Id("open"), DOORS),
+            SForAll(Id("revealed_door"), DOORS),
             SWith(
                 Name("alice"),
                 SChoose(
@@ -590,7 +591,7 @@ def demo() -> None:
                     ),
                 ),
             ),
-            SShow(Name("alice"), Name("monty"), Id("open"), Name("self"), Id("open")),
+            SShow(Name("alice"), Name("monty"), Id("open"), Name("self"), Id("revealed_door")),
             SPass(),
             SChoose(
                 Name("alice"),
@@ -682,10 +683,10 @@ def demo() -> None:
     ctxt.emit(f"retval = {val.tag}")
     assert val.known
 
-    # print()
-    # print('# Compiled code')
-    # for i, line in enumerate(io.getvalue().splitlines()):
-    #     print(f"{i + 1: 5d}  {line}")
+    print()
+    print('# Compiled code')
+    for i, line in enumerate(io.getvalue().splitlines()):
+        print(f"{i + 1: 5d}  {line}")
 
     retvals: dict[Any, Any] = {}
     exec(io.getvalue(), globals(), retvals)
@@ -697,15 +698,13 @@ def demo() -> None:
     # print()
 
     # print('Output:')
-    import itertools
 
+    print()
     deps = val.deps
     for d in deps:
         print(d[0] + "." + d[1], end="\t")
     print("result")
     print("-" * 50)
-
-    import torch
 
     for tup in itertools.product(
         *[range(len(ctxt.frame.choices[d].domain)) for d in deps]
