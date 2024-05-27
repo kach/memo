@@ -58,9 +58,30 @@ def parse_expr(expr):
             return EExpect(expr=parse_expr(slice))
 
         case ast.Subscript(
+                value=ast.Name("imagine"),
+                slice=ast.Tuple(
+                    elts=elts
+                )
+        ):
+            stmts = []
+            for elt in elts[:-1]:
+                match elt:
+                    case ast.Slice(
+                        lower=ast.Name(id=who_),
+                        upper=expr_,
+                        step=None
+                    ):
+                        stmts.extend(parse_stmt(expr_, who_))
+            # print(ast.dump(elts[-1], include_attributes=True, indent=2))
+            assert not isinstance(elts[-1], ast.Slice)
+            return EImagine(do=stmts, then=parse_expr(elts[-1]))
+
+        case ast.Subscript(
             value=ast.Name(id=who_id),
             slice=slice
         ):
+            # print(ast.dump(expr, include_attributes=True, indent=2))
+
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice))
@@ -82,12 +103,12 @@ def parse_stmt(expr, who):
             ],
             keywords=[ast.keyword(arg='wpp', value=wpp_expr)]
         ):
-            return SChoose(
+            return [SChoose(
                 who=Name(who),
                 id=Id(choice_id),
                 domain=dom_id,
                 wpp=parse_expr(wpp_expr)
-            )
+            )]
         case ast.Call(
             func=ast.Name(id='observes'),
             args=[
@@ -98,14 +119,25 @@ def parse_stmt(expr, who):
                 )
             ]
         ):
-            return SShow(
+            return [SShow(
                 who=Name(who),
                 target_who=Name(target_who),
                 target_id=Id(target_id),
                 source_who=Name(source_who),
                 source_id=Id(source_id)
+            )]
+        case ast.Subscript(  # TODO: handle plural variant
+            value=ast.Name('thinks'),
+            slice=ast.Slice(
+                lower=ast.Name(who_),
+                upper=expr_
             )
-        case ast.Subscript(  # TODO: handle singleton variant
+        ):
+            return [SWith(
+                who=Name(who),
+                stmt=s
+            ) for s in parse_stmt(expr_, who_)]
+        case ast.Subscript(
             value=ast.Name('thinks'),
             slice=ast.Tuple(
                 elts=elts
@@ -115,14 +147,15 @@ def parse_stmt(expr, who):
             for elt in elts:
                 match elt:
                     case ast.Slice(
-                        lower=ast.Name(who_),
-                        upper=expr_
-                    ):
-                        stmts.append(parse_stmt(expr_, who_))
-            return SWith(
-                who=Name(who),
-                stmt=stmts[0]  # TODO: fix me
-            )
+                            lower=ast.Name(id=who_),
+                            upper=expr_,
+                            step=None
+                        ):
+                        stmt = parse_stmt(expr_, who_)
+                        stmts.extend(stmt)
+                    case _:
+                        raise Exception()
+            return [SWith(who=Name(who), stmt=s) for s in stmts]
         case _:
             raise Exception()
 
@@ -156,7 +189,7 @@ def memo(f) -> None:
             stmts = []
             retval = None
             for stmt in f.body[1:]:
-                print(ast.dump(stmt, include_attributes=True, indent=2))
+                # print(ast.dump(stmt, include_attributes=True, indent=2))
                 match stmt:
                     case ast.AnnAssign(
                         target=ast.Name(id='given'),
@@ -178,7 +211,7 @@ def memo(f) -> None:
                         value=None
                     ):
                         assert who in cast
-                        stmts.append(parse_stmt(expr, who))
+                        stmts.extend(parse_stmt(expr, who))
                     case ast.Return(
                         value=expr
                     ):
@@ -192,6 +225,7 @@ def memo(f) -> None:
 
     for s in stmts:
         print(pprint_stmt(s))
+    print(pprint_expr(retval))
     run_memo(stmts, retval)
 
 
@@ -208,14 +242,56 @@ def run_memo(stmts, retval):
     retvals: dict[Any, Any] = {}
     exec(io.getvalue(), globals(), retvals)
     print(retvals['retval'])
+    print(retvals['exp_27'], retvals['exp_27'].shape)
+    print(retvals['u_ll_28'], retvals['u_ll_28'].shape)
+    print(retvals['speaker_r_0'], retvals['speaker_r_0'].shape)
 
-R = [1, 2, 3]
+
+R = [2, 3] # 10 -> hat, 11 -> glasses + hat
+U = [2, 3] # 10 -> hat, 01 -> glasses
+
+# @memo
+# def literal_speaker():
+#     cast: [speaker]
+#     speaker: chooses(r in R, wpp=1)
+#     speaker: chooses(u in U, wpp=(1 - 1.0 * ( r == 2 ) * ( u == 3) ))
+#     return E[ speaker[u] == speaker[r] ]
+
+# @memo
+# def l1_listener():
+#     cast: [listener]
+#     given: u in U
+#     listener: thinks[
+#         speaker: chooses(r in R, wpp=1),
+#         speaker: chooses(u in U, wpp=(1 - 1.0 * ( r == 2 ) * ( u == 3) ))
+#     ]
+#     listener: observes(speaker.u is self.u)
+#     return E[ listener[ E[ speaker[r] ] ] ]
 
 @memo
-def speaker():
-    cast: [observer, alice]
-    given: a in R
-    observer: thinks[alice: chooses(r in R, wpp=1),]
-    observer: thinks[alice: chooses(s in R, wpp=1 - 1.0 * (r == s)),]
-    observer: observes(alice.s is self.a)
-    return observer[ E[alice[r]] ]
+def l2_speaker():
+    cast: [speaker]
+    speaker: chooses(r in R, wpp=1)
+    speaker: thinks[
+        listener: thinks[
+            speaker: chooses(r in R, wpp=1),
+            speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
+        ]
+    ]
+    speaker: chooses(u in U, wpp=(
+        imagine[
+            # listener: observes(speaker.u is self.u),
+            listener: chooses(r_ in R, wpp=(E[speaker[r] == r_])),
+            E[listener[r_] == r]
+        ]
+    ))
+    return E[speaker[r]]
+
+# @memo
+# def speaker():
+#     cast: [observer, alice]
+#     given: a in R
+#     observer: thinks[alice: chooses(r in R, wpp=1)]
+    # observer: thinks[alice: chooses(s in R, wpp=1 - 1.0 * (r == s))]
+    # observer: observes(alice.s is self.a)
+    # return observer[ E[alice[r]] ]

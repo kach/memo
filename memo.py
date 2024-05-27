@@ -368,13 +368,22 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             deps = set()
             for who_, id in val_.deps:
                 if who_ == Name("self"):
-                    deps.add((who, id))
+                    if who.startswith('future_'):  ## TODO: there is definitely a bug here
+                        deps.add(("self", id))
+                    else:
+                        deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
                     deps.add(ctxt.frame.children[who].conditions[(who_, id)])
                 else:
                     ic(ctxt.frame.name, who, val_, (who_, id))
                     raise Exception("??")  # should always be true
-            known = all(ctxt.frame.choices[(who, id)].known for (who, id) in deps)
+            try:
+                known = all(ctxt.frame.choices[(who, id)].known for (who, id) in deps)
+            except Exception as e__:
+                print(val_)
+                print(ctxt.frame.choices)
+                print(who, id)
+                raise e__
             return Value(tag=val_.tag, known=known, deps=deps)
 
         case EImagine(do, then):
@@ -382,13 +391,14 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             future_name = Name(ctxt.sym(f"future_{ctxt.frame.name}"))
             future_frame = copy.deepcopy(ctxt.frame)
             future_frame.name = future_name
-            future_frame.parent = ctxt.frame
+            # future_frame.parent = ctxt.frame
             if ctxt.frame.ll is not None:
                 ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ll} = {ctxt.frame.ll}")
                 future_frame.ll = ll
-            ctxt.frame.children[future_name] = future_frame
+            # ctxt.frame.children[future_name] = future_frame
             for stmt in do:
+                # print(stmt)
                 eval_stmt(SWith(future_name, stmt), ctxt)
             val_ = eval_expr(EWith(future_name, then), ctxt)
             return val_
@@ -461,6 +471,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")
             ctxt.emit(f"{ctxt.frame.ll} = {id_ll} * {ctxt.frame.ll}")
+            ctxt.emit(f'print("{ctxt.frame.ll}", {ctxt.frame.ll}, {ctxt.frame.ll}.shape); print()')
 
         case SObserve(who, id):
             if (who, id) not in ctxt.frame.choices:
