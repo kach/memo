@@ -365,11 +365,13 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     f"{who} does not know {expr}. Did you mean to take {who}'s expected value?"
                 )
 
+            ic(val_)
             deps = set()
             for who_, id in val_.deps:
                 if who_ == Name("self"):
                     if who.startswith('future_'):  ## TODO: there is definitely a bug here
                         deps.add(("self", id))
+                        ic(who, id)
                     else:
                         deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
@@ -391,14 +393,13 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             future_name = Name(ctxt.sym(f"future_{ctxt.frame.name}"))
             future_frame = copy.deepcopy(ctxt.frame)
             future_frame.name = future_name
-            # future_frame.parent = ctxt.frame
+            future_frame.parent = ctxt.frame
             if ctxt.frame.ll is not None:
                 ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ll} = {ctxt.frame.ll}")
                 future_frame.ll = ll
-            # ctxt.frame.children[future_name] = future_frame
+            ctxt.frame.children[future_name] = future_frame
             for stmt in do:
-                # print(stmt)
                 eval_stmt(SWith(future_name, stmt), ctxt)
             val_ = eval_expr(EWith(future_name, then), ctxt)
             return val_
@@ -464,8 +465,11 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{id_ll} = torch.ones_like({tag}, dtype=torch.float) * {wpp_val.tag}"
             )
+            # ctxt.emit(
+            #     f"{id_ll} = torch.nan_to_num({id_ll} / {id_ll}.sum(axis=0, keepdims=True))"
+            # )
             ctxt.emit(
-                f"{id_ll} = torch.nan_to_num({id_ll} / {id_ll}.sum(axis=0, keepdims=True))"
+                f"{id_ll} = torch.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
             )
             if ctxt.frame.ll is None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")

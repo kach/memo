@@ -1,11 +1,12 @@
 from memo import *
 import ast, inspect
+import typing
 
 from icecream import ic  # type: ignore
 ic.configureOutput(includeContext=True)
 
 
-def parse_expr(expr):
+def parse_expr(expr : ast.expr) -> Expr:
     match expr:
         case ast.Constant(value=val):
             assert isinstance(val, float) or isinstance(val, int)
@@ -90,7 +91,7 @@ def parse_expr(expr):
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
 
 
-def parse_stmt(expr, who):
+def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
     match expr:
         case ast.Call(
             func=ast.Name(id='chooses'),
@@ -229,7 +230,7 @@ def memo(f) -> None:
     run_memo(stmts, retval)
 
 
-def run_memo(stmts, retval):
+def run_memo(stmts: list[Stmt], retval: Expr):
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
     ctxt.emit(HEADER)
@@ -242,9 +243,9 @@ def run_memo(stmts, retval):
     retvals: dict[Any, Any] = {}
     exec(io.getvalue(), globals(), retvals)
     print(retvals['retval'])
-    print(retvals['exp_27'], retvals['exp_27'].shape)
-    print(retvals['u_ll_28'], retvals['u_ll_28'].shape)
-    print(retvals['speaker_r_0'], retvals['speaker_r_0'].shape)
+    # print(retvals['exp_27'], retvals['exp_27'].shape)
+    # print(retvals['u_ll_28'], retvals['u_ll_28'].shape)
+    # print(retvals['speaker_r_0'], retvals['speaker_r_0'].shape)
 
 
 R = [2, 3] # 10 -> hat, 11 -> glasses + hat
@@ -268,24 +269,43 @@ U = [2, 3] # 10 -> hat, 01 -> glasses
 #     listener: observes(speaker.u is self.u)
 #     return E[ listener[ E[ speaker[r] ] ] ]
 
+
+
+X = [0, 1]
+Y = [0, 1, 2]
+Z = [0, 1, 2, 3]
+
+# type: ignore
+# @memo
+# def l2_speaker():
+#     cast: [speaker]
+#     speaker: chooses(x in X, wpp=1)
+#     speaker: chooses(y in Y, wpp=(
+#         imagine[
+#             listener: chooses(z in Z, wpp=1),
+#             E[ listener[z] ]
+#         ]
+#     ))
+#     return E[speaker[x]]
+
 @memo
 def l2_speaker():
     cast: [speaker]
     speaker: chooses(r in R, wpp=1)
-    speaker: thinks[
+    # speaker: thinks[
+    # ]
+    given: u_ in U
+    given: r_ in R
+    speaker: chooses(u in U, wpp=imagine[
         listener: thinks[
             speaker: chooses(r in R, wpp=1),
             speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-        ]
-    ]
-    speaker: chooses(u in U, wpp=(
-        imagine[
-            # listener: observes(speaker.u is self.u),
-            listener: chooses(r_ in R, wpp=(E[speaker[r] == r_])),
-            E[listener[r_] == r]
-        ]
-    ))
-    return E[speaker[r]]
+        ],
+        listener: observes(speaker.u is self.u),
+        listener: chooses(r_ in R, wpp=(E[speaker[r] == r_])),
+        exp(10. * E[listener[r_] == r])
+    ])
+    return E[(speaker[u] == u_) * (speaker[r] == r_)]
 
 # @memo
 # def speaker():
