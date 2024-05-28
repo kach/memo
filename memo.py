@@ -155,18 +155,18 @@ def pprint_stmt(s: Stmt) -> str:
             wpp_str = pprint_expr(wpp)
             if len(wpp_str) > 10:
                 wpp_str = "\n" + textwrap.indent(wpp_str, "  ")
-            return f"{who} chooses {id} among {dom} wpp {wpp_str}"
+            return f"{who}: chooses({id} in {dom}, wpp={wpp_str})"
         case SObserve(who, id):
             return f"observe {who}.{id}"
         case SWith(who, stmt):
-            return f"{who} thinks {pprint_stmt(stmt)}"
+            return f"{who}: thinks[ {pprint_stmt(stmt)} ]"
         case SShow(who, target_who, target_id, source_who, source_id):
             if source_who == Name('self'):
-                return f"{who} observes {target_who}[{target_id}] to be {source_id}"
+                return f"{who}: observes [{target_who}.{target_id}] is {source_id}"
             else:
-                return f"{who} observes {target_who}[{target_id}] to be {source_who}[{source_id}]"
+                return f"{who}: observes [{target_who}.{target_id}] is {source_who}.{source_id}"
         case SForAll(id, domain):
-            return f"given {id} in {domain}"
+            return f"given: {id} in {domain}"
     raise NotImplementedError
 
 
@@ -216,7 +216,7 @@ def pprint_expr(e: Expr) -> str:
             return f"{who}[ {pprint_expr(expr)} ]"
         case EImagine(do, then):
             stmts = "\n".join(
-                [pprint_stmt(s) for s in do] + ["return " + pprint_expr(then)]
+                [pprint_stmt(s) for s in do] + [pprint_expr(then)]
             )
             stmts_block = textwrap.indent(stmts, "  ")
             return f"""\
