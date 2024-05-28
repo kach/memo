@@ -138,6 +138,12 @@ def marg(t, dims):
     if dims == ():
         return t
     return t.sum(dim=tuple(-1 - d for d in dims), keepdims=True)
+
+def pad(t, total):
+    count = total - len(t.shape)
+    for _ in range(count):
+        t = t.unsqueeze(0)
+    return t
 """
 
 
@@ -527,7 +533,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             tidx = ctxt.frame.children[who].choices[target_addr].idx
             sidx = ctxt.frame.choices[source_addr].idx
             ctxt.emit(
-                f"{ctxt.frame.children[who].ll} = torch.transpose({ctxt.frame.children[who].ll}, -1-{sidx}, -1-{tidx})"
+                f"{ctxt.frame.children[who].ll} = torch.transpose(pad({ctxt.frame.children[who].ll}, {ctxt.next_idx}), -1-{sidx}, -1-{tidx})"
             )
             ctxt.frame.children[who].choices[target_addr].idx = ctxt.frame.choices[
                 source_addr
