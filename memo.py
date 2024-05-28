@@ -376,7 +376,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             for who_, id in val_.deps:
                 if who_ == Name("self"):
                     if who.startswith('future_'):  ## TODO: there is definitely a bug here
-                        deps.add(("self", id))
+                        deps.add((Name("self"), id))
                         ic(who, id)
                     else:
                         deps.add((who, id))

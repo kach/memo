@@ -71,7 +71,7 @@ def parse_expr(expr : ast.expr) -> Expr:
                         lower=ast.Name(id=who_),
                         upper=expr_,
                         step=None
-                    ):
+                    ) if expr_ is not None:
                         stmts.extend(parse_stmt(expr_, who_))
             # print(ast.dump(elts[-1], include_attributes=True, indent=2))
             assert not isinstance(elts[-1], ast.Slice)
@@ -133,7 +133,7 @@ def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
                 lower=ast.Name(who_),
                 upper=expr_
             )
-        ):
+        ) if expr_ is not None:
             return [SWith(
                 who=Name(who),
                 stmt=s
@@ -151,9 +151,8 @@ def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
                             lower=ast.Name(id=who_),
                             upper=expr_,
                             step=None
-                        ):
-                        stmt = parse_stmt(expr_, who_)
-                        stmts.extend(stmt)
+                        ) if expr_ is not None:
+                        stmts.extend(parse_stmt(expr_, who_))
                     case _:
                         raise Exception()
             return [SWith(who=Name(who), stmt=s) for s in stmts]
@@ -187,7 +186,7 @@ def memo(f) -> None:
                 case _:
                     raise Exception()
 
-            stmts = []
+            stmts: list[Stmt] = []
             retval = None
             for stmt in f.body[1:]:
                 # print(ast.dump(stmt, include_attributes=True, indent=2))
@@ -201,11 +200,10 @@ def memo(f) -> None:
                         ),
                         value=None
                     ):
-                        stmt = SForAll(
+                        stmts.append(SForAll(
                             id=Id(choice_id),
                             domain=dom_id
-                        )
-                        stmts.append(stmt)
+                        ))
                     case ast.AnnAssign(
                         target=ast.Name(id=who),
                         annotation=expr,
@@ -215,7 +213,7 @@ def memo(f) -> None:
                         stmts.extend(parse_stmt(expr, who))
                     case ast.Return(
                         value=expr
-                    ):
+                    ) if expr is not None:
                         if retval is not None:
                             raise Exception()
                         retval = parse_expr(expr)
@@ -224,6 +222,8 @@ def memo(f) -> None:
         case _:
             raise Exception()
 
+    if retval is None:
+        raise Exception()
     for s in stmts:
         print(pprint_stmt(s))
     print(pprint_expr(retval))
@@ -256,29 +256,29 @@ def run_memo(stmts: list[Stmt], retval: Expr):
 R = [2, 3] # 10 -> hat, 11 -> glasses + hat
 U = [2, 3] # 10 -> hat, 01 -> glasses
 
-# @memo
-# def literal_speaker():
-#     cast: [speaker]
-#     given: u_ in U
-#     given: r_ in R
+@memo
+def literal_speaker():
+    cast: [speaker]
+    given: u_ in U
+    given: r_ in R
 
-#     speaker: chooses(r in R, wpp=1)
-#     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-#     return E[(speaker[u] == u_) * (speaker[r] == r_)]
+    speaker: chooses(r in R, wpp=1)
+    speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
+    return E[(speaker[u] == u_) * (speaker[r] == r_)]
 
-# @memo
-# def l1_listener():
-#     cast: [listener]
-#     given: u in U
-#     given: r_ in R
+@memo
+def l1_listener():
+    cast: [listener]
+    given: u in U
+    given: r_ in R
 
-#     listener: thinks[
-#         speaker: chooses(r in R, wpp=1),
-#         speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-#     ]
-#     listener: observes(speaker.u is self.u)
-#     listener: chooses(r_ in R, wpp=E[speaker[r] == r_])
-#     return E[ listener[r_] == r_ ]
+    listener: thinks[
+        speaker: chooses(r in R, wpp=1),
+        speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
+    ]
+    listener: observes(speaker.u is self.u)
+    listener: chooses(r_ in R, wpp=E[speaker[r] == r_])
+    return E[ listener[r_] == r_ ]
 
 @memo
 def l2_speaker():
