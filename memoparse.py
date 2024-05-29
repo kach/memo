@@ -1,12 +1,8 @@
 from memo import *
 import ast, inspect
-import typing
-
-from icecream import ic  # type: ignore
-ic.configureOutput(includeContext=True)
 
 
-def parse_expr(expr : ast.expr) -> Expr:
+def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
     match expr:
         case ast.Constant(value=val):
             assert isinstance(val, float) or isinstance(val, int)
@@ -17,7 +13,7 @@ def parse_expr(expr : ast.expr) -> Expr:
             args=[e1]
         ):
             return EOp(
-                op=Op.EXP, args=[parse_expr(e1)]
+                op=Op.EXP, args=[parse_expr(e1, static_parameters)]
             )
 
         case ast.Compare(
@@ -29,7 +25,7 @@ def parse_expr(expr : ast.expr) -> Expr:
                 op={
                     ast.Eq: Op.EQ
                 }[op.__class__],
-                args=[parse_expr(e1), parse_expr(e2)]
+                args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
 
         case ast.BinOp(
@@ -44,10 +40,12 @@ def parse_expr(expr : ast.expr) -> Expr:
                     ast.Mult: Op.MUL,
                     ast.Div: Op.DIV
                 }[op.__class__],
-                args=[parse_expr(e1), parse_expr(e2)]
+                args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
 
         case ast.Name(id=id):
+            if id in static_parameters:
+                return ELit(id)
             return EChoice(id=Id(id))
 
         case ast.Subscript(
@@ -56,7 +54,7 @@ def parse_expr(expr : ast.expr) -> Expr:
         ):
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
-            return EExpect(expr=parse_expr(slice))
+            return EExpect(expr=parse_expr(slice, static_parameters))
 
         case ast.Subscript(
                 value=ast.Name("imagine"),
@@ -72,26 +70,23 @@ def parse_expr(expr : ast.expr) -> Expr:
                         upper=expr_,
                         step=None
                     ) if expr_ is not None:
-                        stmts.extend(parse_stmt(expr_, who_))
-            # print(ast.dump(elts[-1], include_attributes=True, indent=2))
+                        stmts.extend(parse_stmt(expr_, who_, static_parameters))
             assert not isinstance(elts[-1], ast.Slice)
-            return EImagine(do=stmts, then=parse_expr(elts[-1]))
+            return EImagine(do=stmts, then=parse_expr(elts[-1], static_parameters))
 
         case ast.Subscript(
             value=ast.Name(id=who_id),
             slice=slice
         ):
-            # print(ast.dump(expr, include_attributes=True, indent=2))
-
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
-            return EWith(who=Name(who_id), expr=parse_expr(slice))
+            return EWith(who=Name(who_id), expr=parse_expr(slice, static_parameters))
 
         case _:
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
 
 
-def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
+def parse_stmt(expr : ast.expr, who : str, static_parameters: list[str]) -> list[Stmt]:
     match expr:
         case ast.Call(
             func=ast.Name(id='chooses'),
@@ -108,7 +103,7 @@ def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
                 who=Name(who),
                 id=Id(choice_id),
                 domain=dom_id,
-                wpp=parse_expr(wpp_expr)
+                wpp=parse_expr(wpp_expr, static_parameters)
             )]
         case ast.Call(
             func=ast.Name(id='observes'),
@@ -127,7 +122,7 @@ def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
                 source_who=Name(source_who),
                 source_id=Id(source_id)
             )]
-        case ast.Subscript(  # TODO: handle plural variant
+        case ast.Subscript(
             value=ast.Name('thinks'),
             slice=ast.Slice(
                 lower=ast.Name(who_),
@@ -137,7 +132,7 @@ def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
             return [SWith(
                 who=Name(who),
                 stmt=s
-            ) for s in parse_stmt(expr_, who_)]
+            ) for s in parse_stmt(expr_, who_, static_parameters)]
         case ast.Subscript(
             value=ast.Name('thinks'),
             slice=ast.Tuple(
@@ -152,7 +147,7 @@ def parse_stmt(expr : ast.expr, who : str) -> list[Stmt]:
                             upper=expr_,
                             step=None
                         ) if expr_ is not None:
-                        stmts.extend(parse_stmt(expr_, who_))
+                        stmts.extend(parse_stmt(expr_, who_, static_parameters))
                     case _:
                         raise Exception()
             return [SWith(who=Name(who), stmt=s) for s in stmts]
@@ -167,10 +162,14 @@ def memo(f) -> None:
     ast.increment_lineno(tree, n=lineno - 1)
 
     cast = []
+    static_parameters = []
 
     match tree:
         case ast.Module(body=[ast.FunctionDef(_) as f]):
-            assert f.args.args == []
+            for arg in f.args.args:
+                # assert isinstance(arg.annotation, ast.Name) and arg.annotation.id in ['float']
+                # assert arg.type_comment is None
+                static_parameters.append(arg.arg)
             first_stmt = f.body[0]
             match first_stmt:
                 case ast.AnnAssign(
@@ -185,65 +184,67 @@ def memo(f) -> None:
                         cast.append(elt.id)
                 case _:
                     raise Exception()
-
-            stmts: list[Stmt] = []
-            retval = None
-            for stmt in f.body[1:]:
-                # print(ast.dump(stmt, include_attributes=True, indent=2))
-                match stmt:
-                    case ast.AnnAssign(
-                        target=ast.Name(id='given'),
-                        annotation=ast.Compare(
-                            left=ast.Name(id=choice_id),
-                            comparators=[ast.Name(id=dom_id)],
-                            ops=[ast.In()]
-                        ),
-                        value=None
-                    ):
-                        stmts.append(SForAll(
-                            id=Id(choice_id),
-                            domain=dom_id
-                        ))
-                    case ast.AnnAssign(
-                        target=ast.Name(id=who),
-                        annotation=expr,
-                        value=None
-                    ):
-                        assert who in cast
-                        stmts.extend(parse_stmt(expr, who))
-                    case ast.Return(
-                        value=expr
-                    ) if expr is not None:
-                        if retval is not None:
-                            raise Exception()
-                        retval = parse_expr(expr)
-                    case _:
-                        raise Exception()
         case _:
             raise Exception()
+
+    stmts: list[Stmt] = []
+    retval = None
+    for stmt in f.body[1:]:
+        # print(ast.dump(stmt, include_attributes=True, indent=2))
+        match stmt:
+            case ast.AnnAssign(
+                target=ast.Name(id='given'),
+                annotation=ast.Compare(
+                    left=ast.Name(id=choice_id),
+                    comparators=[ast.Name(id=dom_id)],
+                    ops=[ast.In()]
+                ),
+                value=None
+            ):
+                assert choice_id not in static_parameters
+                stmts.append(SForAll(
+                    id=Id(choice_id),
+                    domain=dom_id
+                ))
+            case ast.AnnAssign(
+                target=ast.Name(id=who),
+                annotation=expr,
+                value=None
+            ):
+                assert who in cast
+                stmts.extend(parse_stmt(expr, who, static_parameters))
+            case ast.Return(
+                value=expr
+            ) if expr is not None:
+                if retval is not None:
+                    raise Exception()
+                retval = parse_expr(expr, static_parameters)
+            case _:
+                raise Exception()
 
     if retval is None:
         raise Exception()
     for s in stmts:
         print(pprint_stmt(s))
     print(pprint_expr(retval))
-    run_memo(stmts, retval)
 
-
-def run_memo(stmts: list[Stmt], retval: Expr):
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
     ctxt.emit(HEADER)
     for stmt in stmts:
         eval_stmt(stmt, ctxt)
     val = eval_expr(retval, ctxt)
-    ctxt.emit(f'retval = {val.tag}')
-    for i, line in enumerate(io.getvalue().splitlines()):
+    ctxt.emit(f'return {val.tag}')
+
+    out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
+
+    for i, line in enumerate(out.splitlines()):
         print(f"{i + 1: 5d}  {line}")
 
     retvals: dict[Any, Any] = {}
-    exec(io.getvalue(), globals(), retvals)
-    print(retvals['retval'])
+    exec(out, globals(), retvals)
+    return retvals['_out']
+
     # print(retvals)
     # print(retvals['listener_ll_9'], retvals['listener_ll_9'].shape)
     # print(ctxt.idx_history)
@@ -257,45 +258,47 @@ R = [2, 3] # 10 -> hat, 11 -> glasses + hat
 U = [2, 3] # 10 -> hat, 01 -> glasses
 
 @memo
-def literal_speaker():
+def literal_speaker(a):
     cast: [speaker]
     given: u_ in U
     given: r_ in R
 
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-    return E[(speaker[u] == u_) * (speaker[r] == r_)]
+    return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
+ic(literal_speaker(0.1))
 
-@memo
-def l1_listener():
-    cast: [listener]
-    given: u in U
-    given: r_ in R
+# @memo
+# def l1_listener():
+#     cast: [listener]
+#     given: u in U
+#     given: r_ in R
 
-    listener: thinks[
-        speaker: chooses(r in R, wpp=1),
-        speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-    ]
-    listener: observes(speaker.u is self.u)
-    listener: chooses(r_ in R, wpp=E[speaker[r] == r_])
-    return E[ listener[r_] == r_ ]
+#     listener: thinks[
+#         speaker: chooses(r in R, wpp=1),
+#         speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
+#     ]
+#     listener: observes(speaker.u is self.u)
+#     listener: chooses(r_ in R, wpp=E[speaker[r] == r_])
+#     return E[ listener[r_] == r_ ]
 
-@memo
-def l2_speaker():
-    cast: [speaker]
-    given: u_ in U
-    given: r_ in R
+# @memo
+# def l2_speaker():
+#     cast: [speaker, listener]
+#     given: u_ in U
+#     given: r_ in R
 
-    speaker: chooses(r in R, wpp=1)
-    speaker: thinks[
-        listener: thinks[
-            speaker: chooses(r in R, wpp=1),
-            speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-        ]
-    ]
-    speaker: chooses(u in U, wpp=imagine[
-        listener: observes(speaker.u is self.u),
-        listener: chooses(r_ in R, wpp=(E[speaker[r] == r_])),
-        exp(10. * E[listener[r_] == r])
-    ])
-    return E[(speaker[u] == u_) * (speaker[r] == r_)]
+#     speaker: thinks[
+#         listener: thinks[
+#             speaker: chooses(r in R, wpp=1),
+#             speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
+#         ]
+#     ]
+
+#     speaker: chooses(r in R, wpp=1)
+#     speaker: chooses(u in U, wpp=imagine[
+#         listener: observes(speaker.u is self.u),
+#         listener: chooses(r_ in R, wpp=(E[speaker[r] == r_])),
+#         exp(5. * E[listener[r_] == r])
+#     ])
+#     return E[(speaker[u] == u_) * (speaker[r] == r_)]
