@@ -231,31 +231,30 @@ def memo(f) -> None:
         raise Exception()
     for s in stmts:
         print(pprint_stmt(s))
-    print(retval)
     print(pprint_expr(retval))
 
-    # io = StringIO()
-    # ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
-    # ctxt.emit(HEADER)
-    # for stmt in stmts:
-    #     eval_stmt(stmt, ctxt)
-    # val = eval_expr(retval, ctxt)
-    # ctxt.emit(f'return {val.tag}')
+    io = StringIO()
+    ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
+    ctxt.emit(HEADER)
+    for stmt in stmts:
+        eval_stmt(stmt, ctxt)
+    val = eval_expr(retval, ctxt)
+    ctxt.emit(f'return {val.tag}')
 
-    # out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
+    out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
 
-    # for i, line in enumerate(out.splitlines()):
-    #     print(f"{i + 1: 5d}  {line}")
+    for i, line in enumerate(out.splitlines()):
+        print(f"{i + 1: 5d}  {line}")
 
-    # retvals: dict[Any, Any] = {}
-    # exec(out, globals(), retvals)
-    # return retvals['_out']
+    retvals: dict[Any, Any] = {}
+    exec(out, globals(), retvals)
+    return retvals['_out']
 
-    # print(retvals)
-    # print(retvals['listener_ll_9'], retvals['listener_ll_9'].shape)
-    # print(ctxt.idx_history)
-    # print(retvals['u_ll_28'], retvals['u_ll_28'].shape)
-    # print(retvals['speaker_r_0'], retvals['speaker_r_0'].shape)
+    print(retvals)
+    print(retvals['listener_ll_9'], retvals['listener_ll_9'].shape)
+    print(ctxt.idx_history)
+    print(retvals['u_ll_28'], retvals['u_ll_28'].shape)
+    print(retvals['speaker_r_0'], retvals['speaker_r_0'].shape)
 
 
 
