@@ -23,7 +23,9 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
         ):
             return EOp(
                 op={
-                    ast.Eq: Op.EQ
+                    ast.Eq: Op.EQ,
+                    ast.Lt: Op.LT,
+                    ast.Gt: Op.GT
                 }[op.__class__],
                 args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
