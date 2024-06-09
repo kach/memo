@@ -81,6 +81,11 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice, static_parameters))
+        case ast.Attribute(
+                value = ast.Name(id=who_id),
+                attr=attr
+                ):
+            return EWith(who=Name(who_id), expr=EChoice(attr))
 
         case _:
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
@@ -226,24 +231,25 @@ def memo(f) -> None:
         raise Exception()
     for s in stmts:
         print(pprint_stmt(s))
+    print(retval)
     print(pprint_expr(retval))
 
-    io = StringIO()
-    ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
-    ctxt.emit(HEADER)
-    for stmt in stmts:
-        eval_stmt(stmt, ctxt)
-    val = eval_expr(retval, ctxt)
-    ctxt.emit(f'return {val.tag}')
+    # io = StringIO()
+    # ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
+    # ctxt.emit(HEADER)
+    # for stmt in stmts:
+    #     eval_stmt(stmt, ctxt)
+    # val = eval_expr(retval, ctxt)
+    # ctxt.emit(f'return {val.tag}')
 
-    out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
+    # out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
 
-    for i, line in enumerate(out.splitlines()):
-        print(f"{i + 1: 5d}  {line}")
+    # for i, line in enumerate(out.splitlines()):
+    #     print(f"{i + 1: 5d}  {line}")
 
-    retvals: dict[Any, Any] = {}
-    exec(out, globals(), retvals)
-    return retvals['_out']
+    # retvals: dict[Any, Any] = {}
+    # exec(out, globals(), retvals)
+    # return retvals['_out']
 
     # print(retvals)
     # print(retvals['listener_ll_9'], retvals['listener_ll_9'].shape)
@@ -266,7 +272,17 @@ def literal_speaker(a):
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
-ic(literal_speaker(0.1))
+
+@memo
+def literal_speaker1(a):
+    cast: [speaker]
+    given: u_ in U
+    given: r_ in R
+
+    speaker: chooses(r in R, wpp=1)
+    speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
+    return a * E[(speaker.u == u_) * (speaker.r == r_)]
+# ic(literal_speaker(0.1))
 
 # @memo
 # def l1_listener():
