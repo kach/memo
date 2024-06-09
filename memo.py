@@ -379,13 +379,13 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     f"{who} does not know {expr}. Did you mean to take {who}'s expected value?"
                 )
 
-            ic(val_)
+            # ic(val_)
             deps = set()
             for who_, id in val_.deps:
                 if who_ == Name("self"):
                     if who.startswith('future_'):  ## TODO: there is definitely a bug here
                         deps.add((Name("self"), id))
-                        ic(who, id)
+                        # ic(who, id)
                     else:
                         deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
