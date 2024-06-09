@@ -81,6 +81,11 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice, static_parameters))
+        case ast.Attribute(
+                value = ast.Name(id=who_id),
+                attr=attr
+                ):
+            return EWith(who=Name(who_id), expr=EChoice(attr))
 
         case _:
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
