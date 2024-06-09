@@ -158,7 +158,6 @@ def parse_stmt(expr : ast.expr, who : str, static_parameters: list[str]) -> list
                         raise Exception()
             return [SWith(who=Name(who), stmt=s) for s in stmts]
         case _:
-            # print(ast.dump(expr, include_attributes=True, indent=2))
             raise Exception()
 
 
@@ -272,7 +271,7 @@ def literal_speaker(a):
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
-# ic(literal_speaker(0.1))
+ic(literal_speaker(0.1))
 
 # @memo
 # def l1_listener():
