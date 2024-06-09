@@ -105,13 +105,19 @@ def parse_stmt(expr : ast.expr, who : str, static_parameters: list[str]) -> list
                 domain=dom_id,
                 wpp=parse_expr(wpp_expr, static_parameters)
             )]
-        case ast.Call(
-            func=ast.Name(id='observes'),
-            args=[
-                ast.Compare(
-                    left=ast.Attribute(value=ast.Name(id=target_who), attr=target_id),
-                    comparators=[ast.Attribute(value=ast.Name(id=source_who), attr=source_id)],
-                    ops=[ast.Is()]
+        case ast.Compare(
+            left=ast.Subscript(
+                value=ast.Name(id="observes"),
+                slice=ast.Attribute(
+                    value=ast.Name(id=target_who),
+                    attr=target_id,
+                )
+            ),
+            ops=[ast.Is()],
+            comparators=[
+                ast.Attribute(
+                    value=ast.Name(id=source_who),
+                    attr=source_id
                 )
             ]
         ):
