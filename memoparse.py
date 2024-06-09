@@ -23,7 +23,9 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
         ):
             return EOp(
                 op={
-                    ast.Eq: Op.EQ
+                    ast.Eq: Op.EQ,
+                    ast.Lt: Op.LT,
+                    ast.Gt: Op.GT
                 }[op.__class__],
                 args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
@@ -266,7 +268,19 @@ def literal_speaker(a):
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
+
+@memo
+def literal_speaker1(a):
+    cast: [speaker]
+    given: u_ in U
+    given: r_ in R
+
+    speaker: chooses(r in R, wpp=1)
+    speaker: chooses(u in U, wpp=(1 - 1. * (r < 3) * (u > 2) ))
+    return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
+
 ic(literal_speaker(0.1))
+ic(literal_speaker1(0.1))
 
 # @memo
 # def l1_listener():

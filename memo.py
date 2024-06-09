@@ -55,7 +55,7 @@ class ELit:
 
 
 Op = Enum(
-    "Op", ["ADD", "SUB", "MUL", "DIV", "EQ", "AND", "OR", "EXP", "NEG", "INV", "ITE"]
+    "Op", ["ADD", "SUB", "MUL", "DIV", "EQ", "LT", "GT", "AND", "OR", "EXP", "NEG", "INV", "ITE"]
 )
 
 
@@ -186,6 +186,10 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} / {pprint_expr(args[1])})"
                 case Op.EQ:
                     return f"({pprint_expr(args[0])} == {pprint_expr(args[1])})"
+                case Op.LT:
+                    return f"({pprint_expr(args[0])} < {pprint_expr(args[1])})"
+                case Op.GT:
+                    return f"({pprint_expr(args[0])} > {pprint_expr(args[1])})"
                 case Op.AND:
                     return f"({pprint_expr(args[0])} & {pprint_expr(args[1])})"
                 case Op.OR:
@@ -259,7 +263,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
         case EOp(op, args):
             out = ctxt.sym(f"op_{op.name.lower()}")
-            if op in [Op.ADD, Op.SUB, Op.MUL, Op.DIV, Op.EQ, Op.AND, Op.OR]:
+            if op in [Op.ADD, Op.SUB, Op.MUL, Op.DIV, Op.EQ, Op.LT, Op.GT, Op.AND, Op.OR]:
                 assert len(args) == 2
                 l = eval_expr(args[0], ctxt)
                 r = eval_expr(args[1], ctxt)
@@ -274,6 +278,10 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = {l.tag} / {r.tag}")
                     case Op.EQ:
                         ctxt.emit(f"{out} = torch.eq({l.tag}, {r.tag})")
+                    case Op.LT:
+                        ctxt.emit(f"{out} = torch.lt({l.tag}, {r.tag})")
+                    case Op.GT:
+                        ctxt.emit(f"{out} = torch.gt({l.tag}, {r.tag})")
                     case Op.AND:
                         ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                     case Op.OR:
