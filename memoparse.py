@@ -274,9 +274,9 @@ def memo(f) -> None:
 
     if retval is None:
         raise Exception()
-    for s in stmts:
-        print(pprint_stmt(s))
-    print(pprint_expr(retval))
+    # for s in stmts:
+        # print(pprint_stmt(s))
+    # print(pprint_expr(retval))
 
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
@@ -288,8 +288,8 @@ def memo(f) -> None:
 
     out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
 
-    for i, line in enumerate(out.splitlines()):
-        print(f"{i + 1: 5d}  {line}")
+    # for i, line in enumerate(out.splitlines()):
+        # print(f"{i + 1: 5d}  {line}")
 
     retvals: dict[Any, Any] = {}
     exec(out, globals(), retvals)
@@ -308,59 +308,49 @@ R = [2, 3] # 10 -> hat, 11 -> glasses + hat
 U = [2, 3] # 10 -> hat, 01 -> glasses
 
 @memo
-def literal_speaker(a):
-    cast: [speaker]
-    given: u_ in U
-    given: r_ in R
-
-    speaker: chooses(r in R, wpp=1)
-    speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-    return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
-
-@memo
-def literal_speaker1(a):
+def literal_speaker():
     cast: [speaker]
     given: u_ in U
     given: r_ in R
 
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
-    return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
+    return E[(speaker.u == u_) and (speaker.r == r_)]
 
-ic(literal_speaker(0.1))
-ic(literal_speaker1(0.1))
+@memo
+def l1_listener():
+    cast: [listener]
+    given: u in U
+    given: r_ in R
 
-# @memo
-# def l1_listener():
-#     cast: [listener]
-#     given: u in U
-#     given: r_ in R
+    listener: thinks[
+        speaker: chooses(r in R, wpp=1),
+        speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
+    ]
+    listener: observes [speaker.u] is self.u
+    listener: chooses(r_ in R, wpp=E[speaker.r == r_])
+    return E[ listener.r_ == r_ ]
+ic(l1_listener())
 
-#     listener: thinks[
-#         speaker: chooses(r in R, wpp=1),
-#         speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-#     ]
-#     listener: observes(speaker.u is self.u)
-#     listener: chooses(r_ in R, wpp=E[speaker[r] == r_])
-#     return E[ listener[r_] == r_ ]
+@memo
+def l2_speaker(beta):
+    cast: [speaker, listener]
+    given: u_ in U
+    given: r_ in R
 
-# @memo
-# def l2_speaker():
-#     cast: [speaker, listener]
-#     given: u_ in U
-#     given: r_ in R
+    speaker: thinks[
+        listener: thinks[
+            speaker: chooses(r in R, wpp=1),
+            speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
+        ]
+    ]
 
-#     speaker: thinks[
-#         listener: thinks[
-#             speaker: chooses(r in R, wpp=1),
-#             speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-#         ]
-#     ]
+    speaker: chooses(r in R, wpp=1)
+    speaker: chooses(u in U, wpp=imagine[
+        listener: observes [speaker.u] is self.u,
+        listener: chooses(r_ in R, wpp=E[speaker.r == r_]),
+        exp(beta * E[listener.r_ == r])
+    ])
+    return E[(speaker.u == u_) and (speaker.r == r_)]
+ic(l2_speaker(3.))
 
-#     speaker: chooses(r in R, wpp=1)
-#     speaker: chooses(u in U, wpp=imagine[
-#         listener: observes(speaker.u is self.u),
-#         listener: chooses(r_ in R, wpp=(E[speaker[r] == r_])),
-#         exp(5. * E[listener[r_] == r])
-#     ])
-#     return E[(speaker[u] == u_) * (speaker[r] == r_)]
