@@ -30,6 +30,19 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
                 args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
 
+        case ast.UnaryOp(
+            op=op,
+            operand=operand
+        ):
+            o_expr = parse_expr(operand, static_parameters)
+            return EOp(
+                op={
+                    ast.USub: Op.NEG,
+                    ast.Invert: Op.INV,
+                }[op.__class__],
+                args=[o_expr]
+            )
+
         case ast.BinOp(
             left=e1,
             op=op,
@@ -44,6 +57,30 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
                 }[op.__class__],
                 args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
+
+        case ast.BoolOp(
+            op=op,
+            values=values
+        ):
+            if len(values) != 2:
+                raise Exception(f"Incorrect number of arguments to logical operator {op}")
+            e1, e2 = values
+            return EOp(
+                op={ast.And: Op.AND, ast.Or: Op.OR}[op.__class__],
+                args = [parse_expr(e1, static_parameters),
+                        parse_expr(e2, static_parameters)]
+            )
+
+        case ast.IfExp(
+                test=test,
+                body=body,
+                orelse=orelse
+        ):
+            c_expr = parse_expr(test, static_parameters)
+            t_expr = parse_expr(body, static_parameters)
+            f_expr = parse_expr(orelse, static_parameters)
+            return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr])
+
 
         case ast.Name(id=id):
             if id in static_parameters:
@@ -83,6 +120,11 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice, static_parameters))
+        case ast.Attribute(
+                value = ast.Name(id=who_id),
+                attr=attr
+                ):
+            return EWith(who=Name(who_id), expr=EChoice(attr))
 
         case _:
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
@@ -107,13 +149,19 @@ def parse_stmt(expr : ast.expr, who : str, static_parameters: list[str]) -> list
                 domain=dom_id,
                 wpp=parse_expr(wpp_expr, static_parameters)
             )]
-        case ast.Call(
-            func=ast.Name(id='observes'),
-            args=[
-                ast.Compare(
-                    left=ast.Attribute(value=ast.Name(id=target_who), attr=target_id),
-                    comparators=[ast.Attribute(value=ast.Name(id=source_who), attr=source_id)],
-                    ops=[ast.Is()]
+        case ast.Compare(
+            left=ast.Subscript(
+                value=ast.Name(id="observes"),
+                slice=ast.Attribute(
+                    value=ast.Name(id=target_who),
+                    attr=target_id,
+                )
+            ),
+            ops=[ast.Is()],
+            comparators=[
+                ast.Attribute(
+                    value=ast.Name(id=source_who),
+                    attr=source_id
                 )
             ]
         ):
@@ -276,7 +324,7 @@ def literal_speaker1(a):
     given: r_ in R
 
     speaker: chooses(r in R, wpp=1)
-    speaker: chooses(u in U, wpp=(1 - 1. * (r < 3) * (u > 2) ))
+    speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
 
 ic(literal_speaker(0.1))
