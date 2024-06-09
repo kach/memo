@@ -105,13 +105,19 @@ def parse_stmt(expr : ast.expr, who : str, static_parameters: list[str]) -> list
                 domain=dom_id,
                 wpp=parse_expr(wpp_expr, static_parameters)
             )]
-        case ast.Call(
-            func=ast.Name(id='observes'),
-            args=[
-                ast.Compare(
-                    left=ast.Attribute(value=ast.Name(id=target_who), attr=target_id),
-                    comparators=[ast.Attribute(value=ast.Name(id=source_who), attr=source_id)],
-                    ops=[ast.Is()]
+        case ast.Compare(
+            left=ast.Subscript(
+                value=ast.Name(id="observes"),
+                slice=ast.Attribute(
+                    value=ast.Name(id=target_who),
+                    attr=target_id,
+                )
+            ),
+            ops=[ast.Is()],
+            comparators=[
+                ast.Attribute(
+                    value=ast.Name(id=source_who),
+                    attr=source_id
                 )
             ]
         ):
@@ -152,6 +158,7 @@ def parse_stmt(expr : ast.expr, who : str, static_parameters: list[str]) -> list
                         raise Exception()
             return [SWith(who=Name(who), stmt=s) for s in stmts]
         case _:
+            # print(ast.dump(expr, include_attributes=True, indent=2))
             raise Exception()
 
 
@@ -190,7 +197,6 @@ def memo(f) -> None:
     stmts: list[Stmt] = []
     retval = None
     for stmt in f.body[1:]:
-        # print(ast.dump(stmt, include_attributes=True, indent=2))
         match stmt:
             case ast.AnnAssign(
                 target=ast.Name(id='given'),
@@ -266,7 +272,7 @@ def literal_speaker(a):
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
-ic(literal_speaker(0.1))
+# ic(literal_speaker(0.1))
 
 # @memo
 # def l1_listener():
