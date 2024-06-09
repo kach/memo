@@ -196,7 +196,7 @@ def memo(f) -> None:
     stmts: list[Stmt] = []
     retval = None
     for stmt in f.body[1:]:
-        print(ast.dump(stmt, include_attributes=True, indent=2))
+        # print(ast.dump(stmt, include_attributes=True, indent=2))
         match stmt:
             case ast.AnnAssign(
                 target=ast.Name(id='given'),
