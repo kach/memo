@@ -28,6 +28,19 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
                 args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
 
+        case ast.UnaryOp(
+            op=op,
+            operand=operand
+        ):
+            o_expr = parse_expr(operand, static_parameters)
+            return EOp(
+                op={
+                    ast.USub: Op.NEG,
+                    ast.Invert: Op.INV,
+                }[op.__class__],
+                args=[o_expr]
+            )
+
         case ast.BinOp(
             left=e1,
             op=op,
@@ -42,6 +55,30 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
                 }[op.__class__],
                 args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
+
+        case ast.BoolOp(
+            op=op,
+            values=values
+        ):
+            if len(values) != 2:
+                raise Exception(f"Incorrect number of arguments to logical operator {op}")
+            e1, e2 = values
+            return EOp(
+                op={ast.And: Op.AND, ast.Or: Op.OR}[op.__class__],
+                args = [parse_expr(e1, static_parameters),
+                        parse_expr(e2, static_parameters)]
+            )
+
+        case ast.IfExp(
+                test=test,
+                body=body,
+                orelse=orelse
+        ):
+            c_expr = parse_expr(test, static_parameters)
+            t_expr = parse_expr(body, static_parameters)
+            f_expr = parse_expr(orelse, static_parameters)
+            return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr])
+
 
         case ast.Name(id=id):
             if id in static_parameters:
@@ -277,7 +314,19 @@ def literal_speaker(a):
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
+
+@memo
+def literal_speaker1(a):
+    cast: [speaker]
+    given: u_ in U
+    given: r_ in R
+
+    speaker: chooses(r in R, wpp=1)
+    speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
+    return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
+
 ic(literal_speaker(0.1))
+ic(literal_speaker1(0.1))
 
 # @memo
 # def l1_listener():
