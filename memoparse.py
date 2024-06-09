@@ -250,11 +250,11 @@ def memo(f) -> None:
     exec(out, globals(), retvals)
     return retvals['_out']
 
-    print(retvals)
-    print(retvals['listener_ll_9'], retvals['listener_ll_9'].shape)
-    print(ctxt.idx_history)
-    print(retvals['u_ll_28'], retvals['u_ll_28'].shape)
-    print(retvals['speaker_r_0'], retvals['speaker_r_0'].shape)
+    # print(retvals)
+    # print(retvals['listener_ll_9'], retvals['listener_ll_9'].shape)
+    # print(ctxt.idx_history)
+    # print(retvals['u_ll_28'], retvals['u_ll_28'].shape)
+    # print(retvals['speaker_r_0'], retvals['speaker_r_0'].shape)
 
 
 
@@ -271,17 +271,7 @@ def literal_speaker(a):
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
-
-@memo
-def literal_speaker1(a):
-    cast: [speaker]
-    given: u_ in U
-    given: r_ in R
-
-    speaker: chooses(r in R, wpp=1)
-    speaker: chooses(u in U, wpp=(1 - 1. * (r == 2) * (u == 3) ))
-    return a * E[(speaker.u == u_) * (speaker.r == r_)]
-# ic(literal_speaker(0.1))
+ic(literal_speaker(0.1))
 
 # @memo
 # def l1_listener():
