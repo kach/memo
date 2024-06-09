@@ -27,7 +27,7 @@ def parse_expr(expr : ast.expr, static_parameters: list[str]) -> Expr:
                 }[op.__class__],
                 args=[parse_expr(e1, static_parameters), parse_expr(e2, static_parameters)]
             )
-        
+
         case ast.UnaryOp(
             op=op,
             operand=operand
@@ -314,19 +314,8 @@ def literal_speaker1(a):
     speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
     return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
 
-@memo
-def literal_speaker2(a):
-    cast: [speaker]
-    given: u_ in U
-    given: r_ in R
-
-    speaker: chooses(r in R, wpp=1)
-    speaker: chooses(u in U, wpp=(1. if ~(r == 2 and u == 3) else 0.))
-    return a * E[(speaker[u] == u_) * (speaker[r] == r_)]
-
 ic(literal_speaker(0.1))
 ic(literal_speaker1(0.1))
-ic(literal_speaker2(0.1))
 
 # @memo
 # def l1_listener():
