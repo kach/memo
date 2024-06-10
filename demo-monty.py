@@ -8,21 +8,23 @@ def demo(reward):
     given: revealed_door in DOORS
 
     alice: thinks[
-            monty: chooses(prize in DOORS, wpp=1),
+        monty: chooses(prize in DOORS, wpp=1),
     ]
     alice: chooses(initial_pick in DOORS, wpp=1)
     alice: thinks[
-            monty: thinks[
-                alice: chooses(initial_pick in DOORS, wpp=1)
-            ],
-            monty: observes [alice.initial_pick] is self.initial_pick
+        monty: thinks[ alice: chooses(initial_pick in DOORS, wpp=1) ],
+        monty: observes [alice.initial_pick] is self.initial_pick
     ]
     alice: thinks[
-            monty: chooses(open in DOORS, wpp=(0. if (open == alice.initial_pick or open == prize) else 1.))
+        monty: chooses(
+            open in DOORS,
+            wpp=0. if (open == alice.initial_pick or open == prize) else 1.)
     ]
     alice: observes [monty.open] is self.revealed_door
-    alice: chooses(final_pick in DOORS, wpp=(0. if final_pick == monty.open else 
-                                             exp(E[reward if final_pick == monty.prize else -reward])))
+    alice: chooses(
+        final_pick in DOORS,
+        wpp=0. if final_pick == monty.open else
+            exp(E[reward if final_pick == monty.prize else -reward]))
     return E[ alice.final_pick == alice.initial_pick ]
 
 
