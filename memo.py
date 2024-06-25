@@ -134,15 +134,18 @@ Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll
 
 HEADER = """\
 import torch
+import jax.numpy as jnp
 def marg(t, dims):
     if dims == ():
         return t
-    return t.sum(dim=tuple(-1 - d for d in dims), keepdims=True)
+    # return t.sum(dim=tuple(-1 - d for d in dims), keepdims=True)
+    return t.sum(axis=tuple(-1 - d for d in dims), keepdims=True)
 
 def pad(t, total):
     count = total - len(t.shape)
     for _ in range(count):
-        t = t.unsqueeze(0)
+        # t = t.unsqueeze(0)
+        t = t.expand_dims(0)
     return t
 """
 
@@ -409,9 +412,10 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             future_frame.name = future_name
             future_frame.parent = ctxt.frame
             if ctxt.frame.ll is not None:
-                ll = ctxt.sym(f"{ctxt.frame.name}_ll")
-                ctxt.emit(f"{ll} = {ctxt.frame.ll}")
-                future_frame.ll = ll
+                fresh_lls(ctxt.frame)
+                # ll = ctxt.sym(f"{ctxt.frame.name}_ll")
+                # ctxt.emit(f"{ll} = {ctxt.frame.ll}")
+                # future_frame.ll = ll
             ctxt.frame.children[future_name] = future_frame
             for stmt in do:
                 eval_stmt(SWith(future_name, stmt), ctxt)
@@ -420,6 +424,13 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
     raise NotImplementedError
 
+def fresh_lls(f: Frame):
+    if f.ll is not None:
+        ll = ctxt.sym(f'{f.name}_ll')
+        ctxt.emit(f'{ll} = {f.ll}')
+        f.ll = ll
+    for c in f.children.keys():
+        fresh_lls(f.children[c])
 
 def eval_stmt(s: Stmt, ctxt: Context) -> None:
     match s:
@@ -489,7 +500,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")
             ctxt.emit(f"{ctxt.frame.ll} = {id_ll} * {ctxt.frame.ll}")
-            # ctxt.emit(f'print("{ctxt.frame.ll}", {ctxt.frame.ll}, {ctxt.frame.ll}.shape); print()')
+
+            ctxt.emit(f'print("{id_ll}", {id_ll}.tolist(), {id_ll}.shape)')
+            ctxt.emit(f'print("{ctxt.frame.ll}", {ctxt.frame.ll}.tolist(), {ctxt.frame.ll}.shape); print()')
 
         case SObserve(who, id):
             if (who, id) not in ctxt.frame.choices:
@@ -537,6 +550,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             eval_stmt(SWith(who, SObserve(target_who, target_id)), ctxt)
             target_addr = (target_who, target_id)
             source_addr = (source_who, source_id)
+            assert ctxt.frame.children[who].choices[target_addr].domain == ctxt.frame.choices[source_addr].domain
             ctxt.frame.children[who].conditions[target_addr] = source_addr
             tidx = ctxt.frame.children[who].choices[target_addr].idx
             sidx = ctxt.frame.choices[source_addr].idx
@@ -549,6 +563,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
             )
+            ctxt.emit(f'print("{ctxt.frame.children[who].ll}", {ctxt.frame.children[who].ll}.tolist(), {ctxt.frame.children[who].ll}.shape); print()')
 
         case _:
             raise NotImplementedError

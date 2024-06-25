@@ -288,8 +288,8 @@ def memo(f) -> None:
 
     out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
 
-    # for i, line in enumerate(out.splitlines()):
-        # print(f"{i + 1: 5d}  {line}")
+    for i, line in enumerate(out.splitlines()):
+        print(f"{i + 1: 5d}  {line}")
 
     globals_of_caller = inspect.stack()[1].frame.f_globals
     retvals: dict[Any, Any] = {}
