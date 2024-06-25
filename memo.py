@@ -55,7 +55,22 @@ class ELit:
 
 
 Op = Enum(
-    "Op", ["ADD", "SUB", "MUL", "DIV", "EQ", "LT", "GT", "AND", "OR", "EXP", "NEG", "INV", "ITE"]
+    "Op",
+    [
+        "ADD",
+        "SUB",
+        "MUL",
+        "DIV",
+        "EQ",
+        "LT",
+        "GT",
+        "AND",
+        "OR",
+        "EXP",
+        "NEG",
+        "INV",
+        "ITE",
+    ],
 )
 
 
@@ -197,7 +212,7 @@ def pprint_stmt(s: Stmt) -> str:
         case SWith(who, stmt):
             return f"{who}: thinks[ {pprint_stmt(stmt)} ]"
         case SShow(who, target_who, target_id, source_who, source_id):
-            if source_who == Name('self'):
+            if source_who == Name("self"):
                 return f"{who}: observes [{target_who}.{target_id}] is {source_id}"
             else:
                 return f"{who}: observes [{target_who}.{target_id}] is {source_who}.{source_id}"
@@ -255,9 +270,7 @@ def pprint_expr(e: Expr) -> str:
         case EWith(who, expr):
             return f"{who}[ {pprint_expr(expr)} ]"
         case EImagine(do, then):
-            stmts = "\n".join(
-                [pprint_stmt(s) for s in do] + [pprint_expr(then)]
-            )
+            stmts = "\n".join([pprint_stmt(s) for s in do] + [pprint_expr(then)])
             stmts_block = textwrap.indent(stmts, "  ")
             return f"""\
 imagine [
@@ -285,17 +298,25 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             args_out = []
             for arg in args:
                 args_out.append(eval_expr(arg, ctxt))
-            out = ctxt.sym(f'ffi_{name}')
+            out = ctxt.sym(f"ffi_{name}")
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
             ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
-            return Value(
-                tag=out, known=known, deps=deps
-            )
+            return Value(tag=out, known=known, deps=deps)
 
         case EOp(op, args):
             out = ctxt.sym(f"op_{op.name.lower()}")
-            if op in [Op.ADD, Op.SUB, Op.MUL, Op.DIV, Op.EQ, Op.LT, Op.GT, Op.AND, Op.OR]:
+            if op in [
+                Op.ADD,
+                Op.SUB,
+                Op.MUL,
+                Op.DIV,
+                Op.EQ,
+                Op.LT,
+                Op.GT,
+                Op.AND,
+                Op.OR,
+            ]:
                 assert len(args) == 2
                 l = eval_expr(args[0], ctxt)
                 r = eval_expr(args[1], ctxt)
@@ -415,7 +436,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             deps = set()
             for who_, id in val_.deps:
                 if who_ == Name("self"):
-                    if who.startswith('future_'):  ## TODO: there is definitely a bug here
+                    if who.startswith(
+                        "future_"
+                    ):  ## TODO: there is definitely a bug here
                         deps.add((Name("self"), id))
                         # ic(who, id)
                     else:
@@ -453,13 +476,15 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
     raise NotImplementedError
 
+
 def fresh_lls(ctxt: Context, f: Frame) -> None:
     if f.ll is not None:
-        ll = ctxt.sym(f'{f.name}_ll')
-        ctxt.emit(f'{ll} = {f.ll}')
+        ll = ctxt.sym(f"{f.name}_ll")
+        ctxt.emit(f"{ll} = {f.ll}")
         f.ll = ll
     for c in f.children.keys():
         fresh_lls(ctxt, f.children[c])
+
 
 def eval_stmt(s: Stmt, ctxt: Context) -> None:
     match s:
@@ -520,9 +545,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{id_ll} = jnp.ones_like({tag}, dtype=jnp.float32) * {wpp_val.tag}"
             )
-            ctxt.emit(
-                f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
-            )
+            ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))")
             if ctxt.frame.ll is None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")
@@ -567,17 +590,24 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
         case SShow(who, target_who, target_id, source_who, source_id):
             ctxt.emit(f"\n# telling {who} about {target_who}.{target_id}")
             if who not in ctxt.frame.children:
-                raise Exception(f'{ctxt.frame.name} is not yet modeling {who}')
+                raise Exception(f"{ctxt.frame.name} is not yet modeling {who}")
             if (target_who, target_id) not in ctxt.frame.children[who].choices:
-                raise Exception(f'{ctxt.frame.name} does not yet think {who} is modeling {target_who}.{target_id}')
+                raise Exception(
+                    f"{ctxt.frame.name} does not yet think {who} is modeling {target_who}.{target_id}"
+                )
             if (source_who, source_id) not in ctxt.frame.choices:
-                raise Exception(f'{ctxt.frame.name} does not yet model {source_who}.{source_id}')
+                raise Exception(
+                    f"{ctxt.frame.name} does not yet model {source_who}.{source_id}"
+                )
             # TODO: assert domains match
 
             eval_stmt(SWith(who, SObserve(target_who, target_id)), ctxt)
             target_addr = (target_who, target_id)
             source_addr = (source_who, source_id)
-            assert ctxt.frame.children[who].choices[target_addr].domain == ctxt.frame.choices[source_addr].domain
+            assert (
+                ctxt.frame.children[who].choices[target_addr].domain
+                == ctxt.frame.choices[source_addr].domain
+            )
             ctxt.frame.children[who].conditions[target_addr] = source_addr
             tidx = ctxt.frame.children[who].choices[target_addr].idx
             sidx = ctxt.frame.choices[source_addr].idx
