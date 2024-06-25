@@ -12,7 +12,10 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             return EOp(op=Op.EXP, args=[parse_expr(e1, static_parameters)])
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
-            return EFFI(name=ffi_name, args=[parse_expr(arg, static_parameters) for arg in ffi_args])
+            return EFFI(
+                name=ffi_name,
+                args=[parse_expr(arg, static_parameters) for arg in ffi_args],
+            )
 
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
             return EOp(
@@ -227,7 +230,9 @@ def memo(f) -> None:
     for stmt in stmts:
         eval_stmt(stmt, ctxt)
     val = eval_expr(retval, ctxt)
-    ctxt.emit(f"return {val.tag}.squeeze(axis={tuple(-1-i for i in range(ctxt.next_idx) if i not in ctxt.forall_idxs)})")
+    ctxt.emit(
+        f"return {val.tag}.squeeze(axis={tuple(-1-i for i in range(ctxt.next_idx) if i not in ctxt.forall_idxs)})"
+    )
 
     out = (
         """def _out("""
