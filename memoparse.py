@@ -11,6 +11,9 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
         case ast.Call(func=ast.Name(id="exp"), args=[e1]):
             return EOp(op=Op.EXP, args=[parse_expr(e1, static_parameters)])
 
+        case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
+            return EFFI(name=ffi_name, args=[parse_expr(arg, static_parameters) for arg in ffi_args])
+
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
             return EOp(
                 op={ast.Eq: Op.EQ, ast.Lt: Op.LT, ast.Gt: Op.GT}[op.__class__],
@@ -99,7 +102,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
 def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[Stmt]:
     match expr:
         case ast.Call(
-            func=ast.Name(id="chooses"),
+            func=ast.Name(id="chooses" | "given"),
             args=[
                 ast.Compare(
                     left=ast.Name(id=choice_id),

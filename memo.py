@@ -66,7 +66,13 @@ class EOp:
 
 
 @dataclass(frozen=True)
-class EChoice:  # TODO: alias given
+class EFFI:
+    name: str
+    args: list[Expr]
+
+
+@dataclass(frozen=True)
+class EChoice:
     id: Id
 
 
@@ -87,7 +93,7 @@ class EImagine:
     then: Expr
 
 
-Expr = ELit | EOp | EChoice | EExpect | EWith | EImagine
+Expr = ELit | EOp | EFFI | EChoice | EExpect | EWith | EImagine
 
 
 @dataclass(frozen=True)
@@ -152,19 +158,28 @@ class Context:
 
 
 HEADER = """\
+import jax
 import jax.numpy as jnp
+
 def marg(t, dims):
     if dims == ():
         return t
-    # return t.sum(dim=tuple(-1 - d for d in dims), keepdims=True)
     return t.sum(axis=tuple(-1 - d for d in dims), keepdims=True)
 
 def pad(t, total):
     count = total - len(t.shape)
     for _ in range(count):
-        # t = t.unsqueeze(0)
         t = jnp.expand_dims(t, 0)
     return t
+
+def ffi(f, *args):
+    args = jax.numpy.broadcast_arrays(*args)
+    target_shape = args[0].shape
+    args = [arg.reshape(-1) for arg in args]
+    if isinstance(f, jax.lib.xla_extension.PjitFunction):
+        return jax.vmap(f)(*args).reshape(target_shape)
+    else:
+        raise NotImplementedError
 """
 
 
@@ -265,6 +280,18 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             # out = ctxt.sym("ch")
             # ctxt.emit(f"{out} = {ch.tag}")
             return Value(tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]))
+
+        case EFFI(name, args):
+            args_out = []
+            for arg in args:
+                args_out.append(eval_expr(arg, ctxt))
+            out = ctxt.sym(f'ffi_{name}')
+            known = all(arg.known for arg in args_out)
+            deps = set().union(*(arg.deps for arg in args_out))
+            ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
+            return Value(
+                tag=out, known=known, deps=deps
+            )
 
         case EOp(op, args):
             out = ctxt.sym(f"op_{op.name.lower()}")

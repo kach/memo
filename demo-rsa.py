@@ -1,8 +1,16 @@
 from memoparse import memo, ic
 import jax
+import jax.numpy as np
 
-R = [2, 3] # 10 -> hat, 11 -> glasses + hat
-U = [2, 3] # 10 -> hat, 01 -> glasses
+U = [0, 1]
+R = [0, 1]
+
+@jax.jit
+def denotes(u, r):
+    return np.array([
+        [False, True ],
+        [True , True ]
+    ])[u, r]
 
 @memo
 def literal_speaker():
@@ -11,7 +19,7 @@ def literal_speaker():
     forall: r_ in R
 
     speaker: chooses(r in R, wpp=1)
-    speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
+    speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
     return E[(speaker.u == u_) and (speaker.r == r_)]
 
 @memo
@@ -22,7 +30,7 @@ def l1_listener():
 
     listener: thinks[
         speaker: chooses(r in R, wpp=1),
-        speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
+        speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
     ]
     listener: observes [speaker.u] is self.u
     listener: chooses(r_ in R, wpp=E[speaker.r == r_])
@@ -37,8 +45,8 @@ def l2_speaker(beta):
 
     speaker: thinks[
         listener: thinks[
-            speaker: chooses(r in R, wpp=1),
-            speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
+            speaker: given(r in R, wpp=1),
+            speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
         ]
     ]
 
@@ -53,7 +61,6 @@ ic(l2_speaker(3.))
 
 @jax.value_and_grad
 def f(beta):
-    return l2_speaker(beta).sum()
-
-ic(f(2.))
+    return l2_speaker(beta)[0, 0]
+ic(f(3.))
 
