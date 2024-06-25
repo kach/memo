@@ -4,7 +4,7 @@ from typing import NewType, Any
 import itertools
 from enum import Enum
 import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import copy
 
 import textwrap
@@ -132,6 +132,25 @@ class SForAll:
 
 Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll
 
+
+@dataclass
+class Context:
+    next_idx: int
+    frame: Frame
+    io: StringIO
+    idx_history: list[str]
+    _sym: int = -1
+
+    def emit(self: Context, line: str) -> None:
+        print(line, file=self.io)
+
+    def sym(self, hint: str = "") -> str:
+        self._sym += 1
+        return f"{hint}_{self._sym}"
+
+    forall_idxs: list[int] = field(default_factory=list)
+
+
 HEADER = """\
 import jax.numpy as jnp
 def marg(t, dims):
@@ -230,22 +249,6 @@ imagine [
 {stmts_block}
 ]"""
     raise NotImplementedError
-
-
-@dataclass
-class Context:
-    next_idx: int
-    frame: Frame
-    io: StringIO
-    idx_history: list[str]
-    _sym: int = -1
-
-    def emit(self: Context, line: str) -> None:
-        print(line, file=self.io)
-
-    def sym(self, hint: str = "") -> str:
-        self._sym += 1
-        return f"{hint}_{self._sym}"
 
 
 def eval_expr(e: Expr, ctxt: Context) -> Value:
@@ -411,7 +414,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             future_frame.name = future_name
             future_frame.parent = ctxt.frame
             if ctxt.frame.ll is not None:
-                fresh_lls(ctxt.frame)
+                fresh_lls(ctxt, ctxt.frame)
                 # ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 # ctxt.emit(f"{ll} = {ctxt.frame.ll}")
                 # future_frame.ll = ll
@@ -423,13 +426,13 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
     raise NotImplementedError
 
-def fresh_lls(f: Frame):
+def fresh_lls(ctxt: Context, f: Frame) -> None:
     if f.ll is not None:
         ll = ctxt.sym(f'{f.name}_ll')
         ctxt.emit(f'{ll} = {f.ll}')
         f.ll = ll
     for c in f.children.keys():
-        fresh_lls(f.children[c])
+        fresh_lls(ctxt, f.children[c])
 
 def eval_stmt(s: Stmt, ctxt: Context) -> None:
     match s:
@@ -448,6 +451,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame.choices[(Name("self"), id)] = Choice(
                 tag, idx, True, domain, set()
             )
+            ctxt.forall_idxs.append(idx)
 
         case SChoose(who, id, domain, wpp):
             if who not in ctxt.frame.children:
