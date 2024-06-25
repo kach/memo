@@ -1,4 +1,5 @@
 from memoparse import memo, ic
+import jax
 
 R = [2, 3] # 10 -> hat, 11 -> glasses + hat
 U = [2, 3] # 10 -> hat, 01 -> glasses
@@ -6,8 +7,8 @@ U = [2, 3] # 10 -> hat, 01 -> glasses
 @memo
 def literal_speaker():
     cast: [speaker]
-    given: u_ in U
-    given: r_ in R
+    forall: u_ in U
+    forall: r_ in R
 
     speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(0. if (r == 2 and u == 3) else 1.))
@@ -16,8 +17,8 @@ def literal_speaker():
 @memo
 def l1_listener():
     cast: [listener]
-    given: u in U
-    given: r_ in R
+    forall: u in U
+    forall: r_ in R
 
     listener: thinks[
         speaker: chooses(r in R, wpp=1),
@@ -31,8 +32,8 @@ ic(l1_listener())
 @memo
 def l2_speaker(beta):
     cast: [speaker, listener]
-    given: u_ in U
-    given: r_ in R
+    forall: u_ in U
+    forall: r_ in R
 
     speaker: thinks[
         listener: thinks[
@@ -49,3 +50,10 @@ def l2_speaker(beta):
     ])
     return E[(speaker.u == u_) and (speaker.r == r_)]
 ic(l2_speaker(3.))
+
+@jax.value_and_grad
+def f(beta):
+    return l2_speaker(beta).sum()
+
+ic(f(2.))
+

@@ -243,7 +243,7 @@ def memo(f) -> None:
         # print(ast.dump(stmt, include_attributes=True, indent=2))
         match stmt:
             case ast.AnnAssign(
-                target=ast.Name(id='given'),
+                target=ast.Name(id='forall'),
                 annotation=ast.Compare(
                     left=ast.Name(id=choice_id),
                     comparators=[ast.Name(id=dom_id)],
@@ -286,10 +286,10 @@ def memo(f) -> None:
     val = eval_expr(retval, ctxt)
     ctxt.emit(f'return {val.tag}')
 
-    out = 'def _out(' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
+    out = '''def _out(''' + ', '.join(static_parameters) + '):\n' + textwrap.indent(io.getvalue(), '    ')
 
-    for i, line in enumerate(out.splitlines()):
-        print(f"{i + 1: 5d}  {line}")
+    # for i, line in enumerate(out.splitlines()):
+        # print(f"{i + 1: 5d}  {line}")
 
     globals_of_caller = inspect.stack()[1].frame.f_globals
     retvals: dict[Any, Any] = {}

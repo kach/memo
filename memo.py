@@ -133,7 +133,6 @@ class SForAll:
 Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll
 
 HEADER = """\
-import torch
 import jax.numpy as jnp
 def marg(t, dims):
     if dims == ():
@@ -145,7 +144,7 @@ def pad(t, total):
     count = total - len(t.shape)
     for _ in range(count):
         # t = t.unsqueeze(0)
-        t = t.expand_dims(0)
+        t = jnp.expand_dims(t, 0)
     return t
 """
 
@@ -253,7 +252,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
     match e:
         case ELit(val):
             out = ctxt.sym("lit")
-            ctxt.emit(f"{out} = torch.tensor({val})")
+            ctxt.emit(f"{out} = jnp.array({val})")
             return Value(tag=out, known=True, deps=set())
 
         case EChoice(id):
@@ -280,11 +279,11 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     case Op.DIV:
                         ctxt.emit(f"{out} = {l.tag} / {r.tag}")
                     case Op.EQ:
-                        ctxt.emit(f"{out} = torch.eq({l.tag}, {r.tag})")
+                        ctxt.emit(f"{out} = jnp.equal({l.tag}, {r.tag})")
                     case Op.LT:
-                        ctxt.emit(f"{out} = torch.lt({l.tag}, {r.tag})")
+                        ctxt.emit(f"{out} = jnp.less({l.tag}, {r.tag})")
                     case Op.GT:
-                        ctxt.emit(f"{out} = torch.gt({l.tag}, {r.tag})")
+                        ctxt.emit(f"{out} = jnp.greater({l.tag}, {r.tag})")
                     case Op.AND:
                         ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                     case Op.OR:
@@ -295,7 +294,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 l = eval_expr(args[0], ctxt)
                 match op:
                     case Op.EXP:
-                        ctxt.emit(f"{out} = torch.exp({l.tag})")
+                        ctxt.emit(f"{out} = jnp.exp({l.tag})")
                     case Op.NEG:
                         ctxt.emit(f"{out} = -({l.tag})")
                     case Op.INV:
@@ -306,7 +305,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 c = eval_expr(args[0], ctxt)
                 t = eval_expr(args[1], ctxt)
                 f = eval_expr(args[2], ctxt)
-                ctxt.emit(f"{out} = torch.where({c.tag}, {t.tag}, {f.tag})")
+                ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
                 return Value(
                     tag=out,
                     known=c.known and t.known and f.known,
@@ -444,7 +443,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.idx_history.append(f"forall {id}")
             tag = ctxt.sym(f"forall_{id}")
             ctxt.emit(
-                f"{tag} = torch.tensor({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
+                f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
             )
             ctxt.frame.choices[(Name("self"), id)] = Choice(
                 tag, idx, True, domain, set()
@@ -459,7 +458,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             tag = ctxt.sym(f"{who}_{id}")
             ctxt.emit(f"""\n# {who} choose {id}""")
             ctxt.emit(
-                f"{tag} = torch.tensor({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
+                f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
             )
 
             # briefly enter child's frame
@@ -488,21 +487,18 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame.choices[(who, id)] = Choice(tag, idx, False, domain, new_deps)
             id_ll = ctxt.sym(f"{id}_ll")
             ctxt.emit(
-                f"{id_ll} = torch.ones_like({tag}, dtype=torch.float) * {wpp_val.tag}"
+                f"{id_ll} = jnp.ones_like({tag}, dtype=jnp.float32) * {wpp_val.tag}"
             )
-            # ctxt.emit(
-            #     f"{id_ll} = torch.nan_to_num({id_ll} / {id_ll}.sum(axis=0, keepdims=True))"
-            # )
             ctxt.emit(
-                f"{id_ll} = torch.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
+                f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
             )
             if ctxt.frame.ll is None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")
             ctxt.emit(f"{ctxt.frame.ll} = {id_ll} * {ctxt.frame.ll}")
 
-            ctxt.emit(f'print("{id_ll}", {id_ll}.tolist(), {id_ll}.shape)')
-            ctxt.emit(f'print("{ctxt.frame.ll}", {ctxt.frame.ll}.tolist(), {ctxt.frame.ll}.shape); print()')
+            # ctxt.emit(f'print("{id_ll}", {id_ll}.tolist(), {id_ll}.shape)')
+            # ctxt.emit(f'print("{ctxt.frame.ll}", {ctxt.frame.ll}.tolist(), {ctxt.frame.ll}.shape); print()')
 
         case SObserve(who, id):
             if (who, id) not in ctxt.frame.choices:
@@ -526,7 +522,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
             ctxt.emit(f"""\n# {ctxt.frame.name} observe {who}.{id}""")
             ctxt.emit(
-                f"""{ctxt.frame.ll} = torch.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
+                f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
             )
 
         case SWith(who, stmt):  # TODO: this could take many "who"s as input
@@ -555,7 +551,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             tidx = ctxt.frame.children[who].choices[target_addr].idx
             sidx = ctxt.frame.choices[source_addr].idx
             ctxt.emit(
-                f"{ctxt.frame.children[who].ll} = torch.transpose(pad({ctxt.frame.children[who].ll}, {ctxt.next_idx}), -1-{sidx}, -1-{tidx})"
+                f"{ctxt.frame.children[who].ll} = jnp.swapaxes(pad({ctxt.frame.children[who].ll}, {ctxt.next_idx}), -1-{sidx}, -1-{tidx})"
             )
             ctxt.frame.children[who].choices[target_addr].idx = ctxt.frame.choices[
                 source_addr
@@ -563,7 +559,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
             )
-            ctxt.emit(f'print("{ctxt.frame.children[who].ll}", {ctxt.frame.children[who].ll}.tolist(), {ctxt.frame.children[who].ll}.shape); print()')
+            # ctxt.emit(f'print("{ctxt.frame.children[who].ll}", {ctxt.frame.children[who].ll}.tolist(), {ctxt.frame.children[who].ll}.shape); print()')
 
         case _:
             raise NotImplementedError

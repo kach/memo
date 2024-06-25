@@ -5,7 +5,7 @@ DOORS = [1, 2, 3]
 @memo
 def demo(reward):
     cast: [alice, monty]
-    given: revealed_door in DOORS
+    forall: revealed_door in DOORS
 
     alice: thinks[
         monty: chooses(prize in DOORS, wpp=1),
