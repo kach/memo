@@ -10,7 +10,7 @@ def denotes(u, r):
     return np.array([
         [False, True ],
         [True , True ]
-    ])[u, r]
+    ])[r, u]
 
 @memo
 def literal_speaker():
@@ -18,7 +18,7 @@ def literal_speaker():
     forall: u_ in U
     forall: r_ in R
 
-    speaker: chooses(r in R, wpp=1)
+    speaker: given(r in R, wpp=1)
     speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
     return E[(speaker.u == u_) and (speaker.r == r_)]
 
