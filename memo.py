@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NewType, Any
+from typing import NewType, Any, Tuple
 
 import itertools
 from enum import Enum
@@ -20,6 +20,7 @@ ic.configureOutput(includeContext=True)
 Name = NewType("Name", str)
 Id = NewType("Id", str)
 Dom = NewType("Dom", str)
+
 
 @dataclass(frozen=True)
 class Value:
@@ -85,6 +86,13 @@ class EOp:
 class EFFI:
     name: str
     args: list[Expr]
+
+
+@dataclass(frozen=True)
+class EMemo:
+    name: str
+    args: list[Expr]
+    ids: list[Tuple[Id, Id]]
 
 
 @dataclass(frozen=True)
@@ -293,7 +301,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ch = ctxt.frame.choices[(Name("self"), id)]
             # out = ctxt.sym("ch")
             # ctxt.emit(f"{out} = {ch.tag}")
-            return Value(tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]), static=False)
+            return Value(
+                tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]), static=False
+            )
 
         case EFFI(name, args):
             args_out = []
@@ -303,7 +313,48 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
             ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
-            return Value(tag=out, known=known, deps=deps, static=all(arg.static for arg in args_out))
+            return Value(
+                tag=out,
+                known=known,
+                deps=deps,
+                static=all(arg.static for arg in args_out),
+            )
+
+        case EMemo(name, args, ids):
+            args_out = []
+            for arg in args:
+                args_out.append(eval_expr(arg, ctxt))
+
+            assert all(
+                arg.static for arg in args_out
+            ), """
+            all arguments to memo functions must be statically known!
+            """
+            res = ctxt.sym(f"result_array")
+            ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)})')
+
+            out_idxs = []
+            for target_id, source_id in reversed(ids):
+                out_idxs.append(ctxt.frame.choices[("self", source_id)].idx)
+
+            ctxt.emit(
+                f'{res} = jnp.expand_dims({res}, ({",".join(str(-i - 1) for i in range(max(out_idxs) + 1 - len(out_idxs)))}))'
+            )
+            permuted_dims = [None] * (max(out_idxs) + 1)
+
+            for permuted_idx, source_idx in enumerate(out_idxs):
+                permuted_dims[-1 - source_idx] = permuted_idx
+
+            filler_count = len(out_idxs)
+            for idx in range(len(permuted_dims)):
+                if permuted_dims[idx] is None:
+                    permuted_dims[idx] = filler_count
+                    filler_count += 1
+
+            ctxt.emit(f"print({res})")
+            ctxt.emit(f"{res} = jnp.permute_dims({res}, {tuple(permuted_dims)})")
+
+            return Value(tag=res, known=True, deps=set(), static=False)
 
         case EOp(op, args):
             out = ctxt.sym(f"op_{op.name.lower()}")
@@ -340,7 +391,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                     case Op.OR:
                         ctxt.emit(f"{out} = {l.tag} | {r.tag}")
-                return Value(tag=out, known=l.known and r.known, deps=l.deps | r.deps, static=l.static and r.static)
+                return Value(
+                    tag=out,
+                    known=l.known and r.known,
+                    deps=l.deps | r.deps,
+                    static=l.static and r.static,
+                )
             elif op in [Op.EXP, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
@@ -363,7 +419,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         tag=out,
                         known=c.known and t.known and f.known,
                         deps=c.deps | t.deps | f.deps,
-                        static=t.static and f.static
+                        static=t.static and f.static,
                     )
                 else:
                     ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
@@ -371,7 +427,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         tag=out,
                         known=c.known and t.known and f.known,
                         deps=c.deps | t.deps | f.deps,
-                        static=False
+                        static=False,
                     )
             else:
                 raise NotImplementedError
@@ -426,7 +482,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 known=True,
                 # deps={(name, id) for (name, id) in val_.deps if ctxt.frame.choices[(name, id)].known}
                 deps=deps,
-                static=False
+                static=False,
             )
 
         case EWith(who, expr):
@@ -515,9 +571,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame.choices[(Name("self"), id)] = Choice(
                 tag, idx, True, domain, set()
             )
-            ctxt.forall_idxs.append((
-                idx, id, domain
-            ))
+            ctxt.forall_idxs.append((idx, id, domain))
 
         case SChoose(who, id, domain, wpp):
             if who not in ctxt.frame.children:

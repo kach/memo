@@ -19,6 +19,26 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                 name=ffi_name,
                 args=[parse_expr(arg, static_parameters) for arg in ffi_args],
             )
+        # TODO: handle multiple ids
+        case ast.Call(
+            func=ast.Subscript(
+                value=ast.Name(id=f_name),
+                slice=ast.Compare(
+                    left=ast.Name(id=target_id),
+                    ops=[ast.Is()],
+                    comparators=[
+                        ast.Attribute(value=ast.Name(id="self"), attr=source_id)
+                    ],
+                ),
+            ),
+            args=args,
+        ):
+            print(source_id)
+            return EMemo(
+                name=f_name,
+                args=[parse_expr(arg, static_parameters) for arg in args],
+                ids=[(target_id, source_id)],
+            )
 
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
             return EOp(
@@ -102,6 +122,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             return EWith(who=Name(who_id), expr=EChoice(Id(attr)))
 
         case _:
+            print(ast.dump(expr, include_attributes=True, indent=2))
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
 
 
