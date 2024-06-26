@@ -303,7 +303,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
             ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
-            return Value(tag=out, known=known, deps=deps, static=all(arg.static in args))
+            return Value(tag=out, known=known, deps=deps, static=all(arg.static for arg in args_out))
 
         case EOp(op, args):
             out = ctxt.sym(f"op_{op.name.lower()}")
