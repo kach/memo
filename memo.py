@@ -26,6 +26,7 @@ class Value:
     tag: str
     known: bool
     deps: set[tuple[Name, Id]]
+    static: bool
 
 
 @dataclass
@@ -284,7 +285,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
         case ELit(val):
             out = ctxt.sym("lit")
             ctxt.emit(f"{out} = jnp.array({val})")
-            return Value(tag=out, known=True, deps=set())
+            return Value(tag=out, known=True, deps=set(), static=True)
 
         case EChoice(id):
             if (Name("self"), id) not in ctxt.frame.choices:
@@ -292,7 +293,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ch = ctxt.frame.choices[(Name("self"), id)]
             # out = ctxt.sym("ch")
             # ctxt.emit(f"{out} = {ch.tag}")
-            return Value(tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]))
+            return Value(tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]), static=False)
 
         case EFFI(name, args):
             args_out = []
@@ -302,7 +303,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
             ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
-            return Value(tag=out, known=known, deps=deps)
+            return Value(tag=out, known=known, deps=deps, static=all(arg.static in args))
 
         case EOp(op, args):
             out = ctxt.sym(f"op_{op.name.lower()}")
@@ -339,7 +340,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                     case Op.OR:
                         ctxt.emit(f"{out} = {l.tag} | {r.tag}")
-                return Value(tag=out, known=l.known and r.known, deps=l.deps | r.deps)
+                return Value(tag=out, known=l.known and r.known, deps=l.deps | r.deps, static=l.static and r.static)
             elif op in [Op.EXP, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
@@ -350,18 +351,28 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = -({l.tag})")
                     case Op.INV:
                         ctxt.emit(f"{out} = ~({l.tag})")
-                return Value(tag=out, known=l.known, deps=l.deps)
+                return Value(tag=out, known=l.known, deps=l.deps, static=l.static)
             elif op == Op.ITE:
                 assert len(args) == 3
                 c = eval_expr(args[0], ctxt)
                 t = eval_expr(args[1], ctxt)
                 f = eval_expr(args[2], ctxt)
-                ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
-                return Value(
-                    tag=out,
-                    known=c.known and t.known and f.known,
-                    deps=c.deps | t.deps | f.deps,
-                )
+                if c.static:
+                    ctxt.emit(f"{out} = ({t}) if ({c}) else ({f})")
+                    return Value(
+                        tag=out,
+                        known=c.known and t.known and f.known,
+                        deps=c.deps | t.deps | f.deps,
+                        static=t.static and f.static
+                    )
+                else:
+                    ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
+                    return Value(
+                        tag=out,
+                        known=c.known and t.known and f.known,
+                        deps=c.deps | t.deps | f.deps,
+                        static=False
+                    )
             else:
                 raise NotImplementedError
 
@@ -415,6 +426,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 known=True,
                 # deps={(name, id) for (name, id) in val_.deps if ctxt.frame.choices[(name, id)].known}
                 deps=deps,
+                static=False
             )
 
         case EWith(who, expr):
@@ -455,7 +467,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 print(ctxt.frame.choices)
                 print(who, id)
                 raise e__
-            return Value(tag=val_.tag, known=known, deps=deps)
+            return Value(tag=val_.tag, known=known, deps=deps, static=False)
 
         case EImagine(do, then):
             ctxt.emit(f"\n# {ctxt.frame.name} imagines")
