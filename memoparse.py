@@ -1,5 +1,8 @@
 from memo import *
 import ast, inspect
+from typing import Any, Callable
+import textwrap
+from io import StringIO
 
 
 def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
@@ -96,7 +99,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice, static_parameters))
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
-            return EWith(who=Name(who_id), expr=EChoice(attr))
+            return EWith(who=Name(who_id), expr=EChoice(Id(attr)))
 
         case _:
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
@@ -165,7 +168,7 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
             raise Exception()
 
 
-def memo(f) -> None:
+def memo(f) -> Callable[..., Any]:
     src = inspect.getsource(f)
     lines, lineno = inspect.getsourcelines(f)
     tree = ast.parse(src)
@@ -175,7 +178,9 @@ def memo(f) -> None:
     static_parameters = []
 
     match tree:
-        case ast.Module(body=[ast.FunctionDef(_) as f]):
+        case ast.Module(body=[ast.FunctionDef(name=f_name) as f]):
+            # print(ast.dump(f, include_attributes=True, indent=2))
+            # print(f.name)
             for arg in f.args.args:
                 # assert isinstance(arg.annotation, ast.Name) and arg.annotation.id in ['float']
                 # assert arg.type_comment is None
@@ -198,7 +203,6 @@ def memo(f) -> None:
     stmts: list[Stmt] = []
     retval = None
     for stmt in f.body[1:]:
-        # print(ast.dump(stmt, include_attributes=True, indent=2))
         match stmt:
             case ast.AnnAssign(
                 target=ast.Name(id="forall"),
@@ -227,11 +231,11 @@ def memo(f) -> None:
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
     ctxt.emit(HEADER)
-    for stmt in stmts:
-        eval_stmt(stmt, ctxt)
+    for stmt_ in stmts:
+        eval_stmt(stmt_, ctxt)
     val = eval_expr(retval, ctxt)
     ctxt.emit(
-        f"return {val.tag}.squeeze(axis={tuple(-1-i for i in range(ctxt.next_idx) if i not in ctxt.forall_idxs)})"
+        f"return {val.tag}.squeeze(axis={tuple(-1-i for i in range(ctxt.next_idx) if i not in [z[0] for z in ctxt.forall_idxs])})"
     )
 
     out = (
@@ -239,6 +243,10 @@ def memo(f) -> None:
         + ", ".join(static_parameters)
         + "):\n"
         + textwrap.indent(io.getvalue(), "    ")
+        + "\n\n"
+        + "_out._foralls = ...\n"
+        + f"_out._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
+        + f"{f_name} = _out\n"
     )
 
     # for s in stmts:

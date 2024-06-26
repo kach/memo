@@ -19,7 +19,7 @@ ic.configureOutput(includeContext=True)
 
 Name = NewType("Name", str)
 Id = NewType("Id", str)
-
+Dom = NewType("Dom", str)
 
 @dataclass(frozen=True)
 class Value:
@@ -33,7 +33,7 @@ class Choice:
     tag: str
     idx: int
     known: bool
-    domain: list[float]
+    domain: Dom
     wpp_deps: set[tuple[Name, Id]]
 
 
@@ -120,7 +120,7 @@ class SPass:
 class SChoose:
     who: Name
     id: Id
-    domain: list[float]
+    domain: Dom
     wpp: Expr
 
 
@@ -148,7 +148,7 @@ class SShow:
 @dataclass(frozen=True)
 class SForAll:
     id: Id
-    domain: list[float]
+    domain: Dom
 
 
 Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll
@@ -169,7 +169,7 @@ class Context:
         self._sym += 1
         return f"{hint}_{self._sym}"
 
-    forall_idxs: list[int] = field(default_factory=list)
+    forall_idxs: list[tuple[int, Id, Dom]] = field(default_factory=list)
 
 
 HEADER = """\
@@ -503,7 +503,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame.choices[(Name("self"), id)] = Choice(
                 tag, idx, True, domain, set()
             )
-            ctxt.forall_idxs.append(idx)
+            ctxt.forall_idxs.append((
+                idx, id, domain
+            ))
 
         case SChoose(who, id, domain, wpp):
             if who not in ctxt.frame.children:

@@ -64,3 +64,5 @@ def f(beta):
     return l2_speaker(beta)[0, 0]
 ic(f(3.))
 
+ic(l2_speaker._memo)
+ic(l2_speaker._foralls)
