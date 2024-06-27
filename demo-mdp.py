@@ -20,7 +20,7 @@ def V(t):
     alice: given(s in S, wpp=1)
     alice: chooses(a in A, wpp=Q[s is self.s, a is self.a](t))
     alice: given(s_ in S, wpp=Tr(s, a, s_))
-    return E[R(alice.s, alice.a) + 0.99 * V[s is alice.s_](t - 1)]
+    return E[R(alice.s, alice.a) + (0. if t < 0 else 0.99 * V[s is alice.s_](t - 1))]
 
 @memo
 def Q(t):
@@ -32,7 +32,7 @@ def Q(t):
     alice: chooses(
         a in A,
         wpp=exp(
-            R(s, a) + (0. if t == 0 else 0.99 * imagine[
+            R(s, a) + (0. if t < 0 else 0.99 * imagine[
                 future_alice: given(s_ in S, wpp=Tr(s, a, s_)),
                 E[V[s is future_alice.s_](t - 1)]
             ])
@@ -40,4 +40,4 @@ def Q(t):
     )
     return E[alice.s == s and alice.a == a]
 
-ic(V(2))
+ic(V(3))

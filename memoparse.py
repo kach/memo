@@ -276,12 +276,15 @@ def memo(f) -> Callable[..., Any]:
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
     ctxt.emit(HEADER)
+    # ctxt.emit(f"print('{f_name}', {', '.join(static_parameters)})")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     val = eval_expr(retval, ctxt)
-    ctxt.emit(
-        f"return {val.tag}.squeeze(axis={tuple(-1-i for i in range(ctxt.next_idx) if i not in [z[0] for z in ctxt.forall_idxs])})"
-    )
+    # ctxt.emit(f"print({val.tag}, {val.tag}.shape)")
+    # print(ctxt.forall_idxs)
+    squeeze_axes = [-1-i for i in range(ctxt.next_idx) if i not in [z[0] for z in ctxt.forall_idxs]]
+    ctxt.emit(f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)})")
+    ctxt.emit(f"return {val.tag}")
 
     out = (
         f"""def _out_{f_name}("""
