@@ -18,11 +18,8 @@ def R(s, a):
 @memo
 def V(t):
     cast: [alice]
-    forall: s in S  ## TODO: alice "knows" self.s
-
+    forall: s in S
     alice: knows(self.s)
-    # alice: thinks[root: chooses(s in S, wpp=1)]
-    # alice: observes [root.s] is self.s
     alice: chooses(a in A, wpp=Q[s is self.s, a is self.a](t))
     alice: given(s_ in S, wpp=Tr(s, a, s_))
     return E[
@@ -47,7 +44,7 @@ def Q(t):
             ])
         )
     )
-    return E[alice.s == s and alice.a == a]
+    return E[alice.a == a]
 
 for t in range(200):
     ic(V(t))
