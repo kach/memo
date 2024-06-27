@@ -284,14 +284,14 @@ def memo(f) -> Callable[..., Any]:
     )
 
     out = (
-        """def _out("""
+        f"""def _out_{f_name}("""
         + ", ".join(static_parameters)
         + "):\n"
         + textwrap.indent(io.getvalue(), "    ")
         + "\n\n"
-        + "_out._foralls = ...\n"
-        + f"_out._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
-        + f"{f_name} = _out\n"
+        + f"_out_{f_name}._foralls = ...\n"
+        + f"_out_{f_name}._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
+        + f"{f_name} = _out_{f_name}\n"
     )
 
     # for s in stmts:
@@ -303,4 +303,4 @@ def memo(f) -> Callable[..., Any]:
     globals_of_caller = inspect.stack()[1].frame.f_globals
     retvals: dict[Any, Any] = {}
     exec(out, globals_of_caller, retvals)
-    return retvals["_out"]
+    return retvals[f"_out_{f_name}"]
