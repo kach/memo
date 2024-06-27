@@ -37,7 +37,7 @@ def Q(t):
     forall: s in S
     forall: a in A
 
-    alice: given(s in S, wpp=1)
+    alice: knows(self.s)
     alice: chooses(
         a in A,
         wpp=exp(
