@@ -28,7 +28,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                     left=ast.Name(id=target_id),
                     ops=[ast.Is()],
                     comparators=[
-                        ast.Attribute(value=ast.Name(id="self"), attr=source_id)
+                        ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
                     ],
                 ),
             ),
@@ -37,7 +37,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             return EMemo(
                 name=f_name,
                 args=[parse_expr(arg, static_parameters) for arg in args],
-                ids=[(target_id, source_id)],
+                ids=[(target_id, source_name, source_id)],
             )
 
         # memo call multi arg
@@ -52,10 +52,10 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                         left=ast.Name(id=target_id),
                         ops=[ast.Is()],
                         comparators=[
-                            ast.Attribute(value=ast.Name(id="self"), attr=source_id)
+                            ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
                         ],
                     ):
-                        ids.append((target_id, source_id))
+                        ids.append((target_id, source_name, source_id))
                     case _:
                         raise Exception()
             return EMemo(
