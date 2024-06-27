@@ -171,8 +171,16 @@ class Context:
     idx_history: list[str]
     _sym: int = -1
 
+    tab_level: int = 0
+
     def emit(self: Context, line: str) -> None:
-        print(line, file=self.io)
+        print('    ' * self.tab_level + line, file=self.io)
+
+    def indent(self: Context) -> None:
+        self.tab_level += 1
+
+    def dedent(self: Context) -> None:
+        self.tab_level -= 1
 
     def sym(self, hint: str = "") -> str:
         self._sym += 1
@@ -332,15 +340,16 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             """
             res = ctxt.sym(f"result_array")
             ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)})')
+            # ctxt.emit(f"print({res}, {res}.shape)")
 
             out_idxs = []
             for target_id, source_id in reversed(ids):
-                out_idxs.append(ctxt.frame.choices[("self", source_id)].idx)
+                out_idxs.append(ctxt.frame.choices[(Name("self"), source_id)].idx)
 
             ctxt.emit(
                 f'{res} = jnp.expand_dims({res}, ({",".join(str(-i - 1) for i in range(max(out_idxs) + 1 - len(out_idxs)))}))'
             )
-            permuted_dims = [None] * (max(out_idxs) + 1)
+            permuted_dims: list[None | int] = [None] * (max(out_idxs) + 1)
 
             for permuted_idx, source_idx in enumerate(out_idxs):
                 permuted_dims[-1 - source_idx] = permuted_idx
@@ -351,8 +360,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     permuted_dims[idx] = filler_count
                     filler_count += 1
 
-            ctxt.emit(f"print({res})")
             ctxt.emit(f"{res} = jnp.permute_dims({res}, {tuple(permuted_dims)})")
+            # ctxt.emit(f"print({tuple(permuted_dims)})")
+            # ctxt.emit(f"print({res}, {res}.shape)")
 
             return Value(tag=res, known=True, deps=set(), static=False)
 
@@ -411,10 +421,19 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             elif op == Op.ITE:
                 assert len(args) == 3
                 c = eval_expr(args[0], ctxt)
-                t = eval_expr(args[1], ctxt)
-                f = eval_expr(args[2], ctxt)
                 if c.static:
-                    ctxt.emit(f"{out} = ({t}) if ({c}) else ({f})")
+                    ctxt.emit(f"if {c.tag}:")
+                    ctxt.indent()
+                    t = eval_expr(args[1], ctxt)
+                    ctxt.emit(f"{out} = {t.tag}")
+                    ctxt.dedent()
+                    ctxt.emit("else:")
+                    ctxt.indent()
+                    f = eval_expr(args[2], ctxt)
+                    ctxt.emit(f"{out} = {f.tag}")
+                    ctxt.dedent()
+
+                    # ctxt.emit(f"{out} = ({t.tag}) if ({c.tag}) else ({f.tag})")
                     return Value(
                         tag=out,
                         known=c.known and t.known and f.known,
@@ -422,6 +441,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         static=t.static and f.static,
                     )
                 else:
+                    t = eval_expr(args[1], ctxt)
+                    f = eval_expr(args[2], ctxt)
                     ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
                     return Value(
                         tag=out,
@@ -451,7 +472,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     f"Redundant expectation {pprint_expr(e)}, not marginalizing"
                 )
                 return val_
-            ctxt.emit(f"\n# {ctxt.frame.name} expectation")
+            ctxt.emit(f"# {ctxt.frame.name} expectation")
             #             ctxt.emit(f'print({ctxt.frame.ll}, {ctxt.frame.ll}.shape)')
             #             ctxt.emit(f'print({val_.tag}, {val_.tag}.shape)')
             #             ctxt.emit(f'print(list(reversed({ctxt.idx_history})))')
@@ -526,7 +547,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             return Value(tag=val_.tag, known=known, deps=deps, static=False)
 
         case EImagine(do, then):
-            ctxt.emit(f"\n# {ctxt.frame.name} imagines")
+            ctxt.emit(f"# {ctxt.frame.name} imagines")
             future_name = Name(ctxt.sym(f"future_{ctxt.frame.name}"))
             future_frame = copy.deepcopy(ctxt.frame)
             future_frame.name = future_name
@@ -580,7 +601,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.next_idx += 1
             ctxt.idx_history.append(f"{who}.{id}")
             tag = ctxt.sym(f"{who}_{id}")
-            ctxt.emit(f"""\n# {who} choose {id}""")
+            ctxt.emit(f"""# {who} choose {id}""")
             ctxt.emit(
                 f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
             )
@@ -642,7 +663,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     # ch_val.wpp_deps.add((who, id))
 
             idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
-            ctxt.emit(f"""\n# {ctxt.frame.name} observe {who}.{id}""")
+            ctxt.emit(f"""# {ctxt.frame.name} observe {who}.{id}""")
             ctxt.emit(
                 f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
             )
@@ -656,7 +677,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame = f_old
 
         case SShow(who, target_who, target_id, source_who, source_id):
-            ctxt.emit(f"\n# telling {who} about {target_who}.{target_id}")
+            ctxt.emit(f"# telling {who} about {target_who}.{target_id}")
             if who not in ctxt.frame.children:
                 raise Exception(f"{ctxt.frame.name} is not yet modeling {who}")
             if (target_who, target_id) not in ctxt.frame.children[who].choices:

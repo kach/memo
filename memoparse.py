@@ -19,7 +19,8 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                 name=ffi_name,
                 args=[parse_expr(arg, static_parameters) for arg in ffi_args],
             )
-        # TODO: handle multiple ids
+
+        # memo call single arg
         case ast.Call(
             func=ast.Subscript(
                 value=ast.Name(id=f_name),
@@ -33,11 +34,34 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             ),
             args=args,
         ):
-            print(source_id)
             return EMemo(
                 name=f_name,
                 args=[parse_expr(arg, static_parameters) for arg in args],
                 ids=[(target_id, source_id)],
+            )
+
+        # memo call multi arg
+        case ast.Call(
+            func=ast.Subscript(value=ast.Name(id=f_name), slice=ast.Tuple(elts=elts)),
+            args=args
+        ):
+            ids = []
+            for elt in elts:
+                match elt:
+                    case ast.Compare(
+                        left=ast.Name(id=target_id),
+                        ops=[ast.Is()],
+                        comparators=[
+                            ast.Attribute(value=ast.Name(id="self"), attr=source_id)
+                        ],
+                    ):
+                        ids.append((target_id, source_id))
+                    case _:
+                        raise Exception()
+            return EMemo(
+                name=f_name,
+                args=[parse_expr(arg, static_parameters) for arg in args],
+                ids=ids,
             )
 
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
@@ -217,7 +241,7 @@ def memo(f) -> Callable[..., Any]:
                         assert isinstance(elt, ast.Name)
                         cast.append(elt.id)
                 case _:
-                    raise Exception()
+                    raise Exception("No cast!")
         case _:
             raise Exception()
 
