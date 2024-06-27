@@ -584,19 +584,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 eval_stmt(stmt, ctxt)
             val_ = eval_expr(then, ctxt)
             ctxt.frame = old_frame
-
             return val_
-
-            # future_name = Name(ctxt.sym(f"future_{ctxt.frame.name}"))
-            # future_frame = copy.deepcopy(ctxt.frame)
-            # future_frame.name = future_name
-            # future_frame.parent = ctxt.frame
-            # fresh_lls(ctxt, ctxt.frame)
-            # ctxt.frame.children[future_name] = future_frame
-            # for stmt in do:
-            #     eval_stmt(SWith(future_name, stmt), ctxt)
-            # val_ = eval_expr(EWith(future_name, then), ctxt)
-            # return val_
 
     raise NotImplementedError
 
@@ -745,15 +733,17 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
             )
-            # ctxt.emit(f'print("{ctxt.frame.children[who].ll}", {ctxt.frame.children[who].ll}.tolist(), {ctxt.frame.children[who].ll}.shape); print()')
 
-        # case SKnows(who, source_who, source_id):
-        #     source_addr = (source_who, source_id)
-        #     assert who in ctxt.frame.children
-        #     assert source_addr in ctxt.choices
-        #     ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[source_addr]
-        #     ctxt.frame.children[who].choices[source_addr].known = True
-        #     ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
+        case SKnows(who, source_who, source_id):
+            source_addr = (source_who, source_id)
+            if who not in ctxt.frame.children:
+                ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
+            assert source_addr in ctxt.frame.choices
+            ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[source_addr]
+            ctxt.frame.children[who].choices[source_addr].known = True
+            ctxt.frame.children[who].conditions[source_addr] = source_addr
+            print(ctxt.frame)
+            ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
 
         case _:
             raise NotImplementedError
