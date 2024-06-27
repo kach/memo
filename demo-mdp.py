@@ -14,22 +14,23 @@ def Tr(s, a, s_):
 def R(s, a):
     return s
 
+@cache
 @memo
 def V(t):
     cast: [alice]
     forall: s in S  ## TODO: alice "knows" self.s
 
-    # alice: knows(self.s)
-    # alice: given(s in S, wpp=1)
-    alice: thinks[env: chooses(s in S, wpp=1)]
-    alice: observes [env.s] is self.s
-    alice: chooses(a in A, wpp=Q[s is env.s, a is self.a](t))
-    alice: given(s_ in S, wpp=Tr(env.s, a, s_))
+    alice: knows(self.s)
+    # alice: thinks[root: chooses(s in S, wpp=1)]
+    # alice: observes [root.s] is self.s
+    alice: chooses(a in A, wpp=Q[s is self.s, a is self.a](t))
+    alice: given(s_ in S, wpp=Tr(s, a, s_))
     return E[
         R(s, alice.a)
         + (0. if t < 0 else 0.9 * V[s is alice.s_](t - 1))
     ]
 
+@cache
 @memo
 def Q(t):
     cast: [alice]
@@ -48,6 +49,6 @@ def Q(t):
     )
     return E[alice.s == s and alice.a == a]
 
-for t in range(20):
+for t in range(200):
     ic(V(t))
     ic(Q(t))

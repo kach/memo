@@ -306,7 +306,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
     match e:
         case ELit(val):
             out = ctxt.sym("lit")
-            ctxt.emit(f"{out} = jnp.array({val})")
+            # ctxt.emit(f"{out} = jnp.array({val})")
+            ctxt.emit(f"{out} = {val}")
             return Value(tag=out, known=True, deps=set(), static=True)
 
         case EChoice(id):
@@ -523,6 +524,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             if who == Name("self"):
                 return eval_expr(expr, ctxt)
             if who not in ctxt.frame.children:
+                print(who)
+                print(expr)
                 raise Exception(f"{ctxt.frame.name} asks, who is {who}?")
 
             old_frame = ctxt.frame
@@ -736,13 +739,14 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
 
         case SKnows(who, source_who, source_id):
             source_addr = (source_who, source_id)
+            # out_addr = (ctxt.frame.name if source_who == "self" else source_who, source_id)
             if who not in ctxt.frame.children:
                 ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
             assert source_addr in ctxt.frame.choices
             ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[source_addr]
             ctxt.frame.children[who].choices[source_addr].known = True
-            ctxt.frame.children[who].conditions[source_addr] = source_addr
-            print(ctxt.frame)
+            ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
+            ctxt.frame.conditions[(who, source_id)] = source_addr
             ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
 
         case _:

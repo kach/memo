@@ -295,7 +295,7 @@ def memo(f) -> Callable[..., Any]:
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
     ctxt.emit(HEADER)
-    # ctxt.emit(f"print('{f_name}', {', '.join(static_parameters)})")
+    # ctxt.emit(f"print('{f_name}', type({static_parameters[0]}))")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     val = eval_expr(retval, ctxt)
@@ -306,7 +306,8 @@ def memo(f) -> Callable[..., Any]:
     ctxt.emit(f"return {val.tag}")
 
     out = (
-        f"""def _out_{f_name}("""
+        ""
+        + f"""def _out_{f_name}("""
         + ", ".join(static_parameters)
         + "):\n"
         + textwrap.indent(io.getvalue(), "    ")
