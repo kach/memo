@@ -1,4 +1,5 @@
-from memoparse import memo, ic
+from memo import memo
+from icecream import ic
 
 DOORS = [1, 2, 3]
 

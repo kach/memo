@@ -1,4 +1,5 @@
-from memoparse import *
+from memo import memo
+from icecream import ic
 import jax
 import jax.numpy as np
 from functools import cache

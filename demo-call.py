@@ -1,4 +1,5 @@
-from memoparse import *
+from memo import memo
+from icecream import ic
 
 X = [0, 1, 2, 3]
 
