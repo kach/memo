@@ -53,7 +53,7 @@ class Frame:
 
 @dataclass(frozen=True)
 class ELit:
-    value: float
+    value: float | str
 
 
 Op = Enum(
@@ -117,7 +117,7 @@ class EImagine:
     then: Expr
 
 
-Expr = ELit | EOp | EFFI | EChoice | EExpect | EWith | EImagine
+Expr = ELit | EOp | EFFI | EMemo | EChoice | EExpect | EWith | EImagine
 
 
 @dataclass(frozen=True)

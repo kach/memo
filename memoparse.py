@@ -37,7 +37,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             return EMemo(
                 name=f_name,
                 args=[parse_expr(arg, static_parameters) for arg in args],
-                ids=[(target_id, source_name, source_id)],
+                ids=[(Id(target_id), Name(source_name), Id(source_id))],
             )
 
         # memo call multi arg
@@ -55,7 +55,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                             ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
                         ],
                     ):
-                        ids.append((target_id, source_name, source_id))
+                        ids.append((Id(target_id), Name(source_name), Id(source_id)))
                     case _:
                         raise Exception()
             return EMemo(
