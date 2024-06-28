@@ -43,7 +43,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
         # memo call multi arg
         case ast.Call(
             func=ast.Subscript(value=ast.Name(id=f_name), slice=ast.Tuple(elts=elts)),
-            args=args
+            args=args,
         ):
             ids = []
             for elt in elts:
@@ -52,7 +52,9 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                         left=ast.Name(id=target_id),
                         ops=[ast.Is()],
                         comparators=[
-                            ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
+                            ast.Attribute(
+                                value=ast.Name(id=source_name), attr=source_id
+                            )
                         ],
                     ):
                         ids.append((Id(target_id), Name(source_name), Id(source_id)))
@@ -180,13 +182,11 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
                     attr=source_id,
                 )
             ],
-            keywords=[]
+            keywords=[],
         ):
             return [
                 SKnows(
-                    who=Name(who),
-                    source_who=Name(source_who),
-                    source_id=Id(source_id)
+                    who=Name(who), source_who=Name(source_who), source_id=Id(source_id)
                 )
             ]
 
@@ -229,7 +229,7 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
                         raise Exception()
             return [SWith(who=Name(who), stmt=s) for s in stmts]
         case _:
-            raise Exception()
+            raise Exception(f"Unknown statement {expr} at line {expr.lineno}")
 
 
 def memo(f) -> Callable[..., Any]:
@@ -262,7 +262,11 @@ def memo(f) -> Callable[..., Any]:
                 case _:
                     raise Exception("No cast!")
         case _:
-            raise Exception()
+            raise Exception(
+                f"""\
+memo encountered a syntax error at {tree.lineno}:{tree.col_offset}.
+"""
+            )
 
     stmts: list[Stmt] = []
     retval = None
@@ -295,21 +299,22 @@ def memo(f) -> Callable[..., Any]:
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
     ctxt.emit(HEADER)
-    # ctxt.emit(f"print('{f_name}', type({static_parameters[0]}))")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     val = eval_expr(retval, ctxt)
-    # ctxt.emit(f"print({val.tag}, {val.tag}.shape)")
-    # print(ctxt.forall_idxs)
-    squeeze_axes = [-1-i for i in range(ctxt.next_idx) if i not in [z[0] for z in ctxt.forall_idxs]]
-    ctxt.emit(f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)})")
+    squeeze_axes = [
+        -1 - i
+        for i in range(ctxt.next_idx)
+        if i not in [z[0] for z in ctxt.forall_idxs]
+    ]
+    ctxt.emit(
+        f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)})"
+    )
     ctxt.emit(f"return {val.tag}")
 
     out = (
         ""
-        + f"""def _out_{f_name}("""
-        + ", ".join(static_parameters)
-        + "):\n"
+        + f"""def _out_{f_name}({", ".join(static_parameters)}):\n"""
         + textwrap.indent(io.getvalue(), "    ")
         + "\n\n"
         + f"_out_{f_name}._foralls = ...\n"

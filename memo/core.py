@@ -16,7 +16,6 @@ from icecream import ic  # type: ignore
 
 ic.configureOutput(includeContext=True)
 
-
 Name = NewType("Name", str)
 Id = NewType("Id", str)
 Dom = NewType("Dom", str)
@@ -166,6 +165,7 @@ class SKnows:
     source_who: Name
     source_id: Id
 
+
 Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll | SKnows
 
 
@@ -180,7 +180,7 @@ class Context:
     tab_level: int = 0
 
     def emit(self: Context, line: str) -> None:
-        print('    ' * self.tab_level + line, file=self.io)
+        print("    " * self.tab_level + line, file=self.io)
 
     def indent(self: Context) -> None:
         self.tab_level += 1
@@ -376,8 +376,10 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             return Value(
                 tag=res,
                 known=all(ctxt.frame.choices[sn, si].known for _, sn, si in ids),
-                deps=set.union(*(ctxt.frame.choices[sn, si].wpp_deps for _, sn, si in ids)),
-                static=False
+                deps=set.union(
+                    *(ctxt.frame.choices[sn, si].wpp_deps for _, sn, si in ids)
+                ),
+                static=False,
             )
 
         case EOp(op, args):
@@ -577,8 +579,10 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             child_frame.parent = current_frame_copy
             current_frame_copy.children[future_name] = child_frame
             k = list(current_frame_copy.choices.keys())
-            for (name, id) in k:
-                current_frame_copy.choices[future_name, id] = current_frame_copy.choices[name, id]
+            for name, id in k:
+                current_frame_copy.choices[future_name, id] = (
+                    current_frame_copy.choices[name, id]
+                )
                 current_frame_copy.conditions[future_name, id] = (name, id)
                 old_frame.conditions[future_name, id] = (name, id)
 
@@ -655,7 +659,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     new_deps.add(child_frame.conditions[(who_, id_)])
                 else:
                     print(child_frame.conditions)
-                    raise Exception(f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}")  # should always be true
+                    raise Exception(
+                        f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}"
+                    )  # should always be true
             ctxt.frame.choices[(who, id)] = Choice(tag, idx, False, domain, new_deps)
             id_ll = ctxt.sym(f"{id}_ll")
             ctxt.emit(
@@ -743,7 +749,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             if who not in ctxt.frame.children:
                 ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
             assert source_addr in ctxt.frame.choices
-            ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[source_addr]
+            ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[
+                source_addr
+            ]
             ctxt.frame.children[who].choices[source_addr].known = True
             ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
             ctxt.frame.conditions[(who, source_id)] = source_addr
