@@ -16,11 +16,11 @@ def denotes(u, r):
 def literal_speaker():
     cast: [speaker]
     forall: u_ in U
-    forall: r_ in R
-
-    speaker: given(r in R, wpp=1)
+    forall: r in R
+    speaker: knows(self.r)
     speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
-    return E[(speaker.u == u_) and (speaker.r == r_)]
+    return E[ speaker.u == u_ ]
+ic(literal_speaker())
 
 @memo
 def l1_listener():
@@ -29,7 +29,7 @@ def l1_listener():
     forall: r_ in R
 
     listener: thinks[
-        speaker: chooses(r in R, wpp=1),
+        speaker: given(r in R, wpp=1),
         speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
     ]
     listener: observes [speaker.u] is self.u
@@ -41,7 +41,8 @@ ic(l1_listener())
 def l2_speaker(beta):
     cast: [speaker, listener]
     forall: u_ in U
-    forall: r_ in R
+    forall: r in R
+    speaker: knows(self.r)
 
     speaker: thinks[
         listener: thinks[
@@ -50,19 +51,15 @@ def l2_speaker(beta):
         ]
     ]
 
-    speaker: chooses(r in R, wpp=1)
     speaker: chooses(u in U, wpp=imagine[
         listener: observes [speaker.u] is self.u,
         listener: chooses(r_ in R, wpp=E[speaker.r == r_]),
         exp(beta * E[listener.r_ == r])
     ])
-    return E[(speaker.u == u_) and (speaker.r == r_)]
+    return E[speaker.u == u_]
 ic(l2_speaker(3.))
 
 @jax.value_and_grad
 def f(beta):
     return l2_speaker(beta)[0, 0]
 ic(f(3.))
-
-ic(l2_speaker._memo)
-ic(l2_speaker._foralls)
