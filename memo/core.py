@@ -590,6 +590,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             for stmt in do:
                 eval_stmt(stmt, ctxt)
             val_ = eval_expr(then, ctxt)
+            val_ = Value(  ## ??
+                tag=val_.tag,
+                known=val_.known,
+                deps={ctxt.frame.conditions.get(d, d) for d in val_.deps},
+                static=val_.static
+            )
             ctxt.frame = old_frame
             return val_
 
@@ -658,7 +664,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 elif (who_, id_) in child_frame.conditions:
                     new_deps.add(child_frame.conditions[(who_, id_)])
                 else:
-                    print(child_frame.conditions)
+                    ic(child_frame.conditions)
+                    ic(wpp_val.deps)
+                    ic(child_frame.name)
                     raise Exception(
                         f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}"
                     )  # should always be true
@@ -754,7 +762,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ]
             ctxt.frame.children[who].choices[source_addr].known = True
             ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
+            # ic(who, source_id, ctxt.frame.name)
             ctxt.frame.conditions[(who, source_id)] = source_addr
+            # ic(ctxt.frame.conditions)
             ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
 
         case _:
