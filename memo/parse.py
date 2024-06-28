@@ -1,4 +1,4 @@
-from .code import *
+from .core import *
 import ast, inspect
 from typing import Any, Callable
 import textwrap
