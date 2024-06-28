@@ -41,9 +41,9 @@ class Choice:
 @dataclass
 class Frame:
     name: Name
-    choices: dict[tuple[Name, Id], Choice] = dataclasses.field(default_factory=dict)
-    children: dict[Name, Frame] = dataclasses.field(default_factory=dict)
-    conditions: dict[tuple[Name, Id], tuple[Name, Id]] = dataclasses.field(
+    choices: dict[tuple[Name, Id], Choice] = field(default_factory=dict)
+    children: dict[Name, Frame] = field(default_factory=dict)
+    conditions: dict[tuple[Name, Id], tuple[Name, Id]] = field(
         default_factory=dict
     )  # used to translate in EWith
     ll: str | None = None

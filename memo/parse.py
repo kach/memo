@@ -169,7 +169,7 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
                 SChoose(
                     who=Name(who),
                     id=Id(choice_id),
-                    domain=dom_id,
+                    domain=Dom(dom_id),
                     wpp=parse_expr(wpp_expr, static_parameters),
                 )
             ]
@@ -232,7 +232,7 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
             raise Exception(f"Unknown statement {expr} at line {expr.lineno}")
 
 
-def memo(f) -> Callable[..., Any]:
+def memo(f):  # type: ignore
     src = inspect.getsource(f)
     lines, lineno = inspect.getsourcelines(f)
     tree = ast.parse(src)
@@ -282,7 +282,7 @@ memo encountered a syntax error at {tree.lineno}:{tree.col_offset}.
                 value=None,
             ):
                 assert choice_id not in static_parameters
-                stmts.append(SForAll(id=Id(choice_id), domain=dom_id))
+                stmts.append(SForAll(id=Id(choice_id), domain=Dom(dom_id)))
             case ast.AnnAssign(target=ast.Name(id=who), annotation=expr, value=None):
                 assert who in cast
                 stmts.extend(parse_stmt(expr, who, static_parameters))
