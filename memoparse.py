@@ -20,6 +20,50 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                 args=[parse_expr(arg, static_parameters) for arg in ffi_args],
             )
 
+        # memo call single arg
+        case ast.Call(
+            func=ast.Subscript(
+                value=ast.Name(id=f_name),
+                slice=ast.Compare(
+                    left=ast.Name(id=target_id),
+                    ops=[ast.Is()],
+                    comparators=[
+                        ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
+                    ],
+                ),
+            ),
+            args=args,
+        ):
+            return EMemo(
+                name=f_name,
+                args=[parse_expr(arg, static_parameters) for arg in args],
+                ids=[(Id(target_id), Name(source_name), Id(source_id))],
+            )
+
+        # memo call multi arg
+        case ast.Call(
+            func=ast.Subscript(value=ast.Name(id=f_name), slice=ast.Tuple(elts=elts)),
+            args=args
+        ):
+            ids = []
+            for elt in elts:
+                match elt:
+                    case ast.Compare(
+                        left=ast.Name(id=target_id),
+                        ops=[ast.Is()],
+                        comparators=[
+                            ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
+                        ],
+                    ):
+                        ids.append((Id(target_id), Name(source_name), Id(source_id)))
+                    case _:
+                        raise Exception()
+            return EMemo(
+                name=f_name,
+                args=[parse_expr(arg, static_parameters) for arg in args],
+                ids=ids,
+            )
+
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
             return EOp(
                 op={ast.Eq: Op.EQ, ast.Lt: Op.LT, ast.Gt: Op.GT}[op.__class__],
@@ -102,6 +146,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             return EWith(who=Name(who_id), expr=EChoice(Id(attr)))
 
         case _:
+            print(ast.dump(expr, include_attributes=True, indent=2))
             raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
 
 
@@ -126,6 +171,25 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
                     wpp=parse_expr(wpp_expr, static_parameters),
                 )
             ]
+
+        case ast.Call(
+            func=ast.Name(id="knows"),
+            args=[
+                ast.Attribute(
+                    value=ast.Name(id=source_who),
+                    attr=source_id,
+                )
+            ],
+            keywords=[]
+        ):
+            return [
+                SKnows(
+                    who=Name(who),
+                    source_who=Name(source_who),
+                    source_id=Id(source_id)
+                )
+            ]
+
         case ast.Compare(
             left=ast.Subscript(
                 value=ast.Name(id="observes"),
@@ -196,7 +260,7 @@ def memo(f) -> Callable[..., Any]:
                         assert isinstance(elt, ast.Name)
                         cast.append(elt.id)
                 case _:
-                    raise Exception()
+                    raise Exception("No cast!")
         case _:
             raise Exception()
 
@@ -231,22 +295,26 @@ def memo(f) -> Callable[..., Any]:
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
     ctxt.emit(HEADER)
+    # ctxt.emit(f"print('{f_name}', type({static_parameters[0]}))")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     val = eval_expr(retval, ctxt)
-    ctxt.emit(
-        f"return {val.tag}.squeeze(axis={tuple(-1-i for i in range(ctxt.next_idx) if i not in [z[0] for z in ctxt.forall_idxs])})"
-    )
+    # ctxt.emit(f"print({val.tag}, {val.tag}.shape)")
+    # print(ctxt.forall_idxs)
+    squeeze_axes = [-1-i for i in range(ctxt.next_idx) if i not in [z[0] for z in ctxt.forall_idxs]]
+    ctxt.emit(f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)})")
+    ctxt.emit(f"return {val.tag}")
 
     out = (
-        """def _out("""
+        ""
+        + f"""def _out_{f_name}("""
         + ", ".join(static_parameters)
         + "):\n"
         + textwrap.indent(io.getvalue(), "    ")
         + "\n\n"
-        + "_out._foralls = ...\n"
-        + f"_out._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
-        + f"{f_name} = _out\n"
+        + f"_out_{f_name}._foralls = ...\n"
+        + f"_out_{f_name}._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
+        + f"{f_name} = _out_{f_name}\n"
     )
 
     # for s in stmts:
@@ -258,4 +326,4 @@ def memo(f) -> Callable[..., Any]:
     globals_of_caller = inspect.stack()[1].frame.f_globals
     retvals: dict[Any, Any] = {}
     exec(out, globals_of_caller, retvals)
-    return retvals["_out"]
+    return retvals[f"_out_{f_name}"]

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NewType, Any
+from typing import NewType, Any, Tuple
 
 import itertools
 from enum import Enum
@@ -20,6 +20,7 @@ ic.configureOutput(includeContext=True)
 Name = NewType("Name", str)
 Id = NewType("Id", str)
 Dom = NewType("Dom", str)
+
 
 @dataclass(frozen=True)
 class Value:
@@ -52,7 +53,7 @@ class Frame:
 
 @dataclass(frozen=True)
 class ELit:
-    value: float
+    value: float | str
 
 
 Op = Enum(
@@ -88,6 +89,13 @@ class EFFI:
 
 
 @dataclass(frozen=True)
+class EMemo:
+    name: str
+    args: list[Expr]
+    ids: list[Tuple[Id, Name, Id]]
+
+
+@dataclass(frozen=True)
 class EChoice:
     id: Id
 
@@ -109,7 +117,7 @@ class EImagine:
     then: Expr
 
 
-Expr = ELit | EOp | EFFI | EChoice | EExpect | EWith | EImagine
+Expr = ELit | EOp | EFFI | EMemo | EChoice | EExpect | EWith | EImagine
 
 
 @dataclass(frozen=True)
@@ -152,7 +160,13 @@ class SForAll:
     domain: Dom
 
 
-Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll
+@dataclass(frozen=True)
+class SKnows:
+    who: Name
+    source_who: Name
+    source_id: Id
+
+Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll | SKnows
 
 
 @dataclass
@@ -163,8 +177,16 @@ class Context:
     idx_history: list[str]
     _sym: int = -1
 
+    tab_level: int = 0
+
     def emit(self: Context, line: str) -> None:
-        print(line, file=self.io)
+        print('    ' * self.tab_level + line, file=self.io)
+
+    def indent(self: Context) -> None:
+        self.tab_level += 1
+
+    def dedent(self: Context) -> None:
+        self.tab_level -= 1
 
     def sym(self, hint: str = "") -> str:
         self._sym += 1
@@ -284,16 +306,20 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
     match e:
         case ELit(val):
             out = ctxt.sym("lit")
-            ctxt.emit(f"{out} = jnp.array({val})")
+            # ctxt.emit(f"{out} = jnp.array({val})")
+            ctxt.emit(f"{out} = {val}")
             return Value(tag=out, known=True, deps=set(), static=True)
 
         case EChoice(id):
             if (Name("self"), id) not in ctxt.frame.choices:
+                print(ctxt.frame.choices)
                 raise Exception(f"{ctxt.frame.name} has not yet chosen {id}")
             ch = ctxt.frame.choices[(Name("self"), id)]
             # out = ctxt.sym("ch")
             # ctxt.emit(f"{out} = {ch.tag}")
-            return Value(tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]), static=False)
+            return Value(
+                tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]), static=False
+            )
 
         case EFFI(name, args):
             args_out = []
@@ -303,7 +329,56 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
             ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
-            return Value(tag=out, known=known, deps=deps, static=all(arg.static for arg in args_out))
+            return Value(
+                tag=out,
+                known=known,
+                deps=deps,
+                static=all(arg.static for arg in args_out),
+            )
+
+        case EMemo(name, args, ids):
+            args_out = []
+            for arg in args:
+                args_out.append(eval_expr(arg, ctxt))
+
+            assert all(
+                arg.static for arg in args_out
+            ), """
+            all arguments to memo functions must be statically known!
+            """
+            res = ctxt.sym(f"result_array")
+            ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)})')
+            # ctxt.emit(f"print({res}, {res}.shape)")
+
+            out_idxs = []
+            for target_id, source_name, source_id in reversed(ids):
+                out_idxs.append(ctxt.frame.choices[(source_name, source_id)].idx)
+                # TODO: assert domains match here, too
+
+            ctxt.emit(
+                f'{res} = jnp.expand_dims({res}, ({",".join(str(-i - 1) for i in range(max(out_idxs) + 1 - len(out_idxs)))}))'
+            )
+            permuted_dims: list[None | int] = [None] * (max(out_idxs) + 1)
+
+            for permuted_idx, source_idx in enumerate(out_idxs):
+                permuted_dims[-1 - source_idx] = permuted_idx
+
+            filler_count = len(out_idxs)
+            for idx in range(len(permuted_dims)):
+                if permuted_dims[idx] is None:
+                    permuted_dims[idx] = filler_count
+                    filler_count += 1
+
+            ctxt.emit(f"{res} = jnp.permute_dims({res}, {tuple(permuted_dims)})")
+            # ctxt.emit(f"print({tuple(permuted_dims)})")
+            # ctxt.emit(f"print({res}, {res}.shape)")
+
+            return Value(
+                tag=res,
+                known=all(ctxt.frame.choices[sn, si].known for _, sn, si in ids),
+                deps=set.union(*(ctxt.frame.choices[sn, si].wpp_deps for _, sn, si in ids)),
+                static=False
+            )
 
         case EOp(op, args):
             out = ctxt.sym(f"op_{op.name.lower()}")
@@ -340,7 +415,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                     case Op.OR:
                         ctxt.emit(f"{out} = {l.tag} | {r.tag}")
-                return Value(tag=out, known=l.known and r.known, deps=l.deps | r.deps, static=l.static and r.static)
+                return Value(
+                    tag=out,
+                    known=l.known and r.known,
+                    deps=l.deps | r.deps,
+                    static=l.static and r.static,
+                )
             elif op in [Op.EXP, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
@@ -355,23 +435,34 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             elif op == Op.ITE:
                 assert len(args) == 3
                 c = eval_expr(args[0], ctxt)
-                t = eval_expr(args[1], ctxt)
-                f = eval_expr(args[2], ctxt)
                 if c.static:
-                    ctxt.emit(f"{out} = ({t}) if ({c}) else ({f})")
+                    ctxt.emit(f"if {c.tag}:")
+                    ctxt.indent()
+                    t = eval_expr(args[1], ctxt)
+                    ctxt.emit(f"{out} = {t.tag}")
+                    ctxt.dedent()
+                    ctxt.emit("else:")
+                    ctxt.indent()
+                    f = eval_expr(args[2], ctxt)
+                    ctxt.emit(f"{out} = {f.tag}")
+                    ctxt.dedent()
+
+                    # ctxt.emit(f"{out} = ({t.tag}) if ({c.tag}) else ({f.tag})")
                     return Value(
                         tag=out,
                         known=c.known and t.known and f.known,
                         deps=c.deps | t.deps | f.deps,
-                        static=t.static and f.static
+                        static=t.static and f.static,
                     )
                 else:
+                    t = eval_expr(args[1], ctxt)
+                    f = eval_expr(args[2], ctxt)
                     ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
                     return Value(
                         tag=out,
                         known=c.known and t.known and f.known,
                         deps=c.deps | t.deps | f.deps,
-                        static=False
+                        static=False,
                     )
             else:
                 raise NotImplementedError
@@ -395,7 +486,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     f"Redundant expectation {pprint_expr(e)}, not marginalizing"
                 )
                 return val_
-            ctxt.emit(f"\n# {ctxt.frame.name} expectation")
+            ctxt.emit(f"# {ctxt.frame.name} expectation")
             #             ctxt.emit(f'print({ctxt.frame.ll}, {ctxt.frame.ll}.shape)')
             #             ctxt.emit(f'print({val_.tag}, {val_.tag}.shape)')
             #             ctxt.emit(f'print(list(reversed({ctxt.idx_history})))')
@@ -426,13 +517,15 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 known=True,
                 # deps={(name, id) for (name, id) in val_.deps if ctxt.frame.choices[(name, id)].known}
                 deps=deps,
-                static=False
+                static=False,
             )
 
         case EWith(who, expr):
             if who == Name("self"):
                 return eval_expr(expr, ctxt)
             if who not in ctxt.frame.children:
+                print(who)
+                print(expr)
                 raise Exception(f"{ctxt.frame.name} asks, who is {who}?")
 
             old_frame = ctxt.frame
@@ -470,20 +563,30 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             return Value(tag=val_.tag, known=known, deps=deps, static=False)
 
         case EImagine(do, then):
-            ctxt.emit(f"\n# {ctxt.frame.name} imagines")
-            future_name = Name(ctxt.sym(f"future_{ctxt.frame.name}"))
-            future_frame = copy.deepcopy(ctxt.frame)
-            future_frame.name = future_name
-            future_frame.parent = ctxt.frame
-            if ctxt.frame.ll is not None:
-                fresh_lls(ctxt, ctxt.frame)
-                # ll = ctxt.sym(f"{ctxt.frame.name}_ll")
-                # ctxt.emit(f"{ll} = {ctxt.frame.ll}")
-                # future_frame.ll = ll
-            ctxt.frame.children[future_name] = future_frame
+            ctxt.emit(f"# {ctxt.frame.name} imagines")
+
+            future_name = Name(f"future_{ctxt.frame.name}")
+            old_frame = ctxt.frame
+            old_frame.children[future_name] = Frame(name=future_name, parent=old_frame)
+            current_frame_copy = copy.deepcopy(ctxt.frame)
+            fresh_lls(ctxt, current_frame_copy)
+
+            child_frame = copy.deepcopy(current_frame_copy)
+            fresh_lls(ctxt, child_frame)
+            child_frame.name = future_name
+            child_frame.parent = current_frame_copy
+            current_frame_copy.children[future_name] = child_frame
+            k = list(current_frame_copy.choices.keys())
+            for (name, id) in k:
+                current_frame_copy.choices[future_name, id] = current_frame_copy.choices[name, id]
+                current_frame_copy.conditions[future_name, id] = (name, id)
+                old_frame.conditions[future_name, id] = (name, id)
+
+            ctxt.frame = current_frame_copy
             for stmt in do:
-                eval_stmt(SWith(future_name, stmt), ctxt)
-            val_ = eval_expr(EWith(future_name, then), ctxt)
+                eval_stmt(stmt, ctxt)
+            val_ = eval_expr(then, ctxt)
+            ctxt.frame = old_frame
             return val_
 
     raise NotImplementedError
@@ -515,9 +618,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame.choices[(Name("self"), id)] = Choice(
                 tag, idx, True, domain, set()
             )
-            ctxt.forall_idxs.append((
-                idx, id, domain
-            ))
+            ctxt.forall_idxs.append((idx, id, domain))
 
         case SChoose(who, id, domain, wpp):
             if who not in ctxt.frame.children:
@@ -526,7 +627,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.next_idx += 1
             ctxt.idx_history.append(f"{who}.{id}")
             tag = ctxt.sym(f"{who}_{id}")
-            ctxt.emit(f"""\n# {who} choose {id}""")
+            ctxt.emit(f"""# {who} choose {id}""")
             ctxt.emit(
                 f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
             )
@@ -553,7 +654,8 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 elif (who_, id_) in child_frame.conditions:
                     new_deps.add(child_frame.conditions[(who_, id_)])
                 else:
-                    raise Exception("??")  # should always be true
+                    print(child_frame.conditions)
+                    raise Exception(f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}")  # should always be true
             ctxt.frame.choices[(who, id)] = Choice(tag, idx, False, domain, new_deps)
             id_ll = ctxt.sym(f"{id}_ll")
             ctxt.emit(
@@ -588,7 +690,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     # ch_val.wpp_deps.add((who, id))
 
             idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
-            ctxt.emit(f"""\n# {ctxt.frame.name} observe {who}.{id}""")
+            ctxt.emit(f"""# {ctxt.frame.name} observe {who}.{id}""")
             ctxt.emit(
                 f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
             )
@@ -602,7 +704,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame = f_old
 
         case SShow(who, target_who, target_id, source_who, source_id):
-            ctxt.emit(f"\n# telling {who} about {target_who}.{target_id}")
+            ctxt.emit(f"# telling {who} about {target_who}.{target_id}")
             if who not in ctxt.frame.children:
                 raise Exception(f"{ctxt.frame.name} is not yet modeling {who}")
             if (target_who, target_id) not in ctxt.frame.children[who].choices:
@@ -634,7 +736,18 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
             )
-            # ctxt.emit(f'print("{ctxt.frame.children[who].ll}", {ctxt.frame.children[who].ll}.tolist(), {ctxt.frame.children[who].ll}.shape); print()')
+
+        case SKnows(who, source_who, source_id):
+            source_addr = (source_who, source_id)
+            # out_addr = (ctxt.frame.name if source_who == "self" else source_who, source_id)
+            if who not in ctxt.frame.children:
+                ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
+            assert source_addr in ctxt.frame.choices
+            ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[source_addr]
+            ctxt.frame.children[who].choices[source_addr].known = True
+            ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
+            ctxt.frame.conditions[(who, source_id)] = source_addr
+            ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
 
         case _:
             raise NotImplementedError
