@@ -1,4 +1,4 @@
-from .memo import *
+from .code import *
 import ast, inspect
 from typing import Any, Callable
 import textwrap

@@ -1,1 +1,1 @@
-from .memoparse import memo
+from .parse import memo
