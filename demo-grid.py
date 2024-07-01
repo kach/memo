@@ -18,7 +18,12 @@ W = 5
 S = np.arange(H * W)  # state space is a number line from 0 to N
 G = np.array([0, 4])
 
-A = [ 0, 1, 2, 3, ]  # left, right, up, down
+A = [
+    0,
+    1,
+    2,
+    3,
+]  # left, right, up, down
 
 coord_actions = np.array(
     [
@@ -105,14 +110,7 @@ def V(t):
     )
 
     # her value depends on the expected V-function at the next state
-    return E[
-        R(
-            s,
-            alice.a,
-            g
-        )
-        + (0.0 if t < 0 else (0.0 if is_terminating(s) else 0.9 * V[s is alice.s_, g is self.g](t - 1)))
-    ]
+    return E[R(s, alice.a, g) + (0.0 if t < 0 else (0.0 if is_terminating(s) else 0.9 * V[s is alice.s_, g is self.g](t - 1)))]
 
 
 @cache
@@ -132,11 +130,7 @@ def π(t):
         wpp=exp(
             2.0
             * (
-                R(
-                    s,
-                    a,
-                    g
-                )
+                R(s, a, g)
                 + (
                     0.0
                     if t < 0
@@ -173,12 +167,13 @@ def invplan():
     observer: knows(self.s)
 
     observer: thinks[
-        alice: chooses(g in G, wpp=1),
-        alice: knows(self.s),
-        alice: chooses(a in A, wpp=π[s is self.s, a is self.a, g is self.g](200)),
+        alice : chooses(g in G, wpp=1),
+        alice : knows(self.s),
+        alice : chooses(a in A, wpp=π[s is self.s, a is self.a, g is self.g](200)),
     ]
-    observer: observes [alice.a] is self.a
+    observer: observes[alice.a] is self.a
     return observer[E[alice.g == 0]]
+
 
 value_fn = ic(V(200)).reshape((2, H, W))[0]
 p = plt.imshow(
