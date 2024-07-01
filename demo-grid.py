@@ -1,36 +1,24 @@
-from functools import (
-    cache,
-)
+from functools import cache
 
-from icecream import (
-    ic,
-)
+from icecream import ic
 import jax
 import jax.numpy as np
 import matplotlib.pyplot as plt
 
-from memo import (
-    memo,
-)
+from memo import memo
 
 H = 10
 W = 5
-S = np.arange(H * W)  # state space is a number line from 0 to N
+S = np.arange(H * W)
 G = np.array([0, 4])
-
-A = [
-    0,
-    1,
-    2,
-    3,
-]  # left, right, up, down
+A = np.array([0, 1, 2, 3])  # left, right, up, down
 
 coord_actions = np.array(
     [
         [-1, 0],
-        [1, 0],
+        [+1, 0],
         [0, -1],
-        [0, 1],
+        [0, +1],
     ]
 )
 
@@ -49,39 +37,29 @@ maze = np.array(
         0, 0, 0, 0, 0,
     ]
 )
-
-
 # fmt: on
+
+
 @jax.jit
 def Tr(s, a, s_):
-    """Move by a along the number line, clamp to edges."""
     x = s % W
     y = s // W
 
     next_coords = np.array([x, y]) + coord_actions[a]
-    next_state = np.clip(
-        next_coords[0],
-        0,
-        W - 1,
-    ) + W * np.clip(
-        next_coords[1],
-        0,
-        H - 1,
+    next_state = (
+        np.clip(next_coords[0], 0, W - 1) + W * np.clip(next_coords[1], 0, H - 1)
     )
     return 1.0 * ((next_state == s_) & (maze[next_state] == 0)) + 1.0 * ((maze[next_state] == 1) & (s == s_))
 
 
 @jax.jit
 def R(s, a, g):
-    """Reward of 1 for being on the final state."""
+    """Reward of 1 for being on the goal state."""
     return 1.0 * (s == g)
 
 
 @jax.jit
-def is_terminating(
-    s,
-):
-    # return s == 0
+def is_terminating(s):
     return False
 
 
@@ -127,25 +105,14 @@ def π(t):
     # alice chooses her action based on a softmax over future value
     alice: chooses(
         a in A,
-        wpp=exp(
-            2.0
-            * (
-                R(s, a, g)
-                + (
-                    0.0
-                    if t < 0
+        wpp=exp(2.0 * (
+                R(s, a, g) + (
+                    0.0 if t < 0
                     else (
-                        0.0
-                        if is_terminating(s)
-                        else 0.9
-                        * imagine[
-                            future_alice : given(
-                                s_ in S,
-                                wpp=Tr(
-                                    s,
-                                    a,
-                                    s_,
-                                ),
+                        0.0 if is_terminating(s)
+                        else 0.9 * imagine[
+                            future_alice: given(
+                                s_ in S, wpp=Tr(s, a, s_),
                             ),
                             E[V[s is future_alice.s_, g is future_alice.g](t - 1)],
                         ]
@@ -175,30 +142,30 @@ def invplan():
     return observer[E[alice.g == 0]]
 
 
-value_fn = ic(V(200)).reshape((2, H, W))[0]
-p = plt.imshow(
-    value_fn,
-    origin="upper",
-    cmap="PuRd_r",
-)
-plt.colorbar(p)
+# value_fn = ic(V(200)).reshape((2, H, W))[0]
+# p = plt.imshow(
+#     value_fn,
+#     origin="upper",
+#     cmap="PuRd_r",
+# )
+# plt.colorbar(p)
 
-policy = ic(π(200)).reshape(2, 4, H, W)[0]
-print(policy.shape)
-policy = policy.argmax(axis=0)
+# policy = ic(π(200)).reshape(2, 4, H, W)[0]
+# print(policy.shape)
+# policy = policy.argmax(axis=0)
 
-directions = coord_actions[policy]
-print(directions.shape)
+# directions = coord_actions[policy]
+# print(directions.shape)
 
-plt.quiver(
-    np.arange(W),
-    np.arange(H),
-    directions[:, :, 0],
-    -directions[:, :, 1],
-    color="red",
-)
-plt.axis("off")
-plt.show()
+# plt.quiver(
+#     np.arange(W),
+#     np.arange(H),
+#     directions[:, :, 0],
+#     -directions[:, :, 1],
+#     color="red",
+# )
+# plt.axis("off")
+# plt.show()
 
 posterior = invplan()
 plt.imshow(
