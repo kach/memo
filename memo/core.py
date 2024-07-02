@@ -32,7 +32,7 @@ class MemoError(Exception):
         hint: str | None,
         user: bool,
         ctxt: Context | None,
-        loc: SourceLocation | None
+        loc: SourceLocation | None,
     ) -> None:
         self.message = message
         self.hint = hint
@@ -378,7 +378,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
                         user=True,
                         ctxt=None,
-                        loc=arg_node.loc
+                        loc=arg_node.loc,
                     )
 
             res = ctxt.sym(f"result_array")
@@ -629,7 +629,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 tag=val_.tag,
                 known=val_.known,
                 deps={ctxt.frame.conditions.get(d, d) for d in val_.deps},
-                static=val_.static
+                static=val_.static,
             )
             ctxt.frame = old_frame
             return val_
@@ -766,7 +766,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 )
             # TODO: assert domains match
 
-            eval_stmt(SWith(who, SObserve(target_who, target_id, loc=None), loc=None), ctxt)
+            eval_stmt(
+                SWith(who, SObserve(target_who, target_id, loc=None), loc=None), ctxt
+            )
             target_addr = (target_who, target_id)
             source_addr = (source_who, source_id)
             assert (

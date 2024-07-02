@@ -15,10 +15,7 @@ class ParsingContext:
     loc_file: str
 
 
-def parse_expr(
-    expr: ast.expr,
-    ctxt: ParsingContext
-) -> Expr:
+def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
         case ast.Constant(value=val):
@@ -30,9 +27,7 @@ def parse_expr(
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
             return EFFI(
-                name=ffi_name,
-                args=[parse_expr(arg, ctxt) for arg in ffi_args],
-                loc=loc
+                name=ffi_name, args=[parse_expr(arg, ctxt) for arg in ffi_args], loc=loc
             )
 
         # memo call single arg
@@ -53,7 +48,7 @@ def parse_expr(
                 name=f_name,
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=[(Id(target_id), Name(source_name), Id(source_id))],
-                loc=loc
+                loc=loc,
             )
 
         # memo call multi arg
@@ -80,7 +75,7 @@ def parse_expr(
                 name=f_name,
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=ids,
-                loc=loc
+                loc=loc,
             )
 
         # operators
@@ -91,7 +86,7 @@ def parse_expr(
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
                 ],
-                loc=loc
+                loc=loc,
             )
 
         case ast.UnaryOp(op=op, operand=operand):
@@ -102,7 +97,7 @@ def parse_expr(
                     ast.Invert: Op.INV,
                 }[op.__class__],
                 args=[o_expr],
-                loc=loc
+                loc=loc,
             )
 
         case ast.BinOp(left=e1, op=op, right=e2):
@@ -117,7 +112,7 @@ def parse_expr(
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
                 ],
-                loc=loc
+                loc=loc,
             )
 
         case ast.BoolOp(op=op, values=values):
@@ -127,7 +122,7 @@ def parse_expr(
                     hint=None,
                     user=False,
                     ctxt=None,
-                    loc=loc
+                    loc=loc,
                 )
             e1, e2 = values
             return EOp(
@@ -136,7 +131,7 @@ def parse_expr(
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
                 ],
-                loc=loc
+                loc=loc,
             )
 
         case ast.IfExp(test=test, body=body, orelse=orelse):
@@ -177,19 +172,19 @@ def parse_expr(
                     hint=f"Did you either misspell `{who_id}`, or forget to include `{who_id}` in the cast?",
                     user=True,
                     ctxt=None,
-                    loc=loc
+                    loc=loc,
                 )
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt), loc=loc)
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
-            if who_id not in ctxt.cast and who_id != 'self':
+            if who_id not in ctxt.cast and who_id != "self":
                 raise MemoError(
                     f"agent `{who_id}` is not in the cast",
                     hint=f"Did you either misspell `{who_id}`, or forget to include `{who_id}` in the cast?",
                     user=True,
                     ctxt=None,
-                    loc=loc
+                    loc=loc,
                 )
             return EWith(who=Name(who_id), expr=EChoice(Id(attr), loc=loc), loc=loc)
 
@@ -199,7 +194,7 @@ def parse_expr(
                 hint=f"The full expression is {ast.dump(expr)}",
                 user=True,
                 ctxt=None,
-                loc=loc
+                loc=loc,
             )
 
 
@@ -223,7 +218,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     id=Id(choice_id),
                     domain=Dom(dom_id),
                     wpp=parse_expr(wpp_expr, ctxt),
-                    loc=loc
+                    loc=loc,
                 )
             ]
 
@@ -239,8 +234,10 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
         ):
             return [
                 SKnows(
-                    who=Name(who), source_who=Name(source_who), source_id=Id(source_id),
-                    loc=loc
+                    who=Name(who),
+                    source_who=Name(source_who),
+                    source_id=Id(source_id),
+                    loc=loc,
                 )
             ]
 
@@ -262,7 +259,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     target_id=Id(target_id),
                     source_who=Name(source_who),
                     source_id=Id(source_id),
-                    loc=loc
+                    loc=loc,
                 )
             ]
         case ast.Subscript(
@@ -289,7 +286,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 hint=f"The full statement is {ast.dump(expr)}",
                 user=True,
                 ctxt=None,
-                loc=loc
+                loc=loc,
             )
 
 
@@ -328,7 +325,9 @@ def memo_(f):  # type: ignore
                         hint="The first line of a memo should always declare the cast of agents you will be working with. For example, to declare a memo which reasons about the two agents alice and bob, you would write `cast: [alice, bob]`.",
                         user=True,
                         ctxt=None,
-                        loc=SourceLocation(src_file, first_stmt.lineno, first_stmt.col_offset, f_name)
+                        loc=SourceLocation(
+                            src_file, first_stmt.lineno, first_stmt.col_offset, f_name
+                        ),
                     )
         case _:
             raise MemoError(
@@ -336,14 +335,14 @@ def memo_(f):  # type: ignore
                 hint=None,
                 user=False,
                 ctxt=None,
-                loc=SourceLocation(src_file, f.lineno, f.col_offset, "??")
+                loc=SourceLocation(src_file, f.lineno, f.col_offset, "??"),
             )
 
     pctxt = ParsingContext(
         cast=cast,
         static_parameters=static_parameters,
         loc_name=f_name,
-        loc_file=src_file
+        loc_file=src_file,
     )
     stmts: list[Stmt] = []
     retval = None
@@ -359,9 +358,15 @@ def memo_(f):  # type: ignore
                 value=None,
             ):
                 assert choice_id not in static_parameters
-                stmts.append(SForAll(id=Id(choice_id), domain=Dom(dom_id), loc=SourceLocation(
-                    pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
-                )))
+                stmts.append(
+                    SForAll(
+                        id=Id(choice_id),
+                        domain=Dom(dom_id),
+                        loc=SourceLocation(
+                            pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
+                        ),
+                    )
+                )
             case ast.AnnAssign(target=ast.Name(id=who), annotation=expr, value=None):
                 if who not in cast:
                     raise MemoError(
@@ -369,7 +374,9 @@ def memo_(f):  # type: ignore
                         hint=f"Did you either misspell `{who}`, or forget to include `{who}` in the cast?",
                         user=True,
                         ctxt=None,
-                        loc=SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
+                        loc=SourceLocation(
+                            pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
+                        ),
                     )
                 stmts.extend(parse_stmt(expr, who, pctxt))
             case ast.Return(value=expr) if expr is not None:
@@ -379,7 +386,9 @@ def memo_(f):  # type: ignore
                         hint=f"A memo should only have one return statement, at the end",
                         user=True,
                         ctxt=None,
-                        loc=SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
+                        loc=SourceLocation(
+                            pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
+                        ),
                     )
                 retval = parse_expr(expr, pctxt)
             case _:
@@ -388,7 +397,9 @@ def memo_(f):  # type: ignore
                     hint=f"The full statement is {ast.dump(stmt)}",
                     user=True,
                     ctxt=None,
-                    loc=SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
+                    loc=SourceLocation(
+                        pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
+                    ),
                 )
 
     if retval is None:
@@ -397,7 +408,7 @@ def memo_(f):  # type: ignore
             hint=f"All memos should end with a return statement",
             user=True,
             ctxt=None,
-            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name)
+            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name),
         )
 
     io = StringIO()
@@ -444,12 +455,12 @@ def memo(f):  # type: ignore
     except MemoError as e:
         if e.loc:
             # e.add_note(f"memo error: {e.message}")
-            e.add_note(f"    at: {e.loc.name} in {os.path.basename(e.loc.file)} line {e.loc.line} column {e.loc.offset + 1}")
+            e.add_note(
+                f"    at: {e.loc.name} in {os.path.basename(e.loc.file)} line {e.loc.line} column {e.loc.offset + 1}"
+            )
         if e.hint is not None:
             for line in textwrap.wrap(
-                e.hint,
-                initial_indent   ='  hint: ',
-                subsequent_indent='        '
+                e.hint, initial_indent="  hint: ", subsequent_indent="        "
             ):
                 e.add_note(line)
         if e.ctxt:  # TODO
@@ -457,7 +468,9 @@ def memo(f):  # type: ignore
         raise
         if not e.user:
             e.add_note("")
-            e.add_note("[We think this may be a bug in memo: if you don't understand what is going on, please get in touch with us!]")
+            e.add_note(
+                "[We think this may be a bug in memo: if you don't understand what is going on, please get in touch with us!]"
+            )
             # e.add_note("Just to be safe, we will print some additional debugging information at this time. You can include this information in bug reports submitted to the memo developers.")
         #     raise
         # return None
