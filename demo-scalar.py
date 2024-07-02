@@ -22,12 +22,12 @@ def scalar():
     listener: thinks[
         speaker: given(n in N, wpp=1),
         speaker: chooses(u in U, wpp=imagine[
-            listener: knows(self.u),
+            listener: knows(u),
             listener: chooses(n in N, wpp=meaning(n, u)),
-            E[listener.n == self.n]
+            E[listener.n == n]
         ])
     ]
-    listener: observes [speaker.u] is self.u
+    listener: hears [speaker.u] is u
     listener: chooses(n in N, wpp=E[speaker.n == n])
 
     return E[listener.n == n]

@@ -69,6 +69,12 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                         ],
                     ):
                         ids.append((Id(target_id), Name(source_name), Id(source_id)))
+                    case ast.Compare(
+                        left=ast.Name(id=target_id),
+                        ops=[ast.Is()],
+                        comparators=[ast.Name(id=source_id)],
+                    ):
+                        ids.append((Id(target_id), Name("self"), Id(source_id)))
                     case _:
                         raise Exception()
             return EMemo(
@@ -222,6 +228,21 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 )
             ]
 
+        # knows with/without self
+        case ast.Call(
+            func=ast.Name(id="knows"),
+            args=[ast.Name(id=source_id)],
+            keywords=[],
+        ):
+            return [
+                SKnows(
+                    who=Name(who),
+                    source_who=Name("self"),
+                    source_id=Id(source_id),
+                    loc=loc,
+                )
+            ]
+
         case ast.Call(
             func=ast.Name(id="knows"),
             args=[
@@ -241,9 +262,10 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 )
             ]
 
+        # observes with/without self
         case ast.Compare(
             left=ast.Subscript(
-                value=ast.Name(id="observes"),
+                value=ast.Name(id="observes" | "sees" | "hears"),
                 slice=ast.Attribute(
                     value=ast.Name(id=target_who),
                     attr=target_id,
@@ -262,6 +284,29 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     loc=loc,
                 )
             ]
+
+        case ast.Compare(
+            left=ast.Subscript(
+                value=ast.Name(id="observes" | "sees" | "hears"),
+                slice=ast.Attribute(
+                    value=ast.Name(id=target_who),
+                    attr=target_id,
+                ),
+            ),
+            ops=[ast.Is()],
+            comparators=[ast.Name(source_id)],
+        ):
+            return [
+                SShow(
+                    who=Name(who),
+                    target_who=Name(target_who),
+                    target_id=Id(target_id),
+                    source_who=Name("self"),
+                    source_id=Id(source_id),
+                    loc=loc,
+                )
+            ]
+
         case ast.Subscript(
             value=ast.Name("thinks"), slice=ast.Slice(lower=ast.Name(who_), upper=expr_)
         ) if expr_ is not None:

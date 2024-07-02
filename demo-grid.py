@@ -70,17 +70,12 @@ def V(t):
     forall: s in S
     forall: g in G
 
-    alice: knows(self.s)
-    alice: knows(self.g)
+    alice: knows(s)
+    alice: knows(g)
 
     # alice chooses her action based on her policy
     alice: chooses(
-        a in A,
-        wpp=π[
-            s is self.s,
-            a is self.a,
-            g is self.g,
-        ](t),
+        a in A, wpp=π[s is s, a is a, g is g](t),
     )
     alice: given(
         s_ in S,
@@ -88,7 +83,7 @@ def V(t):
     )
 
     # her value depends on the expected V-function at the next state
-    return E[R(s, alice.a, g) + (0.0 if t < 0 else (0.0 if is_terminating(s) else 0.9 * V[s is alice.s_, g is self.g](t - 1)))]
+    return E[R(s, alice.a, g) + (0.0 if t < 0 else (0.0 if is_terminating(s) else 0.9 * V[s is alice.s_, g is g](t - 1)))]
 
 
 @cache
@@ -99,8 +94,8 @@ def π(t):
     forall: a in A
     forall: g in G
 
-    alice: knows(self.s)
-    alice: knows(self.g)
+    alice: knows(s)
+    alice: knows(g)
 
     # alice chooses her action based on a softmax over future value
     alice: chooses(
@@ -130,15 +125,15 @@ def invplan():
     forall: s in S
     forall: a in A
 
-    observer: knows(self.a)
-    observer: knows(self.s)
+    observer: knows(a)
+    observer: knows(s)
 
     observer: thinks[
-        alice : chooses(g in G, wpp=1),
-        alice : knows(self.s),
-        alice : chooses(a in A, wpp=π[s is self.s, a is self.a, g is self.g](200)),
+        alice: chooses(g in G, wpp=1),
+        alice: knows(s),
+        alice: chooses(a in A, wpp=π[s is s, a is a, g is g](200)),
     ]
-    observer: observes[alice.a] is self.a
+    observer: observes [alice.a] is a
     return observer[E[alice.g == 0]]
 
 
@@ -152,12 +147,9 @@ p = plt.imshow(
 plt.colorbar(p)
 
 policy = (π(200)).reshape(2, 4, H, W)[0]
-print(policy.shape)
 policy = policy.argmax(axis=0)
 
 directions = coord_actions[policy]
-print(directions.shape)
-
 plt.quiver(
     np.arange(W),
     np.arange(H),
@@ -180,7 +172,6 @@ plt.quiver(np.arange(W), np.arange(H), -np.ones((H, W)), np.zeros((H, W)), poste
 plt.quiver(np.arange(W), np.arange(H), np.ones((H, W)), np.zeros((H, W)), posterior[1].reshape((H, W)), cmap="coolwarm", clim=(0, 1))
 plt.quiver(np.arange(W), np.arange(H), np.zeros((H, W)), np.ones((H, W)), posterior[2].reshape((H, W)), cmap="coolwarm", clim=(0, 1))
 plt.quiver(np.arange(W), np.arange(H), np.zeros((H, W)), -np.ones((H, W)), posterior[3].reshape((H, W)), cmap="coolwarm", clim=(0, 1))
-# plt.colorbar()
 
 plt.gca().add_patch(plt.Rectangle((-0.5, -0.5), W, H, fill="tab:gray", ec="black", linewidth=5, alpha=0.25))
 
