@@ -29,7 +29,7 @@ def scalar():
         # "pragmatic" speaker, as on webppl.org
         speaker: chooses(u in U, wpp=imagine[
             listener: knows(self.u),
-            listener: chooses(n in N, wpp=meaning(n, self.u)),
+            listener: chooses(n in N, wpp=meaning(n, u)),
             E[listener.n == self.n]
         ])
     ]
