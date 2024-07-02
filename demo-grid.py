@@ -26,13 +26,13 @@ coord_actions = np.array(
 maze = np.array(
     [
         0, 0, 0, 0, 0,
+        0, 1, 0, 1, 0,
         0, 1, 1, 1, 0,
-        0, 1, 1, 1, 0,
         0, 1, 0, 1, 0,
         0, 1, 0, 1, 0,
         0, 1, 0, 1, 0,
         0, 1, 0, 1, 0,
-        0, 1, 0, 1, 0,
+        0, 1, 0, 0, 0,
         0, 1, 0, 0, 0,
         0, 0, 0, 0, 0,
     ]
@@ -142,31 +142,33 @@ def invplan():
     return observer[E[alice.g == 0]]
 
 
-# value_fn = ic(V(200)).reshape((2, H, W))[0]
-# p = plt.imshow(
-#     value_fn,
-#     origin="upper",
-#     cmap="PuRd_r",
-# )
-# plt.colorbar(p)
+plt.subplot(1, 2, 1)
+value_fn = (V(200)).reshape((2, H, W))[0]
+p = plt.imshow(
+    value_fn,
+    origin="upper",
+    cmap="PuRd_r",
+)
+plt.colorbar(p)
 
-# policy = ic(π(200)).reshape(2, 4, H, W)[0]
-# print(policy.shape)
-# policy = policy.argmax(axis=0)
+policy = (π(200)).reshape(2, 4, H, W)[0]
+print(policy.shape)
+policy = policy.argmax(axis=0)
 
-# directions = coord_actions[policy]
-# print(directions.shape)
+directions = coord_actions[policy]
+print(directions.shape)
 
-# plt.quiver(
-#     np.arange(W),
-#     np.arange(H),
-#     directions[:, :, 0],
-#     -directions[:, :, 1],
-#     color="red",
-# )
-# plt.axis("off")
-# plt.show()
+plt.quiver(
+    np.arange(W),
+    np.arange(H),
+    directions[:, :, 0],
+    -directions[:, :, 1],
+    color="red",
+)
+plt.axis("off")
 
+
+plt.subplot(1, 2, 2)
 posterior = invplan()
 plt.imshow(
     1 - maze.reshape((H, W)),
@@ -183,5 +185,4 @@ plt.quiver(np.arange(W), np.arange(H), np.zeros((H, W)), -np.ones((H, W)), poste
 plt.gca().add_patch(plt.Rectangle((-0.5, -0.5), W, H, fill="tab:gray", ec="black", linewidth=5, alpha=0.25))
 
 plt.axis("off")
-plt.ion()
-# plt.show()
+plt.savefig('out.png')
