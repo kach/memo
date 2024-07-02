@@ -395,6 +395,17 @@ def memo_(f):  # type: ignore
     )
     stmts: list[Stmt] = []
     retval = None
+
+    for tp in f.type_params:
+        assert isinstance(tp.bound, ast.Name)
+        stmts.append(
+            SForAll(
+                id=Id(tp.name),
+                domain=Dom(tp.bound.id),
+                loc=None
+            )
+        )
+
     for stmt in f.body[1:]:
         match stmt:
             case ast.AnnAssign(

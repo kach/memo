@@ -65,11 +65,8 @@ def is_terminating(s, g):
 
 @cache
 @memo
-def V(t):
+def V[s: S, g: G](t):
     cast: [alice]
-    forall: s in S
-    forall: g in G
-
     alice: knows(s)
     alice: knows(g)
 
@@ -88,12 +85,8 @@ def V(t):
 
 @cache
 @memo
-def π(t):
+def π[s: S, a: A, g: G](t):
     cast: [alice]
-    forall: s in S
-    forall: a in A
-    forall: g in G
-
     alice: knows(s)
     alice: knows(g)
 
@@ -115,11 +108,8 @@ def π(t):
 
 
 @memo
-def invplan():
+def invplan[s: S, a: A]():
     cast: [observer, alice]
-    forall: s in S
-    forall: a in A
-
     observer: knows(a)
     observer: knows(s)
 

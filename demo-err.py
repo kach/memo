@@ -4,6 +4,13 @@ from icecream import ic
 X = [1, 2, 3]
 
 @memo
+def g[t: X]():
+    cast: []
+    return 1.0 + t
+ic(g())
+
+'''
+@memo
 def f():
     cast: [alice]
     alice: chooses(x in X, wpp=1)
@@ -18,3 +25,4 @@ def f():
     return 1.0
     # return bob.x
 ic(f())
+'''

@@ -4,6 +4,6 @@ memo is a new probabilistic programming language for expressing computational co
 
 ## Installing memo
 
-1. memo is based on Python. Before installing memo, make sure you have Python 3.11 or higher installed. You can check this by running `python --version`.
+1. memo is based on Python. Before installing memo, make sure you have Python 3.12 or higher installed. You can check this by running `python --version`.
 2. Next, install [JAX](https://github.com/google/jax), a Python module that memo uses to produce fast, differentiable, GPU-enabled code. If you don't have a GPU, then running `pip install jax` should be enough. Otherwise, please consult the JAX website for installation instructions. You can check if JAX is installed by running `import jax` in Python.
 3. Finally, install memo by running `pip install TBD`. You can check if memo is installed by running `import memo` in Python.
