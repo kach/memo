@@ -19,6 +19,7 @@ def parse_expr(
     expr: ast.expr,
     ctxt: ParsingContext
 ) -> Expr:
+    loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
         case ast.Constant(value=val):
             assert isinstance(val, float) or isinstance(val, int)
@@ -120,7 +121,7 @@ def parse_expr(
                     hint=None,
                     user=False,
                     ctxt=None,
-                    loc=SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
+                    loc=loc
                 )
             e1, e2 = values
             return EOp(
@@ -164,11 +165,26 @@ def parse_expr(
         # choice
         case ast.Subscript(value=ast.Name(id=who_id), slice=slice):
             # TODO: check who_id in cast...
+            if who_id not in ctxt.cast:
+                raise MemoError(
+                    f"agent `{who_id}` is not in the cast",
+                    hint=f"Did you either misspell `{who_id}`, or forget to include `{who_id}` in the cast?",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt))
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
-            # TODO: check here as well
+            if who_id not in ctxt.cast:
+                raise MemoError(
+                    f"agent `{who_id}` is not in the cast",
+                    hint=f"Did you either misspell `{who_id}`, or forget to include `{who_id}` in the cast?",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
             return EWith(who=Name(who_id), expr=EChoice(Id(attr)))
 
         case _:
@@ -177,11 +193,12 @@ def parse_expr(
                 hint=f"The full expression is {ast.dump(expr)}",
                 user=True,
                 ctxt=None,
-                loc=SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
+                loc=loc
             )
 
 
 def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
+    loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
         case ast.Call(
             func=ast.Name(id="chooses" | "given"),
@@ -263,7 +280,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 hint=f"The full statement is {ast.dump(expr)}",
                 user=True,
                 ctxt=None,
-                loc=SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
+                loc=loc
             )
 
 
@@ -341,7 +358,7 @@ def memo_(f):  # type: ignore
                         hint=f"Did you either misspell `{who}`, or forget to include `{who}` in the cast?",
                         user=True,
                         ctxt=None,
-                        loc=SourceLocation(src_file, stmt.lineno, stmt.col_offset, f_name)
+                        loc=SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
                     )
                 stmts.extend(parse_stmt(expr, who, pctxt))
             case ast.Return(value=expr) if expr is not None:

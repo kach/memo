@@ -5,3 +5,4 @@ paper/*
 scratch/*
 *.ipynb
 .env/
+figures.key

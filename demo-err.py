@@ -10,6 +10,6 @@ def f():
     #     bob: (yield from f)
     # ]
     # return 1.0
-    return 1.0
-    return 1.0
+    # return 1.0
+    return bob.x
 print(f())
