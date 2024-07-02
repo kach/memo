@@ -2,10 +2,22 @@ from .core import *
 import ast, inspect
 from typing import Any, Callable
 import textwrap
+import os, sys
 from io import StringIO
 
 
-def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
+@dataclass
+class ParsingContext:
+    cast: list[str]
+    static_parameters: list[str]
+    loc_name: str
+    loc_file: str
+
+
+def parse_expr(
+    expr: ast.expr,
+    static_parameters: list[str]
+) -> Expr:
     match expr:
         case ast.Constant(value=val):
             assert isinstance(val, float) or isinstance(val, int)
@@ -66,6 +78,7 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
                 ids=ids,
             )
 
+        # operators
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
             return EOp(
                 op={ast.Eq: Op.EQ, ast.Lt: Op.LT, ast.Gt: Op.GT}[op.__class__],
@@ -119,16 +132,19 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             f_expr = parse_expr(orelse, static_parameters)
             return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr])
 
+        # literals
         case ast.Name(id=id):
             if id in static_parameters:
                 return ELit(id)
             return EChoice(id=Id(id))
 
+        # expected value
         case ast.Subscript(value=ast.Name(id="E"), slice=slice):
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EExpect(expr=parse_expr(slice, static_parameters))
 
+        # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):
             stmts = []
             for elt in elts[:-1]:
@@ -140,11 +156,14 @@ def parse_expr(expr: ast.expr, static_parameters: list[str]) -> Expr:
             assert not isinstance(elts[-1], ast.Slice)
             return EImagine(do=stmts, then=parse_expr(elts[-1], static_parameters))
 
+        # choice
         case ast.Subscript(value=ast.Name(id=who_id), slice=slice):
+            # TODO: check who_id in cast...
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
             return EWith(who=Name(who_id), expr=parse_expr(slice, static_parameters))
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
+            # TODO: check here as well
             return EWith(who=Name(who_id), expr=EChoice(Id(attr)))
 
         case _:
@@ -232,8 +251,10 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
             raise Exception(f"Unknown statement {expr} at line {expr.lineno}")
 
 
-def memo(f):  # type: ignore
+def memo_(f):  # type: ignore
     src = inspect.getsource(f)
+    src_file = inspect.getsourcefile(f)
+    assert src_file is not None
     lines, lineno = inspect.getsourcelines(f)
     tree = ast.parse(src)
     ast.increment_lineno(tree, n=lineno - 1)
@@ -244,10 +265,10 @@ def memo(f):  # type: ignore
     match tree:
         case ast.Module(body=[ast.FunctionDef(name=f_name) as f]):
             # print(ast.dump(f, include_attributes=True, indent=2))
-            # print(f.name)
             for arg in f.args.args:
                 # assert isinstance(arg.annotation, ast.Name) and arg.annotation.id in ['float']
-                # assert arg.type_comment is None
+                # should always be true, see https://docs.python.org/3.8/library/ast.html#ast.parse
+                assert arg.type_comment is None
                 static_parameters.append(arg.arg)
             first_stmt = f.body[0]
             match first_stmt:
@@ -260,12 +281,20 @@ def memo(f):  # type: ignore
                         assert isinstance(elt, ast.Name)
                         cast.append(elt.id)
                 case _:
-                    raise Exception("No cast!")
+                    raise MemoError(
+                        "No cast",
+                        hint="The first line of a memo should always declare the cast of agents you will be working with. For example, to declare a memo which reasons about the two agents alice and bob, you would write `cast: [alice, bob]`.",
+                        user=True,
+                        ctxt=None,
+                        loc=SourceLocation(src_file, first_stmt.lineno, first_stmt.col_offset, f_name)
+                    )
         case _:
-            raise Exception(
-                f"""\
-memo encountered a syntax error at {tree.lineno}:{tree.col_offset}.
-"""
+            raise MemoError(
+                "Unknown syntax error",
+                hint=None,
+                user=False,
+                ctxt=None,
+                loc=SourceLocation(src_file, f.lineno, f.col_offset, "??")
             )
 
     stmts: list[Stmt] = []
@@ -284,7 +313,14 @@ memo encountered a syntax error at {tree.lineno}:{tree.col_offset}.
                 assert choice_id not in static_parameters
                 stmts.append(SForAll(id=Id(choice_id), domain=Dom(dom_id)))
             case ast.AnnAssign(target=ast.Name(id=who), annotation=expr, value=None):
-                assert who in cast
+                if who not in cast:
+                    raise MemoError(
+                        f"agent `{who}` is not in the cast",
+                        hint=f"Did you either misspell `{who}`, or forget to include `{who}` in the cast?",
+                        user=True,
+                        ctxt=None,
+                        loc=SourceLocation(src_file, stmt.lineno, stmt.col_offset, f_name)
+                    )
                 stmts.extend(parse_stmt(expr, who, static_parameters))
             case ast.Return(value=expr) if expr is not None:
                 if retval is not None:
@@ -317,8 +353,8 @@ memo encountered a syntax error at {tree.lineno}:{tree.col_offset}.
         + f"""def _out_{f_name}({", ".join(static_parameters)}):\n"""
         + textwrap.indent(io.getvalue(), "    ")
         + "\n\n"
-        + f"_out_{f_name}._foralls = ...\n"
-        + f"_out_{f_name}._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
+        # + f"_out_{f_name}._foralls = ...\n"
+        # + f"_out_{f_name}._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
         + f"{f_name} = _out_{f_name}\n"
     )
 
@@ -328,7 +364,35 @@ memo encountered a syntax error at {tree.lineno}:{tree.col_offset}.
     # for i, line in enumerate(out.splitlines()):
     #     print(f"{i + 1: 5d}  {line}")
 
-    globals_of_caller = inspect.stack()[1].frame.f_globals
+    globals_of_caller = inspect.stack()[2].frame.f_globals
     retvals: dict[Any, Any] = {}
     exec(out, globals_of_caller, retvals)
     return retvals[f"_out_{f_name}"]
+
+
+def memo(f):  # type: ignore
+    try:
+        return memo_(f)  # type: ignore
+    except MemoError as e:
+        if e.loc:
+            # e.add_note(f"memo error: {e.message}")
+            e.add_note(f" compiling: {e.loc.name}")
+            e.add_note(f"        at: {os.path.basename(e.loc.file)} line {e.loc.line} column {e.loc.offset + 1}")
+        else:
+            e.add_note(f"memo error: {e.message}")
+        if e.hint is not None:
+            for line in textwrap.wrap(
+                e.hint,
+                initial_indent   ='      hint: ',
+                subsequent_indent='            '
+            ):
+                e.add_note(line)
+        if e.ctxt:  # TODO
+            e.add_note(repr(e.ctxt))
+        raise
+        if not e.user:
+            e.add_note("")
+            e.add_note("[We think this may be a bug in memo: if you don't understand what is going on, please get in touch with us!]")
+            # e.add_note("Just to be safe, we will print some additional debugging information at this time. You can include this information in bug reports submitted to the memo developers.")
+        #     raise
+        # return None

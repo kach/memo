@@ -16,6 +16,31 @@ from icecream import ic  # type: ignore
 
 ic.configureOutput(includeContext=True)
 
+
+@dataclass(frozen=True)
+class SourceLocation:
+    file: str
+    line: int
+    offset: int
+    name: str
+
+
+class MemoError(Exception):
+    def __init__(
+        self: MemoError,
+        message: str,
+        hint: str | None,
+        user: bool,
+        ctxt: Context | None,
+        loc: SourceLocation | None
+    ) -> None:
+        self.message = message
+        self.hint = hint
+        self.user = user
+        self.ctxt = ctxt
+        self.loc = loc
+
+
 Name = NewType("Name", str)
 Id = NewType("Id", str)
 Dom = NewType("Dom", str)
