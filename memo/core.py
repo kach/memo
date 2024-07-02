@@ -75,8 +75,13 @@ class Frame:
     parent: Frame | None = None
 
 
+@dataclass(frozen=True, kw_only=True)
+class SyntaxNode:
+    loc: SourceLocation | None
+
+
 @dataclass(frozen=True)
-class ELit:
+class ELit(SyntaxNode):
     value: float | str
 
 
@@ -101,42 +106,42 @@ Op = Enum(
 
 
 @dataclass(frozen=True)
-class EOp:
+class EOp(SyntaxNode):
     op: Op
     args: list[Expr]
 
 
 @dataclass(frozen=True)
-class EFFI:
+class EFFI(SyntaxNode):
     name: str
     args: list[Expr]
 
 
 @dataclass(frozen=True)
-class EMemo:
+class EMemo(SyntaxNode):
     name: str
     args: list[Expr]
     ids: list[Tuple[Id, Name, Id]]
 
 
 @dataclass(frozen=True)
-class EChoice:
+class EChoice(SyntaxNode):
     id: Id
 
 
 @dataclass(frozen=True)
-class EExpect:
+class EExpect(SyntaxNode):
     expr: Expr
 
 
 @dataclass(frozen=True)
-class EWith:
+class EWith(SyntaxNode):
     who: Name
     expr: Expr
 
 
 @dataclass(frozen=True)
-class EImagine:
+class EImagine(SyntaxNode):
     do: list[Stmt]
     then: Expr
 
@@ -145,12 +150,12 @@ Expr = ELit | EOp | EFFI | EMemo | EChoice | EExpect | EWith | EImagine
 
 
 @dataclass(frozen=True)
-class SPass:
+class SPass(SyntaxNode):
     pass
 
 
 @dataclass(frozen=True)
-class SChoose:
+class SChoose(SyntaxNode):
     who: Name
     id: Id
     domain: Dom
@@ -158,19 +163,19 @@ class SChoose:
 
 
 @dataclass(frozen=True)
-class SObserve:
+class SObserve(SyntaxNode):
     who: Name
     id: Id
 
 
 @dataclass(frozen=True)
-class SWith:
+class SWith(SyntaxNode):
     who: Name
     stmt: Stmt
 
 
 @dataclass(frozen=True)
-class SShow:
+class SShow(SyntaxNode):
     who: Name
     target_who: Name
     target_id: Id
@@ -179,13 +184,13 @@ class SShow:
 
 
 @dataclass(frozen=True)
-class SForAll:
+class SForAll(SyntaxNode):
     id: Id
     domain: Dom
 
 
 @dataclass(frozen=True)
-class SKnows:
+class SKnows(SyntaxNode):
     who: Name
     source_who: Name
     source_id: Id
@@ -756,7 +761,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 )
             # TODO: assert domains match
 
-            eval_stmt(SWith(who, SObserve(target_who, target_id)), ctxt)
+            eval_stmt(SWith(who, SObserve(target_who, target_id, loc=None), loc=None), ctxt)
             target_addr = (target_who, target_id)
             source_addr = (source_who, source_id)
             assert (

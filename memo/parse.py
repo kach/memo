@@ -23,15 +23,16 @@ def parse_expr(
     match expr:
         case ast.Constant(value=val):
             assert isinstance(val, float) or isinstance(val, int)
-            return ELit(value=val)
+            return ELit(value=val, loc=loc)
 
         case ast.Call(func=ast.Name(id="exp"), args=[e1]):
-            return EOp(op=Op.EXP, args=[parse_expr(e1, ctxt)])
+            return EOp(op=Op.EXP, args=[parse_expr(e1, ctxt)], loc=loc)
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
             return EFFI(
                 name=ffi_name,
                 args=[parse_expr(arg, ctxt) for arg in ffi_args],
+                loc=loc
             )
 
         # memo call single arg
@@ -52,6 +53,7 @@ def parse_expr(
                 name=f_name,
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=[(Id(target_id), Name(source_name), Id(source_id))],
+                loc=loc
             )
 
         # memo call multi arg
@@ -78,6 +80,7 @@ def parse_expr(
                 name=f_name,
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=ids,
+                loc=loc
             )
 
         # operators
@@ -88,6 +91,7 @@ def parse_expr(
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
                 ],
+                loc=loc
             )
 
         case ast.UnaryOp(op=op, operand=operand):
@@ -98,6 +102,7 @@ def parse_expr(
                     ast.Invert: Op.INV,
                 }[op.__class__],
                 args=[o_expr],
+                loc=loc
             )
 
         case ast.BinOp(left=e1, op=op, right=e2):
@@ -112,6 +117,7 @@ def parse_expr(
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
                 ],
+                loc=loc
             )
 
         case ast.BoolOp(op=op, values=values):
@@ -130,25 +136,26 @@ def parse_expr(
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
                 ],
+                loc=loc
             )
 
         case ast.IfExp(test=test, body=body, orelse=orelse):
             c_expr = parse_expr(test, ctxt)
             t_expr = parse_expr(body, ctxt)
             f_expr = parse_expr(orelse, ctxt)
-            return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr])
+            return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr], loc=loc)
 
         # literals
         case ast.Name(id=id):
             if id in ctxt.static_parameters:
-                return ELit(id)
-            return EChoice(id=Id(id))
+                return ELit(id, loc=loc)
+            return EChoice(id=Id(id), loc=loc)
 
         # expected value
         case ast.Subscript(value=ast.Name(id="E"), slice=slice):
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
-            return EExpect(expr=parse_expr(slice, ctxt))
+            return EExpect(expr=parse_expr(slice, ctxt), loc=loc)
 
         # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):
@@ -160,11 +167,10 @@ def parse_expr(
                     ) if expr_ is not None:
                         stmts.extend(parse_stmt(expr_, who_, ctxt))
             assert not isinstance(elts[-1], ast.Slice)
-            return EImagine(do=stmts, then=parse_expr(elts[-1], ctxt))
+            return EImagine(do=stmts, then=parse_expr(elts[-1], ctxt), loc=loc)
 
         # choice
         case ast.Subscript(value=ast.Name(id=who_id), slice=slice):
-            # TODO: check who_id in cast...
             if who_id not in ctxt.cast:
                 raise MemoError(
                     f"agent `{who_id}` is not in the cast",
@@ -175,9 +181,9 @@ def parse_expr(
                 )
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
-            return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt))
+            return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt), loc=loc)
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
-            if who_id not in ctxt.cast:
+            if who_id not in ctxt.cast and who_id != 'self':
                 raise MemoError(
                     f"agent `{who_id}` is not in the cast",
                     hint=f"Did you either misspell `{who_id}`, or forget to include `{who_id}` in the cast?",
@@ -185,7 +191,7 @@ def parse_expr(
                     ctxt=None,
                     loc=loc
                 )
-            return EWith(who=Name(who_id), expr=EChoice(Id(attr)))
+            return EWith(who=Name(who_id), expr=EChoice(Id(attr), loc=loc), loc=loc)
 
         case _:
             raise MemoError(
@@ -217,6 +223,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     id=Id(choice_id),
                     domain=Dom(dom_id),
                     wpp=parse_expr(wpp_expr, ctxt),
+                    loc=loc
                 )
             ]
 
@@ -232,7 +239,8 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
         ):
             return [
                 SKnows(
-                    who=Name(who), source_who=Name(source_who), source_id=Id(source_id)
+                    who=Name(who), source_who=Name(source_who), source_id=Id(source_id),
+                    loc=loc
                 )
             ]
 
@@ -254,13 +262,14 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     target_id=Id(target_id),
                     source_who=Name(source_who),
                     source_id=Id(source_id),
+                    loc=loc
                 )
             ]
         case ast.Subscript(
             value=ast.Name("thinks"), slice=ast.Slice(lower=ast.Name(who_), upper=expr_)
         ) if expr_ is not None:
             return [
-                SWith(who=Name(who), stmt=s)
+                SWith(who=Name(who), stmt=s, loc=loc)
                 for s in parse_stmt(expr_, who_, ctxt)
             ]
         case ast.Subscript(value=ast.Name("thinks"), slice=ast.Tuple(elts=elts)):
@@ -273,7 +282,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                         stmts.extend(parse_stmt(expr_, who_, ctxt))
                     case _:
                         raise Exception()
-            return [SWith(who=Name(who), stmt=s) for s in stmts]
+            return [SWith(who=Name(who), stmt=s, loc=s.loc) for s in stmts]
         case _:
             raise MemoError(
                 f"Unknown statement syntax",
@@ -350,7 +359,9 @@ def memo_(f):  # type: ignore
                 value=None,
             ):
                 assert choice_id not in static_parameters
-                stmts.append(SForAll(id=Id(choice_id), domain=Dom(dom_id)))
+                stmts.append(SForAll(id=Id(choice_id), domain=Dom(dom_id), loc=SourceLocation(
+                    pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
+                )))
             case ast.AnnAssign(target=ast.Name(id=who), annotation=expr, value=None):
                 if who not in cast:
                     raise MemoError(

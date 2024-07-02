@@ -28,9 +28,9 @@ def scalar():
 
         # "pragmatic" speaker, as on webppl.org
         speaker: chooses(u in U, wpp=imagine[
-            listener_: knows(self.u),
-            listener_: chooses(n in N, wpp=meaning(n, self.u)),
-            E[listener_.n == self.n]
+            listener: knows(self.u),
+            listener: chooses(n in N, wpp=meaning(n, self.u)),
+            E[listener.n == self.n]
         ])
     ]
     listener: observes [speaker.u] is self.u
