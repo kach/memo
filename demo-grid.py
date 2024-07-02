@@ -13,30 +13,26 @@ S = np.arange(H * W)
 G = np.array([0, 4])
 A = np.array([0, 1, 2, 3])  # left, right, up, down
 
-coord_actions = np.array(
-    [
-        [-1, 0],
-        [+1, 0],
-        [0, -1],
-        [0, +1],
-    ]
-)
+coord_actions = np.array([
+    [-1, 0],
+    [+1, 0],
+    [0, -1],
+    [0, +1],
+])
 
 # fmt: off
-maze = np.array(
-    [
-        0, 0, 0, 0, 0,
-        0, 1, 0, 1, 0,
-        0, 1, 1, 1, 0,
-        0, 1, 0, 1, 0,
-        0, 1, 0, 1, 0,
-        0, 1, 0, 1, 0,
-        0, 1, 0, 1, 0,
-        0, 1, 0, 0, 0,
-        0, 1, 0, 0, 0,
-        0, 0, 0, 0, 0,
-    ]
-)
+maze = np.array([
+    0, 0, 0, 0, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 1, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 0, 0,
+    0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0,
+])
 # fmt: on
 
 
@@ -47,7 +43,8 @@ def Tr(s, a, s_):
 
     next_coords = np.array([x, y]) + coord_actions[a]
     next_state = (
-        np.clip(next_coords[0], 0, W - 1) + W * np.clip(next_coords[1], 0, H - 1)
+        + 1 * np.clip(next_coords[0], 0, W - 1)
+        + W * np.clip(next_coords[1], 0, H - 1)
     )
     return (
         + 1.0 * ((next_state == s_) & (maze[next_state] == 0))
@@ -114,7 +111,7 @@ def π(t):
             )
         ),
     )
-    return E[alice.a == a]
+    return E[ alice.a == a ]
 
 
 @memo
