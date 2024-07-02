@@ -1,0 +1,28 @@
+# python -m build
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["memo"]
+
+[project]
+name = "memo-lang"
+dynamic = ["version"]
+authors = [
+  {name = "Kartik Chandra"},
+  {name = "Tony Chen"}
+]
+description = "A language for mental models"
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [ "Private :: Do Not Upload" ]
+dependencies = [ "jax" ]
+
+[project.urls]
+Homepage = "http://github.com/kach/memo"
+Repository = "http://github.com/kach/memo.git"
+Issues = "http://github.com/kach/memo/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "memo.__version__"}
