@@ -422,6 +422,7 @@ def memo_(f):  # type: ignore
         for i in range(ctxt.next_idx)
         if i not in [z[0] for z in ctxt.forall_idxs]
     ]
+    ctxt.emit(f"{val.tag} = jnp.array({val.tag})")
     ctxt.emit(
         f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)})"
     )
