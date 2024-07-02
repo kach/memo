@@ -371,11 +371,16 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             for arg in args:
                 args_out.append(eval_expr(arg, ctxt))
 
-            assert all(
-                arg.static for arg in args_out
-            ), """
-            all arguments to memo functions must be statically known!
-            """
+            for arg, arg_node in zip(args_out, args):
+                if not arg.static:
+                    raise MemoError(
+                        "parameter not statically known",
+                        hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
+                        user=True,
+                        ctxt=None,
+                        loc=arg_node.loc
+                    )
+
             res = ctxt.sym(f"result_array")
             ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)})')
             # ctxt.emit(f"print({res}, {res}.shape)")

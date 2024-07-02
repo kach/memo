@@ -444,15 +444,12 @@ def memo(f):  # type: ignore
     except MemoError as e:
         if e.loc:
             # e.add_note(f"memo error: {e.message}")
-            e.add_note(f" compiling: {e.loc.name}")
-            e.add_note(f"        at: {os.path.basename(e.loc.file)} line {e.loc.line} column {e.loc.offset + 1}")
-        else:
-            e.add_note(f"memo error: {e.message}")
+            e.add_note(f"    at: {e.loc.name} in {os.path.basename(e.loc.file)} line {e.loc.line} column {e.loc.offset + 1}")
         if e.hint is not None:
             for line in textwrap.wrap(
                 e.hint,
-                initial_indent   ='      hint: ',
-                subsequent_indent='            '
+                initial_indent   ='  hint: ',
+                subsequent_indent='        '
             ):
                 e.add_note(line)
         if e.ctxt:  # TODO
