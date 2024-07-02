@@ -12,9 +12,11 @@ from io import StringIO
 
 import warnings
 
-from icecream import ic  # type: ignore
-
-ic.configureOutput(includeContext=True)
+try:
+    from icecream import ic  # type: ignore
+    ic.configureOutput(includeContext=True)
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 @dataclass(frozen=True)
