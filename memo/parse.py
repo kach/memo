@@ -295,7 +295,7 @@ def memo_(f):  # type: ignore
     src_file = inspect.getsourcefile(f)
     assert src_file is not None
     lines, lineno = inspect.getsourcelines(f)
-    tree = ast.parse(src)
+    tree = ast.parse(src, filename=src_file)
     ast.increment_lineno(tree, n=lineno - 1)
 
     cast = []

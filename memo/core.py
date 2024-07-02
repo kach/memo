@@ -241,6 +241,8 @@ def pad(t, total):
     return t
 
 def ffi(f, *args):
+    if len(args) == 0:
+        return f()
     args = jax.numpy.broadcast_arrays(*args)
     target_shape = args[0].shape
     args = [arg.reshape(-1) for arg in args]

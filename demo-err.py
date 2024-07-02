@@ -4,7 +4,7 @@ from memo import memo
 def f():
     cast: [alice]
     alice: chooses(x in X, wpp=1)
-    return g[a is alice.x](alice.x)
+    # return g[a is alice.x](alice.x)
     # alce: chooses(x in X, wpp=1)
     # alice: burns()
     # return a.b.c
