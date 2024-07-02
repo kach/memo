@@ -77,13 +77,10 @@ def V(t):
     alice: knows(g)
 
     # alice chooses her action based on her policy
-    alice: chooses(
-        a in A, wpp=π[s, a, g](t),
-    )
-    alice: given(
-        s_ in S,
-        wpp=Tr(s, a, s_),
-    )
+    alice: chooses(a in A, wpp=π[s, a, g](t))
+
+    # alice gets the next state
+    alice: given(s_ in S, wpp=Tr(s, a, s_))
 
     # her value depends on the expected V-function at the next state
     return E[
