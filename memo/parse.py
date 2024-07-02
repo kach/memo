@@ -4,6 +4,7 @@ from typing import Any, Callable
 import textwrap
 import os, sys
 from io import StringIO
+from dataclasses import dataclass
 
 
 @dataclass
@@ -16,7 +17,7 @@ class ParsingContext:
 
 def parse_expr(
     expr: ast.expr,
-    static_parameters: list[str]
+    ctxt: ParsingContext
 ) -> Expr:
     match expr:
         case ast.Constant(value=val):
@@ -24,12 +25,12 @@ def parse_expr(
             return ELit(value=val)
 
         case ast.Call(func=ast.Name(id="exp"), args=[e1]):
-            return EOp(op=Op.EXP, args=[parse_expr(e1, static_parameters)])
+            return EOp(op=Op.EXP, args=[parse_expr(e1, ctxt)])
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
             return EFFI(
                 name=ffi_name,
-                args=[parse_expr(arg, static_parameters) for arg in ffi_args],
+                args=[parse_expr(arg, ctxt) for arg in ffi_args],
             )
 
         # memo call single arg
@@ -48,7 +49,7 @@ def parse_expr(
         ):
             return EMemo(
                 name=f_name,
-                args=[parse_expr(arg, static_parameters) for arg in args],
+                args=[parse_expr(arg, ctxt) for arg in args],
                 ids=[(Id(target_id), Name(source_name), Id(source_id))],
             )
 
@@ -74,7 +75,7 @@ def parse_expr(
                         raise Exception()
             return EMemo(
                 name=f_name,
-                args=[parse_expr(arg, static_parameters) for arg in args],
+                args=[parse_expr(arg, ctxt) for arg in args],
                 ids=ids,
             )
 
@@ -83,13 +84,13 @@ def parse_expr(
             return EOp(
                 op={ast.Eq: Op.EQ, ast.Lt: Op.LT, ast.Gt: Op.GT}[op.__class__],
                 args=[
-                    parse_expr(e1, static_parameters),
-                    parse_expr(e2, static_parameters),
+                    parse_expr(e1, ctxt),
+                    parse_expr(e2, ctxt),
                 ],
             )
 
         case ast.UnaryOp(op=op, operand=operand):
-            o_expr = parse_expr(operand, static_parameters)
+            o_expr = parse_expr(operand, ctxt)
             return EOp(
                 op={
                     ast.USub: Op.NEG,
@@ -107,34 +108,38 @@ def parse_expr(
                     ast.Div: Op.DIV,
                 }[op.__class__],
                 args=[
-                    parse_expr(e1, static_parameters),
-                    parse_expr(e2, static_parameters),
+                    parse_expr(e1, ctxt),
+                    parse_expr(e2, ctxt),
                 ],
             )
 
         case ast.BoolOp(op=op, values=values):
             if len(values) != 2:
-                raise Exception(
-                    f"Incorrect number of arguments to logical operator {op}"
+                raise MemoError(
+                    f"Incorrect number of arguments to logical operator {op}",
+                    hint=None,
+                    user=False,
+                    ctxt=None,
+                    loc=SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
                 )
             e1, e2 = values
             return EOp(
                 op={ast.And: Op.AND, ast.Or: Op.OR}[op.__class__],
                 args=[
-                    parse_expr(e1, static_parameters),
-                    parse_expr(e2, static_parameters),
+                    parse_expr(e1, ctxt),
+                    parse_expr(e2, ctxt),
                 ],
             )
 
         case ast.IfExp(test=test, body=body, orelse=orelse):
-            c_expr = parse_expr(test, static_parameters)
-            t_expr = parse_expr(body, static_parameters)
-            f_expr = parse_expr(orelse, static_parameters)
+            c_expr = parse_expr(test, ctxt)
+            t_expr = parse_expr(body, ctxt)
+            f_expr = parse_expr(orelse, ctxt)
             return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr])
 
         # literals
         case ast.Name(id=id):
-            if id in static_parameters:
+            if id in ctxt.static_parameters:
                 return ELit(id)
             return EChoice(id=Id(id))
 
@@ -142,7 +147,7 @@ def parse_expr(
         case ast.Subscript(value=ast.Name(id="E"), slice=slice):
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
-            return EExpect(expr=parse_expr(slice, static_parameters))
+            return EExpect(expr=parse_expr(slice, ctxt))
 
         # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):
@@ -152,26 +157,31 @@ def parse_expr(
                     case ast.Slice(
                         lower=ast.Name(id=who_), upper=expr_, step=None
                     ) if expr_ is not None:
-                        stmts.extend(parse_stmt(expr_, who_, static_parameters))
+                        stmts.extend(parse_stmt(expr_, who_, ctxt))
             assert not isinstance(elts[-1], ast.Slice)
-            return EImagine(do=stmts, then=parse_expr(elts[-1], static_parameters))
+            return EImagine(do=stmts, then=parse_expr(elts[-1], ctxt))
 
         # choice
         case ast.Subscript(value=ast.Name(id=who_id), slice=slice):
             # TODO: check who_id in cast...
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
-            return EWith(who=Name(who_id), expr=parse_expr(slice, static_parameters))
+            return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt))
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
             # TODO: check here as well
             return EWith(who=Name(who_id), expr=EChoice(Id(attr)))
 
         case _:
-            print(ast.dump(expr, include_attributes=True, indent=2))
-            raise Exception(f"Unknown expression {expr} at line {expr.lineno}")
+            raise MemoError(
+                f"Unknown expression syntax",
+                hint=f"The full expression is {ast.dump(expr)}",
+                user=True,
+                ctxt=None,
+                loc=SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
+            )
 
 
-def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[Stmt]:
+def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
     match expr:
         case ast.Call(
             func=ast.Name(id="chooses" | "given"),
@@ -189,7 +199,7 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
                     who=Name(who),
                     id=Id(choice_id),
                     domain=Dom(dom_id),
-                    wpp=parse_expr(wpp_expr, static_parameters),
+                    wpp=parse_expr(wpp_expr, ctxt),
                 )
             ]
 
@@ -234,7 +244,7 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
         ) if expr_ is not None:
             return [
                 SWith(who=Name(who), stmt=s)
-                for s in parse_stmt(expr_, who_, static_parameters)
+                for s in parse_stmt(expr_, who_, ctxt)
             ]
         case ast.Subscript(value=ast.Name("thinks"), slice=ast.Tuple(elts=elts)):
             stmts = []
@@ -243,12 +253,18 @@ def parse_stmt(expr: ast.expr, who: str, static_parameters: list[str]) -> list[S
                     case ast.Slice(
                         lower=ast.Name(id=who_), upper=expr_, step=None
                     ) if expr_ is not None:
-                        stmts.extend(parse_stmt(expr_, who_, static_parameters))
+                        stmts.extend(parse_stmt(expr_, who_, ctxt))
                     case _:
                         raise Exception()
             return [SWith(who=Name(who), stmt=s) for s in stmts]
         case _:
-            raise Exception(f"Unknown statement {expr} at line {expr.lineno}")
+            raise MemoError(
+                f"Unknown statement syntax",
+                hint=f"The full statement is {ast.dump(expr)}",
+                user=True,
+                ctxt=None,
+                loc=SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
+            )
 
 
 def memo_(f):  # type: ignore
@@ -297,6 +313,12 @@ def memo_(f):  # type: ignore
                 loc=SourceLocation(src_file, f.lineno, f.col_offset, "??")
             )
 
+    pctxt = ParsingContext(
+        cast=cast,
+        static_parameters=static_parameters,
+        loc_name=f_name,
+        loc_file=src_file
+    )
     stmts: list[Stmt] = []
     retval = None
     for stmt in f.body[1:]:
@@ -321,16 +343,34 @@ def memo_(f):  # type: ignore
                         ctxt=None,
                         loc=SourceLocation(src_file, stmt.lineno, stmt.col_offset, f_name)
                     )
-                stmts.extend(parse_stmt(expr, who, static_parameters))
+                stmts.extend(parse_stmt(expr, who, pctxt))
             case ast.Return(value=expr) if expr is not None:
                 if retval is not None:
-                    raise Exception()
-                retval = parse_expr(expr, static_parameters)
+                    raise MemoError(
+                        f"multiple return statements",
+                        hint=f"A memo should only have one return statement, at the end",
+                        user=True,
+                        ctxt=None,
+                        loc=SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
+                    )
+                retval = parse_expr(expr, pctxt)
             case _:
-                raise Exception()
+                raise MemoError(
+                    f"Unknown statement syntax",
+                    hint=f"The full statement is {ast.dump(expr)}",
+                    user=True,
+                    ctxt=None,
+                    loc=SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
+                )
 
     if retval is None:
-        raise Exception("You didn't return anything!")
+        raise MemoError(
+            f"no return statement",
+            hint=f"All memos should end with a return statement",
+            user=True,
+            ctxt=None,
+            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name)
+        )
 
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
