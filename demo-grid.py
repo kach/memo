@@ -59,8 +59,8 @@ def R(s, a, g):
 
 
 @jax.jit
-def is_terminating(s):
-    return False
+def is_terminating(s, g):
+    return False  # s == g
 
 
 @cache
@@ -83,7 +83,10 @@ def V(t):
     )
 
     # her value depends on the expected V-function at the next state
-    return E[R(s, alice.a, g) + (0.0 if t < 0 else (0.0 if is_terminating(s) else 0.9 * V[s is alice.s_, g is g](t - 1)))]
+    return E[
+        R(s, alice.a, g) +
+        (0.0 if t < 0 else (0.0 if is_terminating(s, g) else 0.9 * V[s is alice.s_, g is g](t - 1)))
+    ]
 
 
 @cache
@@ -104,7 +107,7 @@ def π(t):
                 R(s, a, g) + (
                     0.0 if t < 0
                     else (
-                        0.0 if is_terminating(s)
+                        0.0 if is_terminating(s, g)
                         else 0.9 * imagine[
                             future_alice: given(
                                 s_ in S, wpp=Tr(s, a, s_),

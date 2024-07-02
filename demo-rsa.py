@@ -21,11 +21,10 @@ def literal_speaker():
     speaker: knows(self.r)
     speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
     return E[ speaker.u == u_ ]
-ic(literal_speaker())
 
 @memo
 def l1_listener():
-    cast: [listener]
+    cast: [listener, speaker]
     forall: u in U
     forall: r_ in R
 
@@ -36,7 +35,6 @@ def l1_listener():
     listener: observes [speaker.u] is self.u
     listener: chooses(r_ in R, wpp=E[speaker.r == r_])
     return E[ listener.r_ == r_ ]
-ic(l1_listener())
 
 @memo
 def l2_speaker(beta):
@@ -55,9 +53,14 @@ def l2_speaker(beta):
     speaker: chooses(u in U, wpp=imagine[
         listener: observes [speaker.u] is self.u,
         listener: chooses(r_ in R, wpp=E[speaker.r == r_]),
+        # listener: knows(u),
+        # listener: chooses(r_ in R, wpp=l1_listener[u is u, r_ is r_]()),
         exp(beta * E[listener.r_ == r])
     ])
     return E[speaker.u == u_]
+
+ic(literal_speaker())
+ic(l1_listener())
 ic(l2_speaker(3.))
 
 @jax.value_and_grad

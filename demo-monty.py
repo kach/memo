@@ -8,9 +8,7 @@ def demo(reward):
     cast: [alice, monty]
     forall: revealed_door in DOORS
 
-    alice: thinks[
-        monty: chooses(prize in DOORS, wpp=1),
-    ]
+    alice: thinks[ monty: chooses(prize in DOORS, wpp=1) ]
     alice: chooses(initial_pick in DOORS, wpp=1)
     alice: thinks[
         monty: thinks[ alice: chooses(initial_pick in DOORS, wpp=1) ],
@@ -26,7 +24,7 @@ def demo(reward):
         final_pick in DOORS,
         wpp=0. if final_pick == monty.open else
             exp(E[reward if final_pick == monty.prize else -reward]))
-    return E[ alice.final_pick == alice.initial_pick ]
+    return E[ alice.initial_pick == alice.final_pick ]
 
 
 if __name__ == "__main__":
