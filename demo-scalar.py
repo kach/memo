@@ -1,5 +1,4 @@
 from memo import memo
-from icecream import ic
 import jax
 import jax.numpy as np
 
@@ -22,11 +21,6 @@ def scalar():
 
     listener: thinks[
         speaker: given(n in N, wpp=1),
-
-        # "literal" speaker
-        # speaker: chooses(u in U, wpp=meaning(n, u))
-
-        # "pragmatic" speaker, as on webppl.org
         speaker: chooses(u in U, wpp=imagine[
             listener: knows(self.u),
             listener: chooses(n in N, wpp=meaning(n, u)),
@@ -37,4 +31,5 @@ def scalar():
     listener: chooses(n in N, wpp=E[speaker.n == n])
 
     return E[listener.n == n]
-ic(scalar())
+
+print(scalar())
