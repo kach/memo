@@ -7,11 +7,8 @@ U = [0, 1, 2]     # utterance: {none, some, all} of the people are nice
 
 @jax.jit
 def meaning(n, u):
-    return np.array([
-        n == 0,  # none
-        n > 0,   # some
-        n == 3   # all
-    ])[u]
+    #                 (none)  (some)  (all)
+    return np.array([ n == 0, n > 0, n == 3 ])[u]
 
 @memo
 def scalar():
