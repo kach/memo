@@ -357,7 +357,7 @@ def memo_(f):  # type: ignore
             case _:
                 raise MemoError(
                     f"Unknown statement syntax",
-                    hint=f"The full statement is {ast.dump(expr)}",
+                    hint=f"The full statement is {ast.dump(stmt)}",
                     user=True,
                     ctxt=None,
                     loc=SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
