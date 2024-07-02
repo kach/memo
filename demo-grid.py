@@ -49,7 +49,10 @@ def Tr(s, a, s_):
     next_state = (
         np.clip(next_coords[0], 0, W - 1) + W * np.clip(next_coords[1], 0, H - 1)
     )
-    return 1.0 * ((next_state == s_) & (maze[next_state] == 0)) + 1.0 * ((maze[next_state] == 1) & (s == s_))
+    return (
+        + 1.0 * ((next_state == s_) & (maze[next_state] == 0))
+        + 1.0 * ((maze[next_state] == 1) & (s == s_))
+    )
 
 
 @jax.jit
@@ -75,7 +78,7 @@ def V(t):
 
     # alice chooses her action based on her policy
     alice: chooses(
-        a in A, wpp=π[s is s, a is a, g is g](t),
+        a in A, wpp=π[s, a, g](t),
     )
     alice: given(
         s_ in S,
@@ -85,7 +88,7 @@ def V(t):
     # her value depends on the expected V-function at the next state
     return E[
         R(s, alice.a, g) +
-        (0.0 if t < 0 else (0.0 if is_terminating(s, g) else 0.9 * V[s is alice.s_, g is g](t - 1)))
+        (0.0 if t < 0 else (0.0 if is_terminating(s, g) else 0.9 * V[alice.s_, g](t - 1)))
     ]
 
 
@@ -103,16 +106,11 @@ def π(t):
     # alice chooses her action based on a softmax over future value
     alice: chooses(
         a in A,
-        wpp=exp(2.0 * (
-                R(s, a, g) + (
-                    0.0 if t < 0
-                    else (
-                        0.0 if is_terminating(s, g)
-                        else 0.9 * imagine[
-                            future_alice: given(
-                                s_ in S, wpp=Tr(s, a, s_),
-                            ),
-                            E[V[s is future_alice.s_, g is future_alice.g](t - 1)],
+        wpp=exp(
+            2.0 * (R(s, a, g) + (0.0 if t < 0 else ( 0.0 if is_terminating(s, g) else
+                0.9 * imagine[
+                            future_alice: given(s_ in S, wpp=Tr(s, a, s_)),
+                            E[V[future_alice.s_, future_alice.g](t - 1)],
                         ]
                     )
                 )
@@ -134,7 +132,7 @@ def invplan():
     observer: thinks[
         alice: chooses(g in G, wpp=1),
         alice: knows(s),
-        alice: chooses(a in A, wpp=π[s is s, a is a, g is g](200)),
+        alice: chooses(a in A, wpp=π[s, a, g](200)),
     ]
     observer: observes [alice.a] is a
     return observer[E[alice.g == 0]]

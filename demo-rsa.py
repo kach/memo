@@ -18,8 +18,8 @@ def literal_speaker():
     cast: [speaker]
     forall: u_ in U
     forall: r in R
-    speaker: knows(self.r)
-    speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
+    speaker: knows(r)
+    speaker: chooses(u in U, wpp=1. * denotes(u, r))
     return E[ speaker.u == u_ ]
 
 @memo
@@ -30,9 +30,9 @@ def l1_listener():
 
     listener: thinks[
         speaker: given(r in R, wpp=1),
-        speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
+        speaker: chooses(u in U, wpp=1. * denotes(u, r))
     ]
-    listener: observes [speaker.u] is self.u
+    listener: observes [speaker.u] is u
     listener: chooses(r_ in R, wpp=E[speaker.r == r_])
     return E[ listener.r_ == r_ ]
 
@@ -41,20 +41,20 @@ def l2_speaker(beta):
     cast: [speaker, listener]
     forall: u_ in U
     forall: r in R
-    speaker: knows(self.r)
+    speaker: knows(r)
 
     speaker: thinks[
         listener: thinks[
             speaker: given(r in R, wpp=1),
-            speaker: chooses(u in U, wpp=(1. if denotes(u, r) else 0.))
+            speaker: chooses(u in U, wpp=1. * denotes(u, r))
         ]
     ]
 
     speaker: chooses(u in U, wpp=imagine[
-        listener: observes [speaker.u] is self.u,
+        listener: observes [speaker.u] is u,
         listener: chooses(r_ in R, wpp=E[speaker.r == r_]),
         # listener: knows(u),
-        # listener: chooses(r_ in R, wpp=l1_listener[u is u, r_ is r_]()),
+        # listener: chooses(r_ in R, wpp=l1_listener[u, r_]()),
         exp(beta * E[listener.r_ == r])
     ])
     return E[speaker.u == u_]
