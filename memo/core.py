@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NewType, Any, Tuple, LiteralString
+from typing import NewType, Any, Tuple, Literal
 
 import itertools
 from enum import Enum
@@ -163,7 +163,7 @@ class SChoose(SyntaxNode):
     id: Id
     domain: Dom
     wpp: Expr
-    reduction: str = "wpp"
+    reduction: Literal["normalize", "maximize"]
 
 
 @dataclass(frozen=True)
@@ -265,7 +265,7 @@ def pprint_stmt(s: Stmt) -> str:
             wpp_str = pprint_expr(wpp)
             if len(wpp_str) > 10:
                 wpp_str = "\n" + textwrap.indent(wpp_str, "  ")
-            reduction_str = "wpp" if s.reduce == "normalize" else "to_maximize"
+            reduction_str = "wpp" if s.reduction == "normalize" else "to_maximize"
             return f"{who}: chooses({id} in {dom}, {reduction_str}={wpp_str})"
         case SObserve(who, id):
             return f"observe {who}.{id}"

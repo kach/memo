@@ -227,6 +227,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             if len(kw) == 2 and kw_names == {"wpp", "to_maximize"}:
                 raise MemoError(
                     f"cannot have both `wpp` and `to_maximize` in a chooses/given statement",
+                    f"choose one or the other >:(",
                     user=True,
                     ctxt=None,
                     loc=loc
@@ -241,12 +242,13 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 case _:
                     raise MemoError(
                         f"unknown argument(s) to chooses/given: {[k.arg for k in kw]}",
+                        f"expected either `wpp` or `to_maximize`",
                         user=True,
                         ctxt=None,
                         loc=loc
                     )
-            ic(reduction)
-            ic(wpp_expr)
+            # ic(reduction)
+            # ic(wpp_expr)
             return [
                 SChoose(
                     who=Name(who),
