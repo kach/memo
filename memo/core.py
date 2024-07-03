@@ -513,6 +513,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             idxs_to_marginalize = tuple(
                 c.idx for _, c in ctxt.frame.choices.items() if not c.known
             )
+            # ic(val_.deps)
+            # ic(ctxt.frame.choices.keys())
             if (
                 len(
                     [
@@ -528,16 +530,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 )
                 return val_
             ctxt.emit(f"# {ctxt.frame.name} expectation")
-            #             ctxt.emit(f'print({ctxt.frame.ll}, {ctxt.frame.ll}.shape)')
-            #             ctxt.emit(f'print({val_.tag}, {val_.tag}.shape)')
-            #             ctxt.emit(f'print(list(reversed({ctxt.idx_history})))')
-            #             ctxt.emit(f'print({idxs_to_marginalize}, {[ctxt.idx_history[i] for i in idxs_to_marginalize]})')
-            #             ctxt.emit(f'''\
-            # for k in range(3):
-            #     for i in range(3):
-            #         for j in range(3):
-            #             print(i, j, "|", k, {ctxt.frame.ll}[..., i, j, k], {val_.tag}[..., i, j, :])
-            # ''')
 
             out = ctxt.sym("exp")
             ctxt.emit(
@@ -565,8 +557,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             if who == Name("self"):
                 return eval_expr(expr, ctxt)
             if who not in ctxt.frame.children:
-                print(who)
-                print(expr)
                 raise Exception(f"{ctxt.frame.name} asks, who is {who}?")
 
             old_frame = ctxt.frame
@@ -582,7 +572,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             deps = set()
             for who_, id in val_.deps:
                 if who_ == Name("self"):
-                    if who.startswith(
+                    if False and who.startswith(
                         "future_"
                     ):  ## TODO: there is definitely a bug here
                         deps.add((Name("self"), id))
@@ -595,12 +585,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     ic(ctxt.frame.name, who, val_, (who_, id))
                     raise Exception("??")  # should always be true
             try:
-                known = all(ctxt.frame.choices[(who, id)].known for (who, id) in deps)
-            except Exception as e__:
-                print(val_)
-                print(ctxt.frame.choices)
-                print(who, id)
-                raise e__
+                known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in deps)
+            except Exception:
+                ic(who)
+                ic(ctxt.frame.choices.keys())
+                ic(deps)
+                raise
             return Value(tag=val_.tag, known=known, deps=deps, static=False)
 
         case EImagine(do, then):
