@@ -220,8 +220,33 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     ops=[ast.In()],
                 )
             ],
-            keywords=[ast.keyword(arg="wpp", value=wpp_expr)],
+            # keywords=[ast.keyword(arg="wpp", value=wpp_expr)],
+            keywords=kw
         ):
+            kw_names = set(k.arg for k in kw)
+            if len(kw) == 2 and kw_names == {"wpp", "to_maximize"}:
+                raise MemoError(
+                    f"cannot have both `wpp` and `to_maximize` in a chooses/given statement",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
+
+            reduction = ""
+            match kw:
+                case [ast.keyword(arg="wpp", value=wpp_expr)]:
+                    reduction = "normalize"
+                case [ast.keyword(arg="to_maximize", value=wpp_expr)]:
+                    reduction = "maximize"
+                case _:
+                    raise MemoError(
+                        f"unknown argument(s) to chooses/given: {[k.arg for k in kw]}",
+                        user=True,
+                        ctxt=None,
+                        loc=loc
+                    )
+            ic(reduction)
+            ic(wpp_expr)
             return [
                 SChoose(
                     who=Name(who),
@@ -229,6 +254,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     domain=Dom(dom_id),
                     wpp=parse_expr(wpp_expr, ctxt),
                     loc=loc,
+                    reduction=reduction
                 )
             ]
 

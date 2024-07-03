@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NewType, Any, Tuple
+from typing import NewType, Any, Tuple, LiteralString
 
 import itertools
 from enum import Enum
@@ -14,6 +14,7 @@ import warnings
 
 try:
     from icecream import ic  # type: ignore
+
     ic.configureOutput(includeContext=True)
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
@@ -162,6 +163,7 @@ class SChoose(SyntaxNode):
     id: Id
     domain: Dom
     wpp: Expr
+    reduction: str = "wpp"
 
 
 @dataclass(frozen=True)
@@ -263,7 +265,8 @@ def pprint_stmt(s: Stmt) -> str:
             wpp_str = pprint_expr(wpp)
             if len(wpp_str) > 10:
                 wpp_str = "\n" + textwrap.indent(wpp_str, "  ")
-            return f"{who}: chooses({id} in {dom}, wpp={wpp_str})"
+            reduction_str = "wpp" if s.reduce == "normalize" else "to_maximize"
+            return f"{who}: chooses({id} in {dom}, {reduction_str}={wpp_str})"
         case SObserve(who, id):
             return f"observe {who}.{id}"
         case SWith(who, stmt):
@@ -714,7 +717,21 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{id_ll} = jnp.ones_like({tag}, dtype=jnp.float32) * {wpp_val.tag}"
             )
-            ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))")
+            if s.reduction == "normalize":
+                ctxt.emit(
+                    f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
+                )
+            elif s.reduction == "maximize":
+                ctxt.emit(f"print('from memo: wpp_val.tag', {wpp_val.tag})")
+                argmax_tag = ctxt.sym(f"{id}_argmax")
+                ctxt.emit(f"{argmax_tag} = jnp.argmax({id_ll}, {-1 - idx})")
+                ctxt.emit(f"print('from memo: argmax', {argmax_tag}, {idx})")
+                ctxt.emit(f"print('from memo: len(domain)', len({domain}))")
+                ctxt.emit(
+                    f"{id_ll} = jnp.nan_to_num(jax.nn.one_hot({argmax_tag}, len({domain}), dtype=jnp.float32, axis={-1 - idx}))"
+                )
+                ctxt.emit(f"print('from memo: id_ll', {id_ll}, {idx})")
+                ctxt.emit(f"print('from memo: ctxt.frame.ll', {ctxt.frame.ll})")
             if ctxt.frame.ll is None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")
