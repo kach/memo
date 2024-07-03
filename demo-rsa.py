@@ -9,8 +9,8 @@ R = [0, 1]
 @jax.jit
 def denotes(u, r):
     return np.array([
-        [False, True ],
-        [True , True ]
+        [0, 1],
+        [1, 1]
     ])[r, u]
 
 @memo
@@ -19,7 +19,7 @@ def literal_speaker():
     forall: u_ in U
     forall: r in R
     speaker: knows(r)
-    speaker: chooses(u in U, wpp=1. * denotes(u, r))
+    speaker: chooses(u in U, wpp=denotes(u, r))
     return E[ speaker.u == u_ ]
 
 @memo
@@ -53,8 +53,6 @@ def l2_speaker(beta):
     speaker: chooses(u in U, wpp=imagine[
         listener: observes [speaker.u] is u,
         listener: chooses(r_ in R, wpp=E[speaker.r == r_]),
-        # listener: knows(u),
-        # listener: chooses(r_ in R, wpp=l1_listener[u, r_]()),
         exp(beta * E[listener.r_ == r])
     ])
     return E[speaker.u == u_]
