@@ -3,6 +3,5 @@
 __pycache__/
 paper/*
 scratch/*
-*.ipynb
 .env/
 figures.key
