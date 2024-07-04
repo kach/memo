@@ -95,11 +95,15 @@ Op = Enum(
         "MUL",
         "DIV",
         "EQ",
+        "NEQ",
         "LT",
+        "LTE",
         "GT",
+        "GTE",
         "AND",
         "OR",
         "EXP",
+        "ABS",
         "NEG",
         "INV",
         "ITE",
@@ -294,16 +298,24 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} / {pprint_expr(args[1])})"
                 case Op.EQ:
                     return f"({pprint_expr(args[0])} == {pprint_expr(args[1])})"
+                case Op.NEQ:
+                    return f"({pprint_expr(args[0])} != {pprint_expr(args[1])})"
                 case Op.LT:
                     return f"({pprint_expr(args[0])} < {pprint_expr(args[1])})"
+                case Op.LTE:
+                    return f"({pprint_expr(args[0])} <= {pprint_expr(args[1])})"
                 case Op.GT:
                     return f"({pprint_expr(args[0])} > {pprint_expr(args[1])})"
+                case Op.GTE:
+                    return f"({pprint_expr(args[0])} >= {pprint_expr(args[1])})"
                 case Op.AND:
                     return f"({pprint_expr(args[0])} & {pprint_expr(args[1])})"
                 case Op.OR:
                     return f"({pprint_expr(args[0])} | {pprint_expr(args[1])})"
                 case Op.EXP:
                     return f"exp({pprint_expr(args[0])})"
+                case Op.ABS:
+                    return f"abs({pprint_expr(args[0])})"
                 case Op.NEG:
                     return f"(-{pprint_expr(args[0])})"
                 case Op.INV:
@@ -320,6 +332,10 @@ def pprint_expr(e: Expr) -> str:
  else
 {textwrap.indent(f_str, '   ')})\
 """
+        case EFFI(name, args):
+            return f"{name}({', '.join(pprint_expr(arg) for arg in args)})"
+        case EMemo(name, args, ids):
+            return "EMEMO"
         case EChoice(id):
             return f"{id}"
         case EExpect(expr):
@@ -429,8 +445,11 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 Op.MUL,
                 Op.DIV,
                 Op.EQ,
+                Op.NEQ,
                 Op.LT,
+                Op.LTE,
                 Op.GT,
+                Op.GTE,
                 Op.AND,
                 Op.OR,
             ]:
@@ -448,10 +467,16 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = {l.tag} / {r.tag}")
                     case Op.EQ:
                         ctxt.emit(f"{out} = jnp.equal({l.tag}, {r.tag})")
+                    case Op.NEQ:
+                        ctxt.emit(f"{out} = jnp.not_equal({l.tag}, {r.tag})")
                     case Op.LT:
                         ctxt.emit(f"{out} = jnp.less({l.tag}, {r.tag})")
+                    case Op.LTE:
+                        ctxt.emit(f"{out} = jnp.less_equal({l.tag}, {r.tag})")
                     case Op.GT:
                         ctxt.emit(f"{out} = jnp.greater({l.tag}, {r.tag})")
+                    case Op.GTE:
+                        ctxt.emit(f"{out} = jnp.greater_equal({l.tag}, {r.tag})")
                     case Op.AND:
                         ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                     case Op.OR:
@@ -462,12 +487,14 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     deps=l.deps | r.deps,
                     static=l.static and r.static,
                 )
-            elif op in [Op.EXP, Op.NEG, Op.INV]:
+            elif op in [Op.EXP, Op.ABS, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
                 match op:
                     case Op.EXP:
                         ctxt.emit(f"{out} = jnp.exp({l.tag})")
+                    case Op.ABS:
+                        ctxt.emit(f"{out} = jnp.abs({l.tag})")
                     case Op.NEG:
                         ctxt.emit(f"{out} = -({l.tag})")
                     case Op.INV:
@@ -510,9 +537,11 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
         case EExpect(expr):
             val_ = eval_expr(expr, ctxt)
-            idxs_to_marginalize = tuple(
+            idxs_to_marginalize = tuple(set(  # TODO: ideally, dedup by looking at frame.conditions
                 c.idx for _, c in ctxt.frame.choices.items() if not c.known
-            )
+            ))
+            # ic(val_.deps)
+            # ic(ctxt.frame.choices.keys())
             if (
                 len(
                     [
@@ -528,16 +557,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 )
                 return val_
             ctxt.emit(f"# {ctxt.frame.name} expectation")
-            #             ctxt.emit(f'print({ctxt.frame.ll}, {ctxt.frame.ll}.shape)')
-            #             ctxt.emit(f'print({val_.tag}, {val_.tag}.shape)')
-            #             ctxt.emit(f'print(list(reversed({ctxt.idx_history})))')
-            #             ctxt.emit(f'print({idxs_to_marginalize}, {[ctxt.idx_history[i] for i in idxs_to_marginalize]})')
-            #             ctxt.emit(f'''\
-            # for k in range(3):
-            #     for i in range(3):
-            #         for j in range(3):
-            #             print(i, j, "|", k, {ctxt.frame.ll}[..., i, j, k], {val_.tag}[..., i, j, :])
-            # ''')
 
             out = ctxt.sym("exp")
             ctxt.emit(
@@ -565,8 +584,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             if who == Name("self"):
                 return eval_expr(expr, ctxt)
             if who not in ctxt.frame.children:
-                print(who)
-                print(expr)
                 raise Exception(f"{ctxt.frame.name} asks, who is {who}?")
 
             old_frame = ctxt.frame
@@ -582,25 +599,29 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             deps = set()
             for who_, id in val_.deps:
                 if who_ == Name("self"):
-                    if who.startswith(
-                        "future_"
-                    ):  ## TODO: there is definitely a bug here
-                        deps.add((Name("self"), id))
-                        # ic(who, id)
-                    else:
-                        deps.add((who, id))
+                    deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
-                    deps.add(ctxt.frame.children[who].conditions[(who_, id)])
+                    z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
+                    if z_who == Name("self"):
+                        z_who = who
+                    deps.add((z_who, z_id))
+                    # ic(ctxt.frame.name, who, who_, id, ctxt.frame.children[who].conditions[(who_, id)])
                 else:
-                    ic(ctxt.frame.name, who, val_, (who_, id))
+                    # ic(ctxt.frame.name, who, val_, (who_, id))
                     raise Exception("??")  # should always be true
+            # ic(ctxt.frame.name, who, pprint_expr(expr), deps)
+            # for dep in deps:
+                # ic(dep, ctxt.frame.choices[dep])
             try:
-                known = all(ctxt.frame.choices[(who, id)].known for (who, id) in deps)
-            except Exception as e__:
-                print(val_)
-                print(ctxt.frame.choices)
-                print(who, id)
-                raise e__
+                # "all" short-circuits!!!
+                known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in reversed(sorted(deps)))
+            except Exception:
+                # ic(who, pprint_expr(expr))
+                # ic(ctxt.frame.choices.keys())
+                # ic(ctxt.frame.children['alice'].choices.keys())
+                # ic(ctxt.frame.children['alice'].children['env'].choices.keys())
+                # ic(deps)
+                raise
             return Value(tag=val_.tag, known=known, deps=deps, static=False)
 
         case EImagine(do, then):

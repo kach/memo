@@ -24,6 +24,8 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         case ast.Call(func=ast.Name(id="exp"), args=[e1]):
             return EOp(op=Op.EXP, args=[parse_expr(e1, ctxt)], loc=loc)
+        case ast.Call(func=ast.Name(id="abs"), args=[e1]):
+            return EOp(op=Op.ABS, args=[parse_expr(e1, ctxt)], loc=loc)
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
             return EFFI(
@@ -91,7 +93,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         # operators
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
             return EOp(
-                op={ast.Eq: Op.EQ, ast.Lt: Op.LT, ast.Gt: Op.GT}[op.__class__],
+                op={
+                    ast.Eq: Op.EQ,
+                    ast.NotEq: Op.NEQ,
+                    ast.Lt: Op.LT,
+                    ast.LtE: Op.LTE,
+                    ast.Gt: Op.GT,
+                    ast.GtE: Op.GTE
+                }[op.__class__],
                 args=[
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
@@ -477,6 +486,7 @@ def memo_(f):  # type: ignore
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     val = eval_expr(retval, ctxt)
+    assert val.known
     squeeze_axes = [
         -1 - i
         for i in range(ctxt.next_idx)
