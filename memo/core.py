@@ -96,7 +96,9 @@ Op = Enum(
         "DIV",
         "EQ",
         "LT",
+        "LTE",
         "GT",
+        "GTE",
         "AND",
         "OR",
         "EXP",
@@ -297,8 +299,12 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} == {pprint_expr(args[1])})"
                 case Op.LT:
                     return f"({pprint_expr(args[0])} < {pprint_expr(args[1])})"
+                case Op.LTE:
+                    return f"({pprint_expr(args[0])} <= {pprint_expr(args[1])})"
                 case Op.GT:
                     return f"({pprint_expr(args[0])} > {pprint_expr(args[1])})"
+                case Op.GTE:
+                    return f"({pprint_expr(args[0])} >= {pprint_expr(args[1])})"
                 case Op.AND:
                     return f"({pprint_expr(args[0])} & {pprint_expr(args[1])})"
                 case Op.OR:
@@ -437,7 +443,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 Op.DIV,
                 Op.EQ,
                 Op.LT,
+                Op.LTE,
                 Op.GT,
+                Op.GTE,
                 Op.AND,
                 Op.OR,
             ]:
@@ -457,8 +465,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = jnp.equal({l.tag}, {r.tag})")
                     case Op.LT:
                         ctxt.emit(f"{out} = jnp.less({l.tag}, {r.tag})")
+                    case Op.LTE:
+                        ctxt.emit(f"{out} = jnp.less_equal({l.tag}, {r.tag})")
                     case Op.GT:
                         ctxt.emit(f"{out} = jnp.greater({l.tag}, {r.tag})")
+                    case Op.GTE:
+                        ctxt.emit(f"{out} = jnp.greater_equal({l.tag}, {r.tag})")
                     case Op.AND:
                         ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                     case Op.OR:

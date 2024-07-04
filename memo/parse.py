@@ -93,7 +93,13 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         # operators
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
             return EOp(
-                op={ast.Eq: Op.EQ, ast.Lt: Op.LT, ast.Gt: Op.GT}[op.__class__],
+                op={
+                    ast.Eq: Op.EQ,
+                    ast.Lt: Op.LT,
+                    ast.LtE: Op.LTE,
+                    ast.Gt: Op.GT,
+                    ast.GtE: Op.GTE
+                }[op.__class__],
                 args=[
                     parse_expr(e1, ctxt),
                     parse_expr(e2, ctxt),
