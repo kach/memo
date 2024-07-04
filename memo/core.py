@@ -320,6 +320,10 @@ def pprint_expr(e: Expr) -> str:
  else
 {textwrap.indent(f_str, '   ')})\
 """
+        case EFFI(name, args):
+            return f"{name}({', '.join(pprint_expr(arg) for arg in args)})"
+        case EMemo(name, args, ids):
+            return "EMEMO"
         case EChoice(id):
             return f"{id}"
         case EExpect(expr):
@@ -580,16 +584,24 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     else:
                         deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
-                    deps.add(ctxt.frame.children[who].conditions[(who_, id)])
+                    z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
+                    if z_who == Name("self"):
+                        z_who = who
+                    deps.add((z_who, z_id))
+                    # ic(ctxt.frame.name, who, who_, id, ctxt.frame.children[who].conditions[(who_, id)])
                 else:
-                    ic(ctxt.frame.name, who, val_, (who_, id))
+                    # ic(ctxt.frame.name, who, val_, (who_, id))
                     raise Exception("??")  # should always be true
+            ic(ctxt.frame.name, who, pprint_expr(expr), deps)
             try:
-                known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in deps)
+                # "all" short-circuits!!!
+                known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in reversed(sorted(deps)))
             except Exception:
-                ic(who)
-                ic(ctxt.frame.choices.keys())
-                ic(deps)
+                # ic(who, pprint_expr(expr))
+                # ic(ctxt.frame.choices.keys())
+                # ic(ctxt.frame.children['alice'].choices.keys())
+                # ic(ctxt.frame.children['alice'].children['env'].choices.keys())
+                # ic(deps)
                 raise
             return Value(tag=val_.tag, known=known, deps=deps, static=False)
 
