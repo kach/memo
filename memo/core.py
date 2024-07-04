@@ -599,13 +599,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             deps = set()
             for who_, id in val_.deps:
                 if who_ == Name("self"):
-                    if False and who.startswith(
-                        "future_"
-                    ):  ## TODO: there is definitely a bug here
-                        deps.add((Name("self"), id))
-                        # ic(who, id)
-                    else:
-                        deps.add((who, id))
+                    deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
                     z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
                     if z_who == Name("self"):
