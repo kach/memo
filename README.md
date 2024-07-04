@@ -1,4 +1,4 @@
-![memo's logo](./assets/memo.png)
+![memo's logo](./assets/logo.png)
 
 memo is a new probabilistic programming language for expressing computational cognitive models involving **sophisticated recursive reasoning**, and for performing **fast enumerative inference** on such models. memo inherits from the tradition of WebPPL-based Bayesian modeling (see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities.
 
