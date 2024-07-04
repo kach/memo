@@ -477,6 +477,7 @@ def memo_(f):  # type: ignore
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     val = eval_expr(retval, ctxt)
+    assert val.known
     squeeze_axes = [
         -1 - i
         for i in range(ctxt.next_idx)

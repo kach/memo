@@ -592,7 +592,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 else:
                     # ic(ctxt.frame.name, who, val_, (who_, id))
                     raise Exception("??")  # should always be true
-            ic(ctxt.frame.name, who, pprint_expr(expr), deps)
+            # ic(ctxt.frame.name, who, pprint_expr(expr), deps)
+            # for dep in deps:
+                # ic(dep, ctxt.frame.choices[dep])
             try:
                 # "all" short-circuits!!!
                 known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in reversed(sorted(deps)))
