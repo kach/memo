@@ -24,6 +24,8 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         case ast.Call(func=ast.Name(id="exp"), args=[e1]):
             return EOp(op=Op.EXP, args=[parse_expr(e1, ctxt)], loc=loc)
+        case ast.Call(func=ast.Name(id="abs"), args=[e1]):
+            return EOp(op=Op.ABS, args=[parse_expr(e1, ctxt)], loc=loc)
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
             return EFFI(

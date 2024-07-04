@@ -100,6 +100,7 @@ Op = Enum(
         "AND",
         "OR",
         "EXP",
+        "ABS",
         "NEG",
         "INV",
         "ITE",
@@ -304,6 +305,8 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} | {pprint_expr(args[1])})"
                 case Op.EXP:
                     return f"exp({pprint_expr(args[0])})"
+                case Op.ABS:
+                    return f"abs({pprint_expr(args[0])})"
                 case Op.NEG:
                     return f"(-{pprint_expr(args[0])})"
                 case Op.INV:
@@ -466,12 +469,14 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     deps=l.deps | r.deps,
                     static=l.static and r.static,
                 )
-            elif op in [Op.EXP, Op.NEG, Op.INV]:
+            elif op in [Op.EXP, Op.ABS, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
                 match op:
                     case Op.EXP:
                         ctxt.emit(f"{out} = jnp.exp({l.tag})")
+                    case Op.ABS:
+                        ctxt.emit(f"{out} = jnp.abs({l.tag})")
                     case Op.NEG:
                         ctxt.emit(f"{out} = -({l.tag})")
                     case Op.INV:
@@ -514,9 +519,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
         case EExpect(expr):
             val_ = eval_expr(expr, ctxt)
-            idxs_to_marginalize = tuple(
+            idxs_to_marginalize = tuple(set(  # TODO: ideally, dedup by looking at frame.conditions
                 c.idx for _, c in ctxt.frame.choices.items() if not c.known
-            )
+            ))
             # ic(val_.deps)
             # ic(ctxt.frame.choices.keys())
             if (
