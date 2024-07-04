@@ -95,6 +95,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             return EOp(
                 op={
                     ast.Eq: Op.EQ,
+                    ast.NotEq: Op.NEQ,
                     ast.Lt: Op.LT,
                     ast.LtE: Op.LTE,
                     ast.Gt: Op.GT,

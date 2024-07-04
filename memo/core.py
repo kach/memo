@@ -95,6 +95,7 @@ Op = Enum(
         "MUL",
         "DIV",
         "EQ",
+        "NEQ",
         "LT",
         "LTE",
         "GT",
@@ -297,6 +298,8 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} / {pprint_expr(args[1])})"
                 case Op.EQ:
                     return f"({pprint_expr(args[0])} == {pprint_expr(args[1])})"
+                case Op.NEQ:
+                    return f"({pprint_expr(args[0])} != {pprint_expr(args[1])})"
                 case Op.LT:
                     return f"({pprint_expr(args[0])} < {pprint_expr(args[1])})"
                 case Op.LTE:
@@ -442,6 +445,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 Op.MUL,
                 Op.DIV,
                 Op.EQ,
+                Op.NEQ,
                 Op.LT,
                 Op.LTE,
                 Op.GT,
@@ -463,6 +467,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = {l.tag} / {r.tag}")
                     case Op.EQ:
                         ctxt.emit(f"{out} = jnp.equal({l.tag}, {r.tag})")
+                    case Op.NEQ:
+                        ctxt.emit(f"{out} = jnp.not_equal({l.tag}, {r.tag})")
                     case Op.LT:
                         ctxt.emit(f"{out} = jnp.less({l.tag}, {r.tag})")
                     case Op.LTE:
