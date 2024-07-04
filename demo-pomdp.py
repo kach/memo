@@ -11,7 +11,7 @@ from functools import cache
 S = [0, 1]     # hungry, sated
 A = [0, 1, 2]  # feed, sing, ignore
 O = [0, 1]     # crying, quiet
-B = np.linspace(0, 1, 25)  # P(hungry)
+B = np.linspace(0, 1, 50)  # P(hungry)
 
 @jax.jit
 def get_belief(b, s):
@@ -60,7 +60,7 @@ def V[b: B](t):
     ]
 
     return E[ alice[
-        E[ R(env.s, a) ] + (0.0 if t < 0 else 0.9 * imagine[
+        E[ R(env.s, a) ] + (0.0 if t <= 0 else 0.9 * imagine[
             future_alice: observes [env.o] is env.o,
             future_alice: chooses(b_ in B, wpp=exp(-100.0 * abs(E[env.s_ == 0] - b_))),
             E[ future_alice[ V[b is self.b_](t - 1) ] ]
@@ -81,7 +81,7 @@ def π[b: B, a: A](t):
     alice: chooses(
         a in A,
         wpp=exp(
-            2. * (E[ R(env.s, a) ] + (0.0 if t < 0 else 0.9 * imagine[
+            2. * (E[ R(env.s, a) ] + (0.0 if t <= 0 else 0.9 * imagine[
                         env: knows(a),
                         env: chooses(s_ in S, wpp=Tr(s, a, s_)),
                         env: chooses(o in O, wpp=Obs(o, s_, a)),
@@ -133,13 +133,13 @@ from matplotlib import pyplot as plt
 
 plt.figure(figsize=(7, 3))
 plt.subplot(1, 2, 1)
-z = ic(V(200))
+z = ic(V(10))
 plt.plot(B, z)
 plt.xlabel('P(hungry)')
 plt.title('Value')
 
 plt.subplot(1, 2, 2)
-z = ic(π(200))
+z = ic(π(10))
 plt.plot(B, z.T, label=['feed', 'sing', 'ignore'])
 plt.xlabel('P(hungry)')
 plt.title('Policy')
