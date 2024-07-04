@@ -362,8 +362,13 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
         case EChoice(id):
             if (Name("self"), id) not in ctxt.frame.choices:
-                print(ctxt.frame.choices)
-                raise Exception(f"{ctxt.frame.name} has not yet chosen {id}")
+                raise MemoError(
+                    f"Unknown choice {ctxt.frame.name}.{id}",
+                    hint=f"{ctxt.frame.name} is not yet aware of any choice called {id}. Did you forget to call {ctxt.frame.name}.chooses({id} ...) or {ctxt.frame.name}.knows({id}) earlier in the memo? Alternatively, did you perhaps misspell {id}?",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=e.loc
+                )
             ch = ctxt.frame.choices[(Name("self"), id)]
             # out = ctxt.sym("ch")
             # ctxt.emit(f"{out} = {ch.tag}")
@@ -789,17 +794,22 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 raise Exception(
                     f"{ctxt.frame.name} does not yet model {source_who}.{source_id}"
                 )
-            # TODO: assert domains match
 
             eval_stmt(
                 SWith(who, SObserve(target_who, target_id, loc=None), loc=None), ctxt
             )
             target_addr = (target_who, target_id)
             source_addr = (source_who, source_id)
-            assert (
-                ctxt.frame.children[who].choices[target_addr].domain
-                == ctxt.frame.choices[source_addr].domain
-            )
+            target_dom = ctxt.frame.children[who].choices[target_addr].domain
+            source_dom = ctxt.frame.choices[source_addr].domain
+            if target_dom != source_dom:
+                raise MemoError(
+                    "Domain mismatch",
+                    hint=f"{target_who}.{target_id} is from domain {target_dom}, while {source_who}.{source_id} is from domain {source_dom}.",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=s.loc
+                )
             ctxt.frame.children[who].conditions[target_addr] = source_addr
             tidx = ctxt.frame.children[who].choices[target_addr].idx
             sidx = ctxt.frame.choices[source_addr].idx

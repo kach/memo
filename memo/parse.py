@@ -525,17 +525,25 @@ def memo(f):  # type: ignore
         return memo_(f)  # type: ignore
     except MemoError as e:
         if e.loc:
-            # e.add_note(f"memo error: {e.message}")
+            e.add_note('')
             e.add_note(
-                f"    at: {e.loc.name} in {os.path.basename(e.loc.file)} line {e.loc.line} column {e.loc.offset + 1}"
+                f"    at: @memo {e.loc.name} in {os.path.basename(e.loc.file)}, line {e.loc.line}, column {e.loc.offset + 1}"
             )
         if e.hint is not None:
+            e.add_note('')
             for line in textwrap.wrap(
                 e.hint, initial_indent="  hint: ", subsequent_indent="        "
             ):
                 e.add_note(line)
         if e.ctxt:  # TODO
-            e.add_note(repr(e.ctxt))
+            e.add_note('')
+            ctxt_note = f'''\
+This error was encountered in the context of {e.ctxt.frame.name}, who is currently aware of: {", ".join([v if k == Name("self") else f"{k}.{v}" for k, v in e.ctxt.frame.choices.keys()])}.
+'''
+            for line in textwrap.wrap(
+                ctxt_note, initial_indent="  ctxt: ", subsequent_indent="        "
+            ):
+                e.add_note(line)
         if not e.user:
             e.add_note("")
             e.add_note(
