@@ -2,6 +2,8 @@
 
 memo is a new probabilistic programming language for expressing computational cognitive models involving **sophisticated recursive reasoning**, and for performing **fast enumerative inference** on such models. memo inherits from the tradition of WebPPL-based Bayesian modeling (see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities.
 
+memo stands for: mental modeling, memoized matrix operations, model-expressed-model-optimized, and metacognitive memos.
+
 ## Installing memo
 
 1. memo is based on Python. Before installing memo, make sure you have Python 3.12 or higher installed. You can check this by running `python --version`. (As of writing, Python 3.12 is the latest version of Python, and memo depends on several of its powerful new features.)
