@@ -60,8 +60,3 @@ def l2_speaker(beta):
 ic(literal_speaker())
 ic(l1_listener())
 ic(l2_speaker(3.))
-
-@jax.value_and_grad
-def f(beta):
-    return l2_speaker(beta)[0, 0]
-ic(f(3.))
