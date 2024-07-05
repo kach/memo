@@ -852,7 +852,14 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             # out_addr = (ctxt.frame.name if source_who == "self" else source_who, source_id)
             if who not in ctxt.frame.children:
                 ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
-            assert source_addr in ctxt.frame.choices
+            if source_addr not in ctxt.frame.choices:
+                raise MemoError(
+                    "Knowing unknown choice",
+                    hint=f"{ctxt.frame.name} does not yet model {source_who}'s choice of {source_id}. So, it doesn't make sense for {ctxt.frame.name} to model {who} as knowing that choice.",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=s.loc
+                )
             ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[
                 source_addr
             ]

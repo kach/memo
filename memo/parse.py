@@ -530,7 +530,7 @@ def memo(f):  # type: ignore
         if e.ctxt:  # TODO
             e.add_note('')
             ctxt_note = f'''\
-This error was encountered in the context of {e.ctxt.frame.name}, who is currently aware of: {", ".join([v if k == Name("self") else f"{k}.{v}" for k, v in e.ctxt.frame.choices.keys()])}.
+This error was encountered in the context of {e.ctxt.frame.name}, who is currently modeling the following choices: {{{", ".join([v if k == Name("self") else f"{k}.{v}" for k, v in e.ctxt.frame.choices.keys()])}}}.
 '''
             for line in textwrap.wrap(
                 ctxt_note, initial_indent="  ctxt: ", subsequent_indent="        "
