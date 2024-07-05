@@ -32,7 +32,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 name=ffi_name, args=[parse_expr(arg, ctxt) for arg in ffi_args], loc=loc
             )
 
-        # memo call single arg  TODO: make self optional here as well
+        # memo call single arg
         case ast.Call(
             func=ast.Subscript(
                 value=ast.Name(id=f_name),
@@ -50,6 +50,34 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 name=f_name,
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=[(Id(target_id), Name(source_name), Id(source_id))],
+                loc=loc,
+            )
+
+        case ast.Call(
+            func=ast.Subscript(
+                value=ast.Name(id=f_name),
+                slice=ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
+            ),
+            args=args,
+        ):
+            return EMemo(
+                name=f_name,
+                args=[parse_expr(arg, ctxt) for arg in args],
+                ids=[(Id("..."), Name(source_name), Id(source_id))],
+                loc=loc,
+            )
+
+        case ast.Call(
+            func=ast.Subscript(
+                value=ast.Name(id=f_name),
+                slice=ast.Name(id=source_id)
+            ),
+            args=args,
+        ):
+            return EMemo(
+                name=f_name,
+                args=[parse_expr(arg, ctxt) for arg in args],
+                ids=[(Id("..."), Name("self"), Id(source_id))],
                 loc=loc,
             )
 
