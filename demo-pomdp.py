@@ -63,7 +63,7 @@ def V[b: B](t):
         E[ R(env.s, a) ] + (0.0 if t <= 0 else 0.9 * imagine[
             future_alice: observes [env.o] is env.o,
             future_alice: chooses(b_ in B, wpp=exp(-100.0 * abs(E[env.s_ == 0] - b_))),
-            E[ future_alice[ V[b is self.b_](t - 1) ] ]
+            E[ future_alice[ V[b_](t - 1) ] ]
         ])
     ] ]
 
@@ -92,7 +92,7 @@ def π[b: B, a: A](t):
                         ],
                         future_alice: observes [env.o] is env.o,
                         future_alice: chooses(b_ in B, wpp=exp(-100.0 * abs(E[env.s_ == 0] - b_))),
-                        E[V[b is future_alice.b_](t - 1)],
+                        E[V[future_alice.b_](t - 1)],
                     ]
                 )
             )

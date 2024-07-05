@@ -36,26 +36,6 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         case ast.Call(
             func=ast.Subscript(
                 value=ast.Name(id=f_name),
-                slice=ast.Compare(
-                    left=ast.Name(id=target_id),
-                    ops=[ast.Is()],
-                    comparators=[
-                        ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
-                    ],
-                ),
-            ),
-            args=args,
-        ):
-            return EMemo(
-                name=f_name,
-                args=[parse_expr(arg, ctxt) for arg in args],
-                ids=[(Id(target_id), Name(source_name), Id(source_id))],
-                loc=loc,
-            )
-
-        case ast.Call(
-            func=ast.Subscript(
-                value=ast.Name(id=f_name),
                 slice=ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
             ),
             args=args,
@@ -89,22 +69,6 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             ids = []
             for elt in elts:
                 match elt:
-                    case ast.Compare(
-                        left=ast.Name(id=target_id),
-                        ops=[ast.Is()],
-                        comparators=[
-                            ast.Attribute(
-                                value=ast.Name(id=source_name), attr=source_id
-                            )
-                        ],
-                    ):
-                        ids.append((Id(target_id), Name(source_name), Id(source_id)))
-                    case ast.Compare(
-                        left=ast.Name(id=target_id),
-                        ops=[ast.Is()],
-                        comparators=[ast.Name(id=source_id)],
-                    ):
-                        ids.append((Id(target_id), Name("self"), Id(source_id)))
                     case ast.Attribute(value=ast.Name(id=source_name), attr=source_id):
                         ids.append((Id("..."), Name(source_name), Id(source_id)))
                     case ast.Name(id=source_id):
