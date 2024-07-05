@@ -596,8 +596,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             val_ = eval_expr(expr, ctxt)
             ctxt.frame = old_frame
             if not val_.known:
-                raise Exception(
-                    f"{who} does not know {expr}. Did you mean to take {who}'s expected value?"
+                raise MemoError(
+                    "Asking an agent for an unknown value",
+                    hint=f"{who} has uncertainty about the value of the expression that {ctxt.frame.name} is imagining {who} computing. Did you perhaps mean to take {who}'s *expected* value of that expression, using E[...]?",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=e.loc
                 )
 
             # ic(val_)
@@ -613,7 +617,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     # ic(ctxt.frame.name, who, who_, id, ctxt.frame.children[who].conditions[(who_, id)])
                 else:
                     # ic(ctxt.frame.name, who, val_, (who_, id))
-                    raise Exception("??")  # should always be true
+                    assert False  # should never happen
             # ic(ctxt.frame.name, who, pprint_expr(expr), deps)
             # for dep in deps:
                 # ic(dep, ctxt.frame.choices[dep])
@@ -716,8 +720,12 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             )
             wpp_val = eval_expr(wpp, ctxt)
             if not wpp_val.known:
-                raise Exception(
-                    f"{ctxt.frame.name} does not know wpp when choosing {id}"
+                raise MemoError(
+                    "Uncertain about wpp",
+                    hint=f"{who} is uncertain about the value of the 'wpp' expression that {who} is using to choose {id}. Hence, {who} cannot compute the probabilities needed to make the choice. Perhaps you meant to take an expected value somewhere, using E[...]?",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=s.loc
                 )
             ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
             ctxt.frame = old_frame
@@ -732,9 +740,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     ic(child_frame.conditions)
                     ic(wpp_val.deps)
                     ic(child_frame.name)
-                    raise Exception(
-                        f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}"
-                    )  # should always be true
+                    assert False, f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}"
             ctxt.frame.choices[(who, id)] = Choice(tag, idx, False, domain, new_deps)
             id_ll = ctxt.sym(f"{id}_ll")
             ctxt.emit(
@@ -751,12 +757,22 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
 
         case SObserve(who, id):
             if (who, id) not in ctxt.frame.choices:
-                raise Exception(
-                    f"{ctxt.frame.name} does not think that {who} chose {id}"
+                raise MemoError(
+                    "Observation of unmodeled choice",
+                    hint=f"{ctxt.frame.name} does not have {who}'s choice of {id} in their mental model. Perhaps you meant to write `{ctxt.frame.name}: thinks[ {who}: chooses({id} ...) ]` somewhere earlier in this memo?",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=s.loc
                 )
             ch = ctxt.frame.choices[(who, id)]
             if ch.known:
-                raise Exception(f"{ctxt.frame.name} already knows {who}.{id}")
+                raise MemoError(
+                    "Observation of already-known choice",
+                    hint=f"{ctxt.frame.name} already knows {who}'s choice of {id}. It doesn't make sense for {ctxt.frame.name} to re-observe that same choice again.",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=s.loc
+                )
             ch.known = True
 
             # ic(f'{ctxt.frame.name} observes {who}.{id}')
@@ -787,12 +803,20 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             if who not in ctxt.frame.children:
                 raise Exception(f"{ctxt.frame.name} is not yet modeling {who}")
             if (target_who, target_id) not in ctxt.frame.children[who].choices:
-                raise Exception(
-                    f"{ctxt.frame.name} does not yet think {who} is modeling {target_who}.{target_id}"
+                raise MemoError(
+                    "Observation of unmodeled choice",
+                    hint=f"{ctxt.frame.name} does not yet think that {who} is modeling {target_who}'s choice of {target_id}, so it doesn't make sense for {who} to observe that choice. Perhaps you meant to write `{who}: thinks[ {target_who}: chooses({target_id} ...) ]` somewhere earlier in {ctxt.frame.name}'s memo?",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=s.loc
                 )
             if (source_who, source_id) not in ctxt.frame.choices:
-                raise Exception(
-                    f"{ctxt.frame.name} does not yet model {source_who}.{source_id}"
+                raise MemoError(
+                    "Observation of unknown choice",
+                    hint=f"{ctxt.frame.name} does not yet think that {source_who} has chosen {source_id}, so cannot model {who} observing that value. Perhaps you misspelled {source_id}?",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=s.loc
                 )
 
             eval_stmt(
