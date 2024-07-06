@@ -80,8 +80,8 @@ def π[b: B, a: A](t):
 
     alice: chooses(
         a in A,
-        wpp=exp(
-            2. * (E[ R(env.s, a) ] + (0.0 if t <= 0 else 0.9 * imagine[
+        to_maximize=(
+            (E[ R(env.s, a) ] + (0.0 if t <= 0 else 0.9 * imagine[
                         env: knows(a),
                         env: chooses(s_ in S, wpp=Tr(s, a, s_)),
                         env: chooses(o in O, wpp=Obs(o, s_, a)),
