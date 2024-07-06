@@ -22,6 +22,3 @@ def h():
     alice: chooses(x in X, wpp=1)
     alice: chooses(y in Y, to_maximize=1.0 * (self.x + y < 4) * (self.x + y))
     return E[alice.y]
-
-# print(f())
-print(h())
