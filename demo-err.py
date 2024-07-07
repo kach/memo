@@ -10,9 +10,28 @@ def f[x: X]():
     return alice[bob[x]]
 print(f())
 
+@memo
+def g[y: X]():
+    cast: [alice, bob]
+    bob: thinks [ alice: chooses(x in X, wpp=1) ]
+    bob: observes [alice.x] is y
+    return bob[ alice.x ]
+print(g())
+
 # @memo
-# def f[y: X]():
-#     cast: [alice, bob]
-#     bob: thinks [ alice: chooses(x in X, wpp=1) ]
-#     bob: observes [alice.x] is y
-#     return bob[ alice.x ]
+# def h():
+#     cast: [alice, bob, future_alice]
+#     alice: chooses(z in z, wpp=1)
+#     alice: thinks[ bob: chooses(y in Y, wpp=1) ]
+
+#     alice: chooses(x in X, wpp=
+#                    E[
+#         imagine[
+#             future_alice: chooses(x in X, wpp=z),
+#             bob: knows(z),
+#             E[future_alice.x]
+#         ]
+#                    ]
+#     )
+#     return E[ alice[ bob.z ] ]
+# print(h())
