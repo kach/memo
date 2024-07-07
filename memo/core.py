@@ -550,18 +550,13 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
         case EExpect(expr):
             val_ = eval_expr(expr, ctxt)
-            idxs_to_marginalize = tuple(set(  # TODO: ideally, dedup by looking at frame.conditions
+            if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
+                warnings.warn(f"Redundant expectation {pprint_expr(e)}, not marginalizing")
+                return val_
+            idxs_to_marginalize = tuple(set(
+                # TODO: ideally, dedup by looking at frame.conditions
                 c.idx for _, c in ctxt.frame.choices.items() if not c.known
             ))
-            if (len([  # TODO: this should be an all() expression
-                ctxt.frame.choices[(name, id)].idx
-                for (name, id) in sorted(val_.deps)
-                if not ctxt.frame.choices[(name, id)].known
-            ]) == 0):
-                warnings.warn(
-                    f"Redundant expectation {pprint_expr(e)}, not marginalizing"
-                )
-                return val_
             ctxt.emit(f"# {ctxt.frame.name} expectation")
 
             out = ctxt.sym("exp")
