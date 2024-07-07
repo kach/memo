@@ -5,3 +5,4 @@ paper/*
 scratch/*
 .env/
 figures.key
+out.png
