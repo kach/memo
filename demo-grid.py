@@ -124,6 +124,7 @@ def invplan[s: S, a: A]():
 
 plt.subplot(1, 2, 1)
 value_fn = (V(200)).reshape((2, H, W))[0]
+ic(value_fn)
 p = plt.imshow(
     value_fn,
     origin="upper",

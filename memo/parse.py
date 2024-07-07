@@ -6,6 +6,12 @@ import os, sys
 from io import StringIO
 from dataclasses import dataclass
 
+try:
+    from icecream import ic  # type: ignore
+    ic.configureOutput(includeContext=True)
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 @dataclass
 class ParsingContext:
@@ -433,6 +439,7 @@ def memo_(f):  # type: ignore
         )
 
     for stmt in f.body[1:]:
+        loc = SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
         match stmt:
             case ast.AnnAssign(
                 target=ast.Name(id="forall"),
@@ -448,9 +455,7 @@ def memo_(f):  # type: ignore
                     SForAll(
                         id=Id(choice_id),
                         domain=Dom(dom_id),
-                        loc=SourceLocation(
-                            pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
-                        ),
+                        loc=loc,
                     )
                 )
             case ast.AnnAssign(target=ast.Name(id=who), annotation=expr, value=None):
@@ -460,9 +465,7 @@ def memo_(f):  # type: ignore
                         hint=f"Did you either misspell `{who}`, or forget to include `{who}` in the cast?",
                         user=True,
                         ctxt=None,
-                        loc=SourceLocation(
-                            pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
-                        ),
+                        loc=loc
                     )
                 stmts.extend(parse_stmt(expr, who, pctxt))
             case ast.Return(value=expr) if expr is not None:
@@ -472,9 +475,7 @@ def memo_(f):  # type: ignore
                         hint=f"A memo should only have one return statement, at the end",
                         user=True,
                         ctxt=None,
-                        loc=SourceLocation(
-                            pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
-                        ),
+                        loc=loc
                     )
                 retval = parse_expr(expr, pctxt)
             case _:
@@ -483,14 +484,12 @@ def memo_(f):  # type: ignore
                     hint=f"The full statement is {ast.dump(stmt)}",
                     user=True,
                     ctxt=None,
-                    loc=SourceLocation(
-                        pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name
-                    ),
+                    loc=loc
                 )
 
     if retval is None:
         raise MemoError(
-            f"no return statement",
+            f"No return statement",
             hint=f"All memos should end with a return statement",
             user=True,
             ctxt=None,
@@ -498,12 +497,21 @@ def memo_(f):  # type: ignore
         )
 
     io = StringIO()
-    ctxt = Context(next_idx=0, io=io, frame=Frame(name=Name("root")), idx_history=[])
+    ctxt = Context(next_idx=0, io=io, frame=Frame(name=ROOT_FRAME_NAME), idx_history=[])
     ctxt.emit(HEADER)
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
+    # ic(ctxt.frame.children['alice'].choices.keys())
     val = eval_expr(retval, ctxt)
-    assert val.known
+    if not val.known:
+        ic(val.deps)
+        raise MemoError(
+            "Returning a value that the observer has uncertainty over",
+            hint="TODO",
+            ctxt=ctxt,
+            user=True,
+            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name)  # TODO loc of return stmt
+        )
     squeeze_axes = [
         -1 - i
         for i in range(ctxt.next_idx)
@@ -554,8 +562,15 @@ def memo(f):  # type: ignore
                 e.add_note(line)
         if e.ctxt:  # TODO
             e.add_note('')
+            frame_name = f"{e.ctxt.frame.name}"
+            z = e.ctxt.frame
+            while z.parent is not None and z.parent.name != ROOT_FRAME_NAME:
+                z = z.parent
+                frame_name += f", as modeled by {z.name}"
             ctxt_note = f'''\
-This error was encountered in the context of {e.ctxt.frame.name}, who is currently modeling the following choices: {{{", ".join([v if k == Name("self") else f"{k}.{v}" for k, v in e.ctxt.frame.choices.keys()])}}}.
+This error was encountered in the frame of {frame_name}.
+
+In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ctxt.frame.choices)} choices: {", ".join([v if k == Name("self") else f"{k}.{v}" for k, v in e.ctxt.frame.choices.keys()])}.
 '''
             for line in textwrap.wrap(
                 ctxt_note, initial_indent="  ctxt: ", subsequent_indent="        "

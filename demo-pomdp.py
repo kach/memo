@@ -66,6 +66,7 @@ def V[b: B](t):
             E[ future_alice[ V[b_](t - 1) ] ]
         ])
     ] ]
+ic("Compiled V")
 
 @cache
 @memo
@@ -99,7 +100,6 @@ def π[b: B, a: A](t):
         ),
     )
     return E[ alice.a == a ]
-
 
 
 @memo

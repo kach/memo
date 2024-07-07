@@ -14,7 +14,6 @@ import warnings
 
 try:
     from icecream import ic  # type: ignore
-
     ic.configureOutput(includeContext=True)
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
@@ -73,10 +72,14 @@ class Frame:
     children: dict[Name, Frame] = field(default_factory=dict)
     conditions: dict[tuple[Name, Id], tuple[Name, Id]] = field(
         default_factory=dict
-    )  # used to translate in EWith
+    )
+    # key is a choice in this frame, val is a choice in the parent frame
+    # used to create "aliases" in child's choices, e.g. in observe/knows
     ll: str | None = None
     parent: Frame | None = None
 
+
+ROOT_FRAME_NAME = Name("observer")
 
 @dataclass(frozen=True, kw_only=True)
 class SyntaxNode:
@@ -282,7 +285,9 @@ def pprint_stmt(s: Stmt) -> str:
                 return f"{who}: observes [{target_who}.{target_id}] is {source_who}.{source_id}"
         case SForAll(id, domain):
             return f"given: {id} in {domain}"
-    raise NotImplementedError
+        case SKnows(who, source_who, source_id):
+            return f"{who}: knows({source_who}.{source_id})"
+    raise NotImplementedError(s)
 
 
 def pprint_expr(e: Expr) -> str:
@@ -548,18 +553,11 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             idxs_to_marginalize = tuple(set(  # TODO: ideally, dedup by looking at frame.conditions
                 c.idx for _, c in ctxt.frame.choices.items() if not c.known
             ))
-            # ic(val_.deps)
-            # ic(ctxt.frame.choices.keys())
-            if (
-                len(
-                    [
-                        ctxt.frame.choices[(name, id)].idx
-                        for (name, id) in val_.deps
-                        if not ctxt.frame.choices[(name, id)].known
-                    ]
-                )
-                == 0
-            ):
+            if (len([  # TODO: this should be an all() expression
+                ctxt.frame.choices[(name, id)].idx
+                for (name, id) in sorted(val_.deps)
+                if not ctxt.frame.choices[(name, id)].known
+            ]) == 0):
                 warnings.warn(
                     f"Redundant expectation {pprint_expr(e)}, not marginalizing"
                 )
@@ -570,16 +568,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ctxt.emit(
                 f"{out} = marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize})"
             )
-            deps = (
-                {
-                    c
-                    for c, _ in ctxt.frame.choices.items()
-                    if ctxt.frame.choices[c].known
-                }
-                # | set.union(*[ctxt.frame.choices[c].wpp_deps for c in val_.deps])
-            )
-            # ic({c: ctxt.frame.choices[c].wpp_deps for c in val_.deps})
-            # ic(val_, deps)
+            deps = ({  # TODO: this lets in too many deps!!
+                c for c, _ in ctxt.frame.choices.items()
+                if ctxt.frame.choices[c].known
+            })
+            # deps = set.union(*[ctxt.frame.choices[c].wpp_deps for c in val_.deps]) | set.union(*[ctxt.frame.choices[c].wpp_deps for c in ctxt.frame.conditions.keys()])
+            # ic(deps)
             return Value(
                 tag=out,
                 known=True,
@@ -607,32 +601,25 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     loc=e.loc
                 )
 
-            # ic(val_)
             deps = set()
+            # print()
+            # ic(ctxt.frame.name, who, pprint_expr(e))
+            # ic(ctxt.frame.children[who].conditions)
+            # ic(val_.deps)
             for who_, id in val_.deps:
                 if who_ == Name("self"):
                     deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
                     z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
-                    if z_who == Name("self"):
-                        z_who = who
                     deps.add((z_who, z_id))
-                    # ic(ctxt.frame.name, who, who_, id, ctxt.frame.children[who].conditions[(who_, id)])
                 else:
-                    # ic(ctxt.frame.name, who, val_, (who_, id))
+                    ic(ctxt.frame.name, who, pprint_expr(e), who_, id)
                     assert False  # should never happen
-            # ic(ctxt.frame.name, who, pprint_expr(expr), deps)
-            # for dep in deps:
-                # ic(dep, ctxt.frame.choices[dep])
+            # ic(deps)
             try:
                 # "all" short-circuits!!!
                 known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in reversed(sorted(deps)))
             except Exception:
-                # ic(who, pprint_expr(expr))
-                # ic(ctxt.frame.choices.keys())
-                # ic(ctxt.frame.children['alice'].choices.keys())
-                # ic(ctxt.frame.children['alice'].children['env'].choices.keys())
-                # ic(deps)
                 raise
             return Value(tag=val_.tag, known=known, deps=deps, static=False)
 
@@ -641,33 +628,59 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
             future_name = Name(f"future_{ctxt.frame.name}")
             old_frame = ctxt.frame
-            old_frame.children[future_name] = Frame(name=future_name, parent=old_frame)
+            old_frame.children[future_name] = Frame(
+                name=future_name,
+                parent=old_frame
+            )
+            # this copy is for the "scratchpad"
             current_frame_copy = copy.deepcopy(ctxt.frame)
             fresh_lls(ctxt, current_frame_copy)
 
-            child_frame = copy.deepcopy(current_frame_copy)
-            fresh_lls(ctxt, child_frame)
-            child_frame.name = future_name
-            child_frame.parent = current_frame_copy
-            current_frame_copy.children[future_name] = child_frame
-            k = list(current_frame_copy.choices.keys())
-            for name, id in k:
-                current_frame_copy.choices[future_name, id] = (
-                    current_frame_copy.choices[name, id]
-                )
+            # this copy is for the "inner" frame, representing the future self
+            future_frame = copy.deepcopy(current_frame_copy)
+            fresh_lls(ctxt, future_frame)
+            future_frame.name = future_name
+            future_frame.parent = current_frame_copy
+            current_frame_copy.children[future_name] = future_frame
+            # needed so that future_alice deps get correctly translated by EWith
+            for k in future_frame.conditions.keys():
+                future_frame.conditions[k] = k
+
+            # alice should know all of future_alice's choices
+            for name, id in list(current_frame_copy.choices.keys()):
+                current_frame_copy.choices[future_name, id] = copy.deepcopy(current_frame_copy.choices[name, id])
                 current_frame_copy.conditions[future_name, id] = (name, id)
+
+                # TODO: is this necessary?
                 old_frame.conditions[future_name, id] = (name, id)
 
             ctxt.frame = current_frame_copy
             for stmt in do:
                 eval_stmt(stmt, ctxt)
             val_ = eval_expr(then, ctxt)
+            # assert val_.known  # TODO: error message? not sure if needed...
+
+            # We only want to "translate" choices made by future self.
+            # There must be a better way of doing this as well.
+            new_deps = {
+                ctxt.frame.conditions.get(d, d) if d[0] == future_name else d
+                for d in val_.deps
+            }
+            # ic(new_deps)
             val_ = Value(  ## ??
                 tag=val_.tag,
                 known=val_.known,
-                deps={ctxt.frame.conditions.get(d, d) for d in val_.deps},
+                deps=new_deps,
                 static=val_.static,
             )
+
+            # if we do something like env.knows(a) within imagine, then
+            # we need some way of "translating" that knowledge back into
+            # the outside world. this is hack, not very robust because it
+            # wouldn't survive multiple consecutive imagine statements, etc.
+            for d in current_frame_copy.conditions.keys():
+                old_frame.conditions[d] = current_frame_copy.conditions[d]
+
             ctxt.frame = old_frame
             return val_
 
@@ -689,7 +702,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             pass
 
         case SForAll(id, domain):
-            assert ctxt.frame.name == "root"
+            assert ctxt.frame.name == ROOT_FRAME_NAME
             idx = ctxt.next_idx
             ctxt.next_idx += 1
             ctxt.idx_history.append(f"forall {id}")
@@ -740,9 +753,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 elif (who_, id_) in child_frame.conditions:
                     new_deps.add(child_frame.conditions[(who_, id_)])
                 else:
-                    ic(child_frame.conditions)
-                    ic(wpp_val.deps)
-                    ic(child_frame.name)
+                    ic(child_frame.name, child_frame.conditions)
                     assert False, f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}"
             ctxt.frame.choices[(who, id)] = Choice(tag, idx, False, domain, new_deps)
             id_ll = ctxt.sym(f"{id}_ll")
@@ -785,14 +796,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 )
             ch.known = True
 
-            # ic(f'{ctxt.frame.name} observes {who}.{id}')
             for ch_addr, ch_val in ctxt.frame.choices.items():
                 if not ch_val.known:
-                    # ic('updating belief about', ch_addr)
-                    # ic('previously depended on', ch_val.wpp_deps)
-                    # ic('now adding', ctxt.frame.choices[(who, id)].wpp_deps)
                     ch_val.wpp_deps.update(ctxt.frame.choices[(who, id)].wpp_deps)
-                    # ch_val.wpp_deps.add((who, id))
 
             idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
             ctxt.emit(f"""# {ctxt.frame.name} observe {who}.{id}""")
@@ -870,14 +876,12 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     ctxt=ctxt,
                     loc=s.loc
                 )
-            ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[
-                source_addr
-            ]
+            ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[source_addr]
             ctxt.frame.children[who].choices[source_addr].known = True
+            ctxt.frame.children[who].conditions[source_addr] = source_addr
+
             ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
-            # ic(who, source_id, ctxt.frame.name)
-            ctxt.frame.conditions[(who, source_id)] = source_addr
-            # ic(ctxt.frame.conditions)
+            ctxt.frame.conditions[(who, source_id)] = (ctxt.frame.name, source_id)  ## TODO generalize
             ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
 
         case _:
