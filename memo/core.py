@@ -78,6 +78,10 @@ class Frame:
     ll: str | None = None
     parent: Frame | None = None
 
+    def ensure_child(self, who):
+        if who not in self.children:
+            self.children[who] = Frame(name=who, parent=self)
+
 
 ROOT_FRAME_NAME = Name("observer")
 
@@ -580,8 +584,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
         case EWith(who, expr):
             if who == Name("self"):
                 return eval_expr(expr, ctxt)
-            if who not in ctxt.frame.children:
-                raise Exception(f"{ctxt.frame.name} asks, who is {who}?")
+            ctxt.frame.ensure_child(who)
 
             old_frame = ctxt.frame
             ctxt.frame = ctxt.frame.children[who]
@@ -802,8 +805,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             )
 
         case SWith(who, stmt):  # TODO: this could take many "who"s as input
-            if who not in ctxt.frame.children:
-                ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
+            ctxt.frame.ensure_child(who)
             f_old = ctxt.frame
             ctxt.frame = ctxt.frame.children[who]
             eval_stmt(stmt, ctxt)
@@ -811,8 +813,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
 
         case SShow(who, target_who, target_id, source_who, source_id):
             ctxt.emit(f"# telling {who} about {target_who}.{target_id}")
-            if who not in ctxt.frame.children:
-                raise Exception(f"{ctxt.frame.name} is not yet modeling {who}")
+            ctxt.frame.ensure_child(who)
             if (target_who, target_id) not in ctxt.frame.children[who].choices:
                 raise MemoError(
                     "Observation of unmodeled choice",
@@ -861,8 +862,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
         case SKnows(who, source_who, source_id):
             source_addr = (source_who, source_id)
             # out_addr = (ctxt.frame.name if source_who == "self" else source_who, source_id)
-            if who not in ctxt.frame.children:
-                ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
+            ctxt.frame.ensure_child(who)
             if source_addr not in ctxt.frame.choices:
                 raise MemoError(
                     "Knowing unknown choice",
