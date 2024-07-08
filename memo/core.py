@@ -78,7 +78,7 @@ class Frame:
     ll: str | None = None
     parent: Frame | None = None
 
-    def ensure_child(self, who):
+    def ensure_child(self, who: Name) -> None:
         if who not in self.children:
             self.children[who] = Frame(name=who, parent=self)
 

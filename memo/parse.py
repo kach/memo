@@ -1,6 +1,6 @@
 from .core import *
 import ast, inspect
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 import textwrap
 import os, sys
 from io import StringIO
@@ -239,7 +239,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     loc=loc
                 )
 
-            reduction = ""
+            reduction: Literal["normalize", "maximize"]
             match kw:
                 case [ast.keyword(arg="wpp", value=wpp_expr)]:
                     reduction = "normalize"
@@ -429,6 +429,7 @@ def memo_(f):  # type: ignore
     retval = None
 
     for tp in f.type_params:
+        assert isinstance(tp, ast.TypeVar)
         assert isinstance(tp.bound, ast.Name)
         stmts.append(
             SForAll(
