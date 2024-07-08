@@ -18,8 +18,8 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 Once you have installed memo, take a look at the [Memonomicon](./Memonomicon.ipynb) for a tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent.
 
 This repository also includes several classical examples of recursive reasoning models implemented in memo:
-- [demo-scalar.py](./demo-scalar.py) shows scalar implicature, analogous to the example on the front page of WebPPL.org. (This example is explained in more detail in the Memonomicon.)
-- [demo-rsa.py](./demo-rsa.py) shows Rational Speech Acts with the recursion explicitly unrolled.
-- [demo-rsa-recursive.py](./demo-rsa-recursive.py) shows Rational Speech Acts with recursive calls.
-- [demo-grid.py](./demo-grid.py) shows planning and inverse planning in a grid-world MDP.
-- [demo-pomdp.py](./demo-pomdp.py) shows belief-space planning in a POMDP.
+- [demo-scalar.py](./demo/demo-scalar.py) shows scalar implicature, analogous to the example on the front page of WebPPL.org. (This example is explained in more detail in the Memonomicon.)
+- [demo-rsa.py](./demo/demo-rsa.py) shows Rational Speech Acts with the recursion explicitly unrolled.
+- [demo-rsa-recursive.py](./demo/demo-rsa-recursive.py) shows Rational Speech Acts with recursive calls.
+- [demo-grid.py](./demo/demo-grid.py) shows planning and inverse planning in a grid-world MDP.
+- [demo-pomdp.py](./demo/demo-pomdp.py) shows belief-space planning in a POMDP.
