@@ -112,6 +112,7 @@ Op = Enum(
         "OR",
         "EXP",
         "ABS",
+        "UADD",
         "NEG",
         "INV",
         "ITE",
@@ -328,6 +329,8 @@ def pprint_expr(e: Expr) -> str:
                     return f"exp({pprint_expr(args[0])})"
                 case Op.ABS:
                     return f"abs({pprint_expr(args[0])})"
+                case Op.UADD:
+                    return f"(+{pprint_expr(args[0])})"
                 case Op.NEG:
                     return f"(-{pprint_expr(args[0])})"
                 case Op.INV:
@@ -504,7 +507,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     deps=l.deps | r.deps,
                     static=l.static and r.static,
                 )
-            elif op in [Op.EXP, Op.ABS, Op.NEG, Op.INV]:
+            elif op in [Op.EXP, Op.ABS, Op.UADD, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
                 match op:
@@ -512,6 +515,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         ctxt.emit(f"{out} = jnp.exp({l.tag})")
                     case Op.ABS:
                         ctxt.emit(f"{out} = jnp.abs({l.tag})")
+                    case Op.UADD:
+                        ctxt.emit(f"{out} = +({l.tag})")
                     case Op.NEG:
                         ctxt.emit(f"{out} = -({l.tag})")
                     case Op.INV:

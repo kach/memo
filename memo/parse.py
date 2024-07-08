@@ -110,6 +110,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             o_expr = parse_expr(operand, ctxt)
             return EOp(
                 op={
+                    ast.UAdd: Op.UADD,
                     ast.USub: Op.NEG,
                     ast.Invert: Op.INV,
                 }[op.__class__],
