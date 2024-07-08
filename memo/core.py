@@ -382,7 +382,11 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             if (Name("self"), id) not in ctxt.frame.choices:
                 raise MemoError(
                     f"Unknown choice {ctxt.frame.name}.{id}",
-                    hint=f"{ctxt.frame.name} is not yet aware of any choice called {id}. Did you forget to call {ctxt.frame.name}.chooses({id} ...) or {ctxt.frame.name}.knows({id}) earlier in the memo? Alternatively, did you perhaps misspell {id}?",
+                    hint=f"Did you perhaps misspell {id}?" + (
+                        f" Or, did you forget to include {id} as an axis in the definition of this memo?"
+                        if ctxt.frame.parent is None else
+                        f" {ctxt.frame.name} is not yet aware of any choice called {id}. Or, did you forget to call {ctxt.frame.name}.chooses({id} ...) or {ctxt.frame.name}.knows({id}) earlier in the memo?"
+                    ),
                     user=True,
                     ctxt=ctxt,
                     loc=e.loc
@@ -724,8 +728,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.forall_idxs.append((idx, id, domain))
 
         case SChoose(who, id, domain, wpp):
-            if who not in ctxt.frame.children:
-                ctxt.frame.children[who] = Frame(name=who, parent=ctxt.frame)
+            ctxt.frame.ensure_child(who)
             idx = ctxt.next_idx
             ctxt.next_idx += 1
             ctxt.idx_history.append(f"{who}.{id}")
