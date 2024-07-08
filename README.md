@@ -21,5 +21,5 @@ This repository also includes several classical examples of recursive reasoning 
 - [Scalar implicature](./demo/demo-scalar.py), analogous to the example on the front page of WebPPL.org. (This example is explained in more detail in the Memonomicon.)
 - [Rational Speech Acts](./demo/demo-rsa.py) (RSA), with the recursion explicitly unrolled.
 - [Rational Speech Acts](./demo/demo-rsa-recursive.py) with recursive calls.
-- [An grid-world MDP](./demo/demo-grid.py) with planning and inverse planning.
+- [A grid-world MDP](./demo/demo-grid.py) with planning and inverse planning.
 - [A POMDP](./demo/demo-pomdp.py) with belief-space planning.
