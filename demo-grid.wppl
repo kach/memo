@@ -1,0 +1,83 @@
+var H = 10
+var W = 5
+var make_states = function(i) {
+  return i == 1 ? [0] : make_states(i - 1).concat([i - 1])
+}
+var S = make_states(H * W)
+var G = [0, 4]
+var A = [0, 1, 2, 3]  // left, right, up, down
+
+var coord_actions = [
+    [-1, 0],
+    [1, 0],
+    [0, 1],
+    [0, -1],
+]
+
+var maze = [
+    0, 0, 0, 0, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 1, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 1, 0,
+    0, 1, 0, 0, 0,
+    0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0,
+]
+
+var Tr = function(s, a) {
+    var x = s % W
+    var y = Math.floor(s / W)
+
+    var next_x = x + coord_actions[a][0]
+    var next_y = y + coord_actions[a][1]
+    
+    var next_x = next_x < 0 ? 0 : (next_x > W - 1 ? W - 1 : next_x)
+    var next_y = next_y < 0 ? 0 : (next_y > H - 1 ? H - 1 : next_y)
+    
+    var next_state = next_x + W * next_y
+    return maze[next_state] == 1 ? s : next_state
+}
+
+var R = function(s, a, g){
+    return s == g ? 1.0 : 0.0
+}
+
+var is_terminating = function(s, g) {
+    return s == g
+}
+
+var policy = dp.cache(function(s, g, t) {
+  return Infer(function() {
+    var a = uniformDraw(A)
+    var value = R(s, a, g) + (t <= 0 ? 0. : (
+       is_terminating(s, g) ? 0.0 : (0.9 * expectation(Infer(function() {
+         var s_ = Tr(s, a)
+         return V(s_, g, t-1)
+       })))))
+    factor(value) // factor(beta * value)
+
+    return a
+  })
+})
+
+var V = dp.cache(function(s, g, t) {
+  return expectation(Infer(function() {
+    var a = sample(policy(s, g, t))
+    return R(s, a, g) + (t <= 0 ?
+      0.0 : (is_terminating(s, g) ? 0. :
+      0.9 * expectation(Infer(function() {
+        var s_ = Tr(s, a)
+        return V(s_, g, t-1)
+    }))))}))
+})
+
+var out = map(
+  function(s) {
+    return V(s, 0, 200)
+  }, S
+)
+
+console.log(out)
