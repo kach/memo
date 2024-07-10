@@ -23,3 +23,6 @@ This repository also includes several classical examples of recursive reasoning 
 - [Rational Speech Acts](./demo/demo-rsa-recursive.py) with recursive calls.
 - [A grid-world MDP](./demo/demo-grid.py) with planning and inverse planning.
 - [A POMDP](./demo/demo-pomdp.py) with belief-space planning.
+- [A visual convention-formation model](./demo/demo-7segment.ipynb) that
+  highlights memo's interoperability with the JAX ecosystem, including deep
+  learning, graphics, simulation, etc.
