@@ -375,7 +375,16 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
 
 
 def memo_(f):  # type: ignore
-    src = inspect.getsource(f)
+    try:
+        src = inspect.getsource(f)
+    except OSError:
+        raise MemoError(
+            "Python couldn't find your memo source code",
+            hint="You cannot define a new @memo in the Python interactive REPL. Try writing your memo code to a file and running via `python filename.py`. If you really want an interactive experience, memo also works inside Jupyter notebooks.",
+            user=True,
+            ctxt=None,
+            loc=None
+        )
     src_file = inspect.getsourcefile(f)
     assert src_file is not None
     lines, lineno = inspect.getsourcelines(f)
