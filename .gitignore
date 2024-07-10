@@ -6,3 +6,4 @@ scratch/*
 .env/
 figures.key
 out.png
+demo/*-aux
