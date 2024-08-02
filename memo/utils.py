@@ -1,3 +1,5 @@
+from functools import partial
+
 class domain(list):
     def __init__(self, **kwargs):
         self.n = 1
@@ -14,7 +16,7 @@ class domain(list):
             self.place_moduli[k] = v
 
         for k in kwargs.keys():
-            self.__setattr__(k, lambda z: self.unpack(z, k))
+            self.__setattr__(k, partial(self.unpack, k=k))
 
     def _update(self, z, **kwargs):
         for k in kwargs.keys():
