@@ -9,17 +9,13 @@ class A(IntEnum):
     N = 0; E = 1; S = 2; W = 3; X = 4
 
 maze = '''\
-*--*--*--*--*--*--*
-|     |     |     |
-*  *--*  *  *  *  *
-|        |     |  |
-*--*--*  *  *  *  *
-|     |        |  |
-*  *  *  *--*  *  *
-|  |  |  |     |  |
-*  *  *  *  *--*  *
-|  |     |        |
-*--*--*--*--*--*--*
+*--*--*--*--*--*
+|              |
+*--*--*--*  *  *
+|  |     |  |  |
+*  *  *  *  *  *
+|     |     |  |
+*--*--*--*--*--*
 '''
 
 maze = maze.splitlines()
@@ -45,20 +41,24 @@ class Mode(IntEnum):
     GOOD = 0
     EVIL = 1
 
+class Horizon(IntEnum):
+    FIN = 0
+    INF = 1
+
 Hid = np.array(Mode)
 Loc = domain(x=W, y=H)
-S = domain(player=len(Loc), portal=len(Loc))
+S = domain(player=len(Loc), portal=len(Loc), horizon=len(Horizon))
 print("State space size:", len(S))
 
 S_init = Loc(0, 0)
-S_good = Loc(0, 2)
-S_evil = Loc(5, 2)
-S_goal = Loc(5, 4)
+S_good = Loc(0, H - 1)
+S_evil = Loc(W - 1, H - 1)
+S_goal = Loc(W - 1, H - 1)
 
 @jax.jit
 def Tr(h, s, a, s_):
-    sxy, pxy = S._tuple(s)
-    sxy_, pxy_ = S._tuple(s_)
+    sxy, pxy, hor = S._tuple(s)
+    sxy_, pxy_, hor_ = S._tuple(s_)
 
     sx, sy = Loc._tuple(sxy)
     nxy = Loc(
@@ -69,27 +69,27 @@ def Tr(h, s, a, s_):
     return np.select(
         [
             # regular move
-            (a != A.X) & (s_ == np.where(motion[sx, sy, a], s, S(nxy, pxy))),
+            (a != A.X) & (s_ == np.where(motion[sx, sy, a], s, S(nxy, pxy, hor))),
             # goal -> reset and randomize portal
-            (a == A.X) & (sxy == S_goal) & (sxy_ == S_init),
+            (a == A.X) & (sxy == S_goal) & (sxy_ == S_init) & (hor == hor_),
             # on portal -> goto mode
             (a == A.X) & (sxy == pxy) & (h == Mode.GOOD) & (s_ == S._update(s, player=S_good)),
             (a == A.X) & (sxy == pxy) & (h == Mode.GOOD) & (s_ == S._update(s, player=S_evil)),
             (a == A.X) & (sxy == pxy) & (h == Mode.EVIL) & (s_ == S._update(s, player=S_good)),
             (a == A.X) & (sxy == pxy) & (h == Mode.EVIL) & (s_ == S._update(s, player=S_evil)),
         ],
-        [1, 1,  1, 0, 1, 9], 0
+        [1, 1,  1, 0, 1, 99], 0
     )
 
 @jax.jit
 def R(s, a):
-    sxy, _ = S._tuple(s)
+    sxy, _, _ = S._tuple(s)
     return 1. * ((sxy == S_goal) & (a == A.X))
 
 @jax.jit
 def term(s, a):
-    sxy, _ = S._tuple(s)
-    return (sxy == S_goal) & (a == A.X) & (...)
+    sxy, _, hor = S._tuple(s)
+    return (sxy == S_goal) & (a == A.X) & (hor == Horizon.FIN)
 
 B = np.linspace(0, 1, 3)  # P(good)
 @jax.jit
@@ -122,9 +122,9 @@ def V[b: B, s: S](t):
     ]
 
     return E[ alice[
-        R(s, a) + (0.0 if t <= 0 else 0.95 * imagine[
+        R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else 0.95 * imagine[
             future_alice: observes [env.s_] is env.s_,
-            future_alice: chooses(b_ in B, wpp=exp(-10.0 * abs(E[env.h == 0] - b_))),
+            future_alice: chooses(b_ in B, wpp=exp(-10.0 * abs(E[env.h == 0] - get_belief(b_, 0)))),
             E[ future_alice[ V[b_, env.s_](t - 1) ] ]
         ])
     ] ]
@@ -146,7 +146,7 @@ def π[b: B, s: S, a: A](t):
     alice: chooses(
         a in A,
         to_maximize=(
-            (R(s, a) + (0.0 if t <= 0 else 0.95 * imagine[
+            (R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else 0.95 * imagine[
                         env: knows(a),
                         env: chooses(s_ in S, wpp=Tr(h, s, a, s_)),
                         future_alice: thinks[
@@ -154,7 +154,7 @@ def π[b: B, s: S, a: A](t):
                             env: chooses(s_ in S, wpp=Tr(h, s, a, s_))
                         ],
                         future_alice: observes [env.s_] is env.s_,
-                        future_alice: chooses(b_ in B, wpp=exp(-10.0 * abs(E[env.h == 0] - b_))),
+                        future_alice: chooses(b_ in B, wpp=exp(-10.0 * abs(E[env.h == 0] - get_belief(b_, 0)))),
                         E[V[future_alice.b_, env.s_](t - 1)],
                     ]
                 )
@@ -164,8 +164,12 @@ def π[b: B, s: S, a: A](t):
     return E[ alice.a == a ]
 ic('Compiled π')
 
-v = ic(V(50))
-np.save('v.npy', v)
+import sys
+if len(sys.argv) > 1:
+    v = ic(V(50))
+    np.save('v.npy', v)
+    p = ic(π(50))
+    np.save('p.npy', p)
 
 
 
