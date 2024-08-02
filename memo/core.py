@@ -458,9 +458,10 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             return Value(
                 tag=res,
                 known=all(ctxt.frame.choices[sn, si].known for _, sn, si in ids),
-                deps=set.union(
-                    *(ctxt.frame.choices[sn, si].wpp_deps for _, sn, si in ids)
-                ),
+                # deps=set.union(
+                #     *(ctxt.frame.choices[sn, si].wpp_deps for _, sn, si in ids)
+                # ),
+                deps=set((sn, si) for _, sn, si in ids),
                 static=False,
             )
 
