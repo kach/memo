@@ -51,8 +51,8 @@ S = domain(player=len(Loc), portal=len(Loc), horizon=len(Horizon))
 print("State space size:", len(S))
 
 S_init = Loc(0, 0)
-S_good = Loc(0, H - 1)
-S_evil = Loc(W - 1, H - 1)
+S_good = Loc(W - 1, H - 2)
+S_evil = Loc(0, H - 2)
 S_goal = Loc(W - 1, H - 1)
 
 @jax.jit
@@ -78,7 +78,7 @@ def Tr(h, s, a, s_):
             (a == A.X) & (sxy == pxy) & (h == Mode.EVIL) & (s_ == S._update(s, player=S_good)),
             (a == A.X) & (sxy == pxy) & (h == Mode.EVIL) & (s_ == S._update(s, player=S_evil)),
         ],
-        [1, 1,  1, 0, 1, 99], 0
+        [1, 1,  1, 0, 0, 1], 0
     )
 
 @jax.jit
@@ -91,7 +91,7 @@ def term(s, a):
     sxy, _, hor = S._tuple(s)
     return (sxy == S_goal) & (a == A.X) & (hor == Horizon.FIN)
 
-B = np.linspace(0, 1, 3)  # P(good)
+B = np.linspace(0, 1, 5)  # P(good)
 @jax.jit
 def get_belief(b, h):
     return np.array([b, 1 - b])[h]
@@ -166,9 +166,11 @@ ic('Compiled π')
 
 import sys
 if len(sys.argv) > 1:
-    v = ic(V(50))
+    v = V(50)
+    ic('got V')
     np.save('v.npy', v)
-    p = ic(π(50))
+    p = π(50)
+    ic('got π')
     np.save('p.npy', p)
 
 
