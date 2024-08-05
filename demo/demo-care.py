@@ -164,11 +164,49 @@ def π[b: B, s: S, a: A](t):
     return E[ alice.a == a ]
 ic('Compiled π')
 
+@cache
+@memo
+def V_veridical[h: Hid, b: B, s: S](t):
+    cast: [alice, env, future_alice]
+    alice: knows(b)
+    alice: knows(s)
+    env: knows(h)
+    env: knows(s)
+
+    alice: thinks[
+        env: knows(b),
+        env: knows(s),
+        env: chooses(h in Hid, wpp=get_belief(b, h))
+    ]
+    alice: chooses(a in A, wpp=π[b, s, a](t))
+
+    alice: thinks[
+        env: knows(a),
+        env: chooses(s_ in S, wpp=Tr(h, s, a, s_))
+    ]
+    env: thinks[ alice: chooses(a in A, wpp=1) ]
+    env: observes [alice.a] is alice.a
+    env: chooses(s_ in S, wpp=Tr(h, s, alice.a, s_))
+
+    alice: observes [env.s_] is env.s_
+    alice: chooses(b_ in B, wpp=exp(-10.0 * abs(E[env.h == 0] - get_belief(b_, 0))))
+
+    return E[
+        R(s, alice.a)
+        + (0.0 if t <= 0 else 0.0 if term(s, alice.a) else 0.95 * V_veridical[h, alice.b_, env.s_](t - 1))
+    ]
+ic('Compiled V_veridical')
+
 import sys
 if len(sys.argv) > 1:
     v = V(50)
     ic('got V')
     np.save('v.npy', v)
+
+    vv = V_veridical(50)
+    ic('got Vv')
+    np.save('vv.npy', vv)
+
     p = π(50)
     ic('got π')
     np.save('p.npy', p)
