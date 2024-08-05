@@ -114,7 +114,7 @@ def V[b: B, s: S](t):
         env: chooses(h in Hid, wpp=get_belief(b, h))
     ]
 
-    alice: chooses(a in A, wpp=π[b, s, a](t))
+    alice: chooses(a in A, to_maximize=π[b, s, a](t))
 
     alice: thinks[
         env: knows(a),
@@ -145,8 +145,8 @@ def π[b: B, s: S, a: A](t):
 
     alice: chooses(
         a in A,
-        to_maximize=(
-            (R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else 0.95 * imagine[
+        wpp=exp(
+            2. * (R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else 0.95 * imagine[
                         env: knows(a),
                         env: chooses(s_ in S, wpp=Tr(h, s, a, s_)),
                         future_alice: thinks[
