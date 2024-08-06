@@ -10,11 +10,11 @@ class A(IntEnum):
 
 maze = '''\
 *--*--*--*--*--*
-|              |
-*--*--*--*  *  *
-|  |     |  |  |
-*  *  *  *  *  *
-|     |     |  |
+|     |        |
+*--*  *  *  *  *
+|  |     |     |
+*  *--*  *  *  *
+|           |  |
 *--*--*--*--*--*
 '''
 
@@ -51,9 +51,9 @@ S = domain(player=len(Loc), portal=len(Loc), horizon=len(Horizon))
 print("State space size:", len(S))
 
 S_init = Loc(0, 0)
-S_good = Loc(W - 1, H - 2)
-S_evil = Loc(0, H - 2)
 S_goal = Loc(W - 1, H - 1)
+S_good = Loc(W - 1, H - 1)
+S_evil = Loc(0, 0)
 
 @jax.jit
 def Tr(h, s, a, s_):
@@ -84,7 +84,7 @@ def Tr(h, s, a, s_):
 @jax.jit
 def R(s, a):
     sxy, _, _ = S._tuple(s)
-    return 1. * ((sxy == S_goal) & (a == A.X))
+    return 1. * ((sxy == S_goal) & (a == A.X)) - 0.05
 
 @jax.jit
 def term(s, a):
@@ -98,7 +98,13 @@ def get_belief(b, h):
 
 
 
+@jax.jit
+def gamma():
+    return 1.0
 
+@jax.jit
+def beta():
+    return 7
 
 
 @cache
@@ -122,7 +128,7 @@ def V[b: B, s: S](t):
     ]
 
     return E[ alice[
-        R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else 0.95 * imagine[
+        R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else gamma() * imagine[
             future_alice: observes [env.s_] is env.s_,
             future_alice: chooses(b_ in B, wpp=exp(-10.0 * abs(E[env.h == 0] - get_belief(b_, 0)))),
             E[ future_alice[ V[b_, env.s_](t - 1) ] ]
@@ -146,7 +152,7 @@ def π[b: B, s: S, a: A](t):
     alice: chooses(
         a in A,
         wpp=exp(
-            2. * (R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else 0.95 * imagine[
+            beta() * (R(s, a) + (0.0 if t <= 0 else 0.0 if term(s, a) else gamma() * imagine[
                         env: knows(a),
                         env: chooses(s_ in S, wpp=Tr(h, s, a, s_)),
                         future_alice: thinks[
@@ -193,7 +199,7 @@ def V_veridical[h: Hid, b: B, s: S](t):
 
     return E[
         R(s, alice.a)
-        + (0.0 if t <= 0 else 0.0 if term(s, alice.a) else 0.95 * V_veridical[h, alice.b_, env.s_](t - 1))
+        + (0.0 if t <= 0 else 0.0 if term(s, alice.a) else gamma() * V_veridical[h, alice.b_, env.s_](t - 1))
     ]
 ic('Compiled V_veridical')
 
