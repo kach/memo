@@ -201,19 +201,69 @@ def V_veridical[h: Hid, b: B, s: S](t):
     ]
 ic('Compiled V_veridical')
 
+@jax.jit
+def make_teacher_state(l, hor):
+    return S(Loc(0, 0), l, hor)
+
+@jax.jit
+def is_valid_pxy(l):
+    return (l != S_goal) & (l != S_init)
+
+@cache
+@memo
+def teacher[h: Hid, hor: Horizon, b: B, l: Loc](t):
+    cast: [teacher, env]
+    teacher: knows(h)
+    teacher: knows(hor)
+    teacher: knows(b)
+    teacher: chooses(l in Loc, wpp=is_valid_pxy(l) * beta() * exp(
+        imagine[
+            env: knows(l),
+            env: knows(hor),
+            env: chooses(s in S, wpp=s == make_teacher_state(l, hor)),
+            E[V_veridical[h, b, env.s](t)]
+        ]))
+    return E[teacher.l == l]
+ic('Compiled teacher')
+
+@cache
+@memo
+def student[h: Hid, hor: Horizon, b: B, l: Loc](t):
+    cast: [student, teacher]
+    student: knows(hor)
+    student: knows(b)
+    student: thinks[
+        teacher: given(h in Hid, wpp=1),
+        teacher: knows(hor),
+        teacher: knows(b),
+        teacher: chooses(l in Loc, wpp=teacher[h, hor, b, l](t))
+    ]
+    student: observes[teacher.l] is l
+    student: chooses(h in Hid, wpp=E[teacher.h == h])
+    return E[student.h == h]
+ic('Compiled student')
+
 import sys
 if len(sys.argv) > 1:
     v = V(50)
     ic('got V')
-    np.save('v.npy', v)
+    np.save('aux-care/v.npy', v)
 
     vv = V_veridical(50)
     ic('got Vv')
-    np.save('vv.npy', vv)
+    np.save('aux-care/vv.npy', vv)
 
     p = π(50)
     ic('got π')
-    np.save('p.npy', p)
+    np.save('aux-care/p.npy', p)
+
+    t = teacher(50)
+    ic('got t')
+    np.save('aux-care/t.npy', t)
+
+    s = student(50)
+    ic('got s')
+    np.save('aux-care/s.npy', s)
 
 
 
