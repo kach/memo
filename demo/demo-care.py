@@ -11,7 +11,7 @@ class A(IntEnum):
 maze = '''\
 *--*--*--*--*--*
 |     |        |
-*--*  *  *  *  *
+*--*  *  *--*  *
 |  |     |     |
 *  *--*  *  *  *
 |           |  |
@@ -52,8 +52,8 @@ print("State space size:", len(S))
 
 S_init = Loc(0, 0)
 S_goal = Loc(W - 1, H - 1)
-S_good = Loc(W - 1, H - 1)
-S_evil = Loc(0, 0)
+S_good = S_goal
+S_evil = S_init
 
 @jax.jit
 def Tr(h, s, a, s_):
@@ -84,19 +84,17 @@ def Tr(h, s, a, s_):
 @jax.jit
 def R(s, a):
     sxy, _, _ = S._tuple(s)
-    return 1. * ((sxy == S_goal) & (a == A.X)) - 0.05
+    return 1. * ((sxy == S_goal) & (a == A.X)) - 0.03
 
 @jax.jit
 def term(s, a):
     sxy, _, hor = S._tuple(s)
     return (sxy == S_goal) & (a == A.X) & (hor == Horizon.FIN)
 
-B = np.linspace(0, 1, 5)  # P(good)
+B = np.linspace(0.01, 0.99, 5)  # P(good)
 @jax.jit
 def get_belief(b, h):
     return np.array([b, 1 - b])[h]
-
-
 
 @jax.jit
 def gamma():
