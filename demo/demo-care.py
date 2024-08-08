@@ -109,12 +109,10 @@ def beta():
 @memo
 def V[b: B, s: S](t):
     cast: [alice, env, future_alice]
-    alice: knows(b)
-    alice: knows(s)
+    alice: knows(b, s)
 
     alice: thinks[
-        env: knows(b),
-        env: knows(s),
+        env: knows(b, s),
         env: chooses(h in Hid, wpp=get_belief(b, h))
     ]
 
@@ -138,12 +136,10 @@ ic("Compiled V")
 @memo
 def π[b: B, s: S, a: A](t):
     cast: [alice, env, future_alice]
-    alice: knows(b)
-    alice: knows(s)
+    alice: knows(b, s)
 
     alice: thinks[
-        env: knows(b),
-        env: knows(s),
+        env: knows(b, s),
         env: chooses(h in Hid, wpp=get_belief(b, h))
     ]
 
@@ -172,14 +168,11 @@ ic('Compiled π')
 @memo
 def V_veridical[h: Hid, b: B, s: S](t):
     cast: [alice, env, future_alice]
-    alice: knows(b)
-    alice: knows(s)
-    env: knows(h)
-    env: knows(s)
+    alice: knows(b, s)
+    env: knows(h, s)
 
     alice: thinks[
-        env: knows(b),
-        env: knows(s),
+        env: knows(b, s),
         env: chooses(h in Hid, wpp=get_belief(b, h))
     ]
     alice: chooses(a in A, wpp=π[b, s, a](t))
@@ -213,13 +206,10 @@ def is_valid_pxy(l):
 @memo
 def teacher[h: Hid, hor: Horizon, b: B, l: Loc](t):
     cast: [teacher, env]
-    teacher: knows(h)
-    teacher: knows(hor)
-    teacher: knows(b)
+    teacher: knows(h, hor, b)
     teacher: chooses(l in Loc, wpp=is_valid_pxy(l) * beta() * exp(
         imagine[
-            env: knows(l),
-            env: knows(hor),
+            env: knows(l, hor),
             env: chooses(s in S, wpp=s == make_teacher_state(l, hor)),
             E[V_veridical[h, b, env.s](t)]
         ]))
@@ -230,12 +220,10 @@ ic('Compiled teacher')
 @memo
 def student[h: Hid, hor: Horizon, b: B, l: Loc](t):
     cast: [student, teacher]
-    student: knows(hor)
-    student: knows(b)
+    student: knows(hor, b)
     student: thinks[
         teacher: given(h in Hid, wpp=1),
-        teacher: knows(hor),
-        teacher: knows(b),
+        teacher: knows(hor, b),
         teacher: chooses(l in Loc, wpp=teacher[h, hor, b, l](t))
     ]
     student: observes[teacher.l] is l
