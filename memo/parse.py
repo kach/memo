@@ -167,10 +167,10 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             return EChoice(id=Id(id), loc=loc)
 
         # expected value
-        case ast.Subscript(value=ast.Name(id="E"), slice=slice):
-            assert not isinstance(slice, ast.Slice)
-            assert not isinstance(slice, ast.Tuple)
-            return EExpect(expr=parse_expr(slice, ctxt), loc=loc)
+        case ast.Subscript(value=ast.Name(id="E" | "Pr"), slice=rv_expr):
+            assert not isinstance(rv_expr, ast.Slice)
+            assert not isinstance(rv_expr, ast.Tuple)
+            return EExpect(expr=parse_expr(rv_expr, ctxt), loc=loc)
 
         # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):
