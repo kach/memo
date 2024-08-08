@@ -755,6 +755,8 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     ctxt=ctxt,
                     loc=s.loc
                 )
+            if (Name("self"), id) not in wpp_val.deps and not isinstance(wpp, ELit):
+                warnings.warn(f"When {who} chooses {id}, the probability doesn't depend on the value of {id}, and is thus the same for all values of {id}. As a result, the choice will effectively be uniform after normalization. Are you sure this is what you want? (A uniform choice is more easily expressed with wpp=1.)")
             ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
             ctxt.frame = old_frame
 
