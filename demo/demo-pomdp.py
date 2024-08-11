@@ -140,7 +140,7 @@ plt.title('Value')
 
 plt.subplot(1, 2, 2)
 z = ic(π(10))
-plt.plot(B, z.T, label=['feed', 'sing', 'ignore'])
+plt.plot(B, z, label=['feed', 'sing', 'ignore'])
 plt.xlabel('P(hungry)')
 plt.title('Policy')
 

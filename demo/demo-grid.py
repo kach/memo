@@ -123,16 +123,16 @@ def invplan[s: S, a: A]():
 
 
 plt.subplot(1, 2, 1)
-value_fn = (V(200)).reshape((2, H, W))[0]
+value_fn = V(200).transpose().reshape((2, H, W))[0]
 ic(value_fn)
 p = plt.imshow(
-    value_fn,
+    value_fn * (1 - maze.reshape((H, W))),
     origin="upper",
     cmap="PuRd_r",
 )
 plt.colorbar(p)
 
-policy = (π(200)).reshape(2, 4, H, W)[0]
+policy = π(200).transpose().reshape(2, 4, H, W)[0]
 policy = policy.argmax(axis=0)
 
 directions = coord_actions[policy]
@@ -147,7 +147,7 @@ plt.axis("off")
 
 
 plt.subplot(1, 2, 2)
-posterior = invplan()
+posterior = invplan().transpose()
 plt.imshow(
     1 - maze.reshape((H, W)),
     origin="upper",

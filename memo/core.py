@@ -429,7 +429,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     )
 
             res = ctxt.sym(f"result_array")
-            ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)})')
+            ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)}).transpose()')
             # ctxt.emit(f"print({res}, {res}.shape)")
 
             out_idxs = []

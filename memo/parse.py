@@ -537,7 +537,7 @@ def memo_(f):  # type: ignore
     ]
     ctxt.emit(f"{val.tag} = jnp.array({val.tag})")
     ctxt.emit(
-        f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)})"
+        f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)}).transpose()"
     )
     ctxt.emit(f"return {val.tag}")
 
