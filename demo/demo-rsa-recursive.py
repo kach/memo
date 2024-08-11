@@ -24,7 +24,7 @@ def speaker[u: U, r: R](beta, t):
     ])
     return Pr[speaker.u == u]
 
-@memo
+@memo(debug_print_compiled=True)
 def listener[u: U, r: R](beta, t):
     cast: [listener, speaker]
     listener: thinks[

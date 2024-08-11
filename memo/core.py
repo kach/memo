@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import NewType, Any, Tuple, Literal
 
+from contextlib import contextmanager
 import itertools
 from enum import Enum
 import dataclasses
@@ -216,28 +217,64 @@ class SKnows(SyntaxNode):
 Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll | SKnows
 
 
-@dataclass
-class Context:
-    next_idx: int
-    frame: Frame
-    io: StringIO
-    idx_history: list[str]
-    _sym: int = -1
+class Buffer:
+    def __init__(self: Buffer) -> None:
+        self.io: StringIO = StringIO()
+        self.tab_level: int = 0
 
-    tab_level: int = 0
-
-    def emit(self: Context, line: str) -> None:
-        print("    " * self.tab_level + line, file=self.io)
-
-    def indent(self: Context) -> None:
+    def indent(self: Buffer) -> None:
         self.tab_level += 1
 
-    def dedent(self: Context) -> None:
+    def dedent(self: Buffer) -> None:
         self.tab_level -= 1
 
-    def sym(self, hint: str = "") -> str:
+    def emit(self: Buffer, line: str) -> None:
+        print("    " * self.tab_level + line, file=self.io)
+
+    def getvalue(self: Buffer) -> str:
+        return self.io.getvalue()
+
+@dataclass
+class Context:
+    frame: Frame
+
+    hoisted_buf: Buffer = field(default_factory=Buffer)
+    regular_buf: Buffer = field(default_factory=Buffer)
+    hoisted: bool = False
+
+    next_idx: int = 0
+    _sym: int = -1
+    idx_history: list[str] = field(default_factory=list)
+    path_condition: list[str] = field(default_factory=list)
+
+    def current_buf(self: Context) -> Buffer:
+        return self.hoisted_buf if self.hoisted else self.regular_buf
+
+    def emit(self: Context, line: str) -> None:
+        self.current_buf().emit(line)
+
+    def indent(self: Context) -> None:
+        self.current_buf().indent()
+
+    def dedent(self: Context) -> None:
+        self.current_buf().dedent()
+
+    def sym(self: Context, hint: str = "") -> str:
         self._sym += 1
         return f"{hint}_{self._sym}"
+
+    @contextmanager
+    def hoist(self: Context, state: bool = True):
+        old_state = self.hoisted
+        self.hoisted = state
+        yield
+        self.hoisted = old_state
+
+    @contextmanager
+    def path_depends(self: Context, pc: str):
+        self.path_condition.append(pc)
+        yield
+        self.path_condition.pop()
 
     forall_idxs: list[tuple[int, Id, Dom]] = field(default_factory=list)
 
@@ -347,7 +384,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
         case ELit(val):
             out = ctxt.sym("lit")
             # ctxt.emit(f"{out} = jnp.array({val})")
-            ctxt.emit(f"{out} = {val}")
+            with ctxt.hoist():
+                ctxt.emit(f"{out} = {val}")
             return Value(tag=out, known=True, deps=set(), static=True)
 
         case EChoice(id):
@@ -377,18 +415,21 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             out = ctxt.sym(f"ffi_{name}")
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
-            ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
+            static = all(arg.static for arg in args_out)
+            with ctxt.hoist(static):
+                ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
             return Value(
                 tag=out,
                 known=known,
                 deps=deps,
-                static=all(arg.static for arg in args_out),
+                static=static,
             )
 
         case EMemo(name, args, ids):
             args_out = []
-            for arg in args:
-                args_out.append(eval_expr(arg, ctxt))
+            with ctxt.hoist():
+                for arg in args:
+                    args_out.append(eval_expr(arg, ctxt))
 
             for arg_val, arg_node in zip(args_out, args):
                 if not arg_val.static:
@@ -400,9 +441,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         loc=arg_node.loc,
                     )
 
-            res = ctxt.sym(f"result_array")
-            ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)}).transpose()')
-            # ctxt.emit(f"print({res}, {res}.shape)")
+            res = ctxt.sym(f"result_array_{name}")
+            with ctxt.hoist():
+                ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
+                ctxt.indent()
+                ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)}).transpose()')
+                ctxt.dedent()
 
             out_idxs = []
             for target_id, source_name, source_id in reversed(ids):
@@ -456,70 +500,75 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 assert len(args) == 2
                 l = eval_expr(args[0], ctxt)
                 r = eval_expr(args[1], ctxt)
-                match op:
-                    case Op.ADD:
-                        ctxt.emit(f"{out} = {l.tag} + {r.tag}")
-                    case Op.SUB:
-                        ctxt.emit(f"{out} = {l.tag} - {r.tag}")
-                    case Op.MUL:
-                        ctxt.emit(f"{out} = {l.tag} * {r.tag}")
-                    case Op.DIV:
-                        ctxt.emit(f"{out} = {l.tag} / {r.tag}")
-                    case Op.EQ:
-                        ctxt.emit(f"{out} = jnp.equal({l.tag}, {r.tag})")
-                    case Op.NEQ:
-                        ctxt.emit(f"{out} = jnp.not_equal({l.tag}, {r.tag})")
-                    case Op.LT:
-                        ctxt.emit(f"{out} = jnp.less({l.tag}, {r.tag})")
-                    case Op.LTE:
-                        ctxt.emit(f"{out} = jnp.less_equal({l.tag}, {r.tag})")
-                    case Op.GT:
-                        ctxt.emit(f"{out} = jnp.greater({l.tag}, {r.tag})")
-                    case Op.GTE:
-                        ctxt.emit(f"{out} = jnp.greater_equal({l.tag}, {r.tag})")
-                    case Op.AND:
-                        ctxt.emit(f"{out} = {l.tag} & {r.tag}")
-                    case Op.OR:
-                        ctxt.emit(f"{out} = {l.tag} | {r.tag}")
+                static = l.static and r.static
+                with ctxt.hoist(static):
+                    match op:
+                        case Op.ADD:
+                            ctxt.emit(f"{out} = {l.tag} + {r.tag}")
+                        case Op.SUB:
+                            ctxt.emit(f"{out} = {l.tag} - {r.tag}")
+                        case Op.MUL:
+                            ctxt.emit(f"{out} = {l.tag} * {r.tag}")
+                        case Op.DIV:
+                            ctxt.emit(f"{out} = {l.tag} / {r.tag}")
+                        case Op.EQ:
+                            ctxt.emit(f"{out} = jnp.equal({l.tag}, {r.tag})")
+                        case Op.NEQ:
+                            ctxt.emit(f"{out} = jnp.not_equal({l.tag}, {r.tag})")
+                        case Op.LT:
+                            ctxt.emit(f"{out} = jnp.less({l.tag}, {r.tag})")
+                        case Op.LTE:
+                            ctxt.emit(f"{out} = jnp.less_equal({l.tag}, {r.tag})")
+                        case Op.GT:
+                            ctxt.emit(f"{out} = jnp.greater({l.tag}, {r.tag})")
+                        case Op.GTE:
+                            ctxt.emit(f"{out} = jnp.greater_equal({l.tag}, {r.tag})")
+                        case Op.AND:
+                            ctxt.emit(f"{out} = {l.tag} & {r.tag}")
+                        case Op.OR:
+                            ctxt.emit(f"{out} = {l.tag} | {r.tag}")
                 return Value(
                     tag=out,
                     known=l.known and r.known,
                     deps=l.deps | r.deps,
-                    static=l.static and r.static,
+                    static=static,
                 )
             elif op in [Op.EXP, Op.ABS, Op.LOG, Op.UADD, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
-                match op:
-                    case Op.EXP:
-                        ctxt.emit(f"{out} = jnp.exp({l.tag})")
-                    case Op.ABS:
-                        ctxt.emit(f"{out} = jnp.abs({l.tag})")
-                    case Op.LOG:
-                        ctxt.emit(f"{out} = jnp.log({l.tag})")
-                    case Op.UADD:
-                        ctxt.emit(f"{out} = +({l.tag})")
-                    case Op.NEG:
-                        ctxt.emit(f"{out} = -({l.tag})")
-                    case Op.INV:
-                        ctxt.emit(f"{out} = ~({l.tag})")
-                return Value(tag=out, known=l.known, deps=l.deps, static=l.static)
+                static = l.static
+                with ctxt.hoist(static):
+                    match op:
+                        case Op.EXP:
+                            ctxt.emit(f"{out} = jnp.exp({l.tag})")
+                        case Op.ABS:
+                            ctxt.emit(f"{out} = jnp.abs({l.tag})")
+                        case Op.LOG:
+                            ctxt.emit(f"{out} = jnp.log({l.tag})")
+                        case Op.UADD:
+                            ctxt.emit(f"{out} = +({l.tag})")
+                        case Op.NEG:
+                            ctxt.emit(f"{out} = -({l.tag})")
+                        case Op.INV:
+                            ctxt.emit(f"{out} = ~({l.tag})")
+                return Value(tag=out, known=l.known, deps=l.deps, static=static)
             elif op == Op.ITE:
                 assert len(args) == 3
                 c = eval_expr(args[0], ctxt)
                 if c.static:
                     ctxt.emit(f"if {c.tag}:")
                     ctxt.indent()
-                    t = eval_expr(args[1], ctxt)
+                    with ctxt.path_depends(c.tag):
+                        t = eval_expr(args[1], ctxt)
                     ctxt.emit(f"{out} = {t.tag}")
                     ctxt.dedent()
                     ctxt.emit("else:")
                     ctxt.indent()
-                    f = eval_expr(args[2], ctxt)
+                    inv_out = eval_expr(EOp(Op.INV, [ELit(c.tag, loc=None)], loc=None), ctxt)
+                    with ctxt.path_depends(inv_out.tag):
+                        f = eval_expr(args[2], ctxt)
                     ctxt.emit(f"{out} = {f.tag}")
                     ctxt.dedent()
-
-                    # ctxt.emit(f"{out} = ({t.tag}) if ({c.tag}) else ({f.tag})")
                     return Value(
                         tag=out,
                         known=c.known and t.known and f.known,

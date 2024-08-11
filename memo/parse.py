@@ -379,7 +379,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             )
 
 
-def memo_(f, debug_print_compiled=False):  # type: ignore
+def memo_(f, debug_print_compiled=False, debug_trace=False):  # type: ignore
     try:
         src = inspect.getsource(f)
     except OSError:
@@ -522,9 +522,11 @@ def memo_(f, debug_print_compiled=False):  # type: ignore
             loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name),
         )
 
-    io = StringIO()
-    ctxt = Context(next_idx=0, io=io, frame=Frame(name=ROOT_FRAME_NAME), idx_history=[])
-    ctxt.emit("from memo.lib import marg, pad, ffi, jax, jnp")
+    ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
+    with ctxt.hoist():
+        ctxt.emit("from memo.lib import marg, pad, ffi, jax, jnp")
+        if debug_trace:
+            ctxt.emit(f"""print(f'--> {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     # ic(ctxt.frame.children['alice'].choices.keys())
@@ -547,12 +549,14 @@ def memo_(f, debug_print_compiled=False):  # type: ignore
     ctxt.emit(
         f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)}).transpose()"
     )
+    if debug_trace:
+        ctxt.emit(f"""print(f'<-- {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
     ctxt.emit(f"return {val.tag}")
 
     out = (
         ""
         + f"""def _out_{f_name}({", ".join(static_parameters)}):\n"""
-        + textwrap.indent(io.getvalue(), "    ")
+        + textwrap.indent(ctxt.hoisted_buf.getvalue() + "\n" + ctxt.regular_buf.getvalue(), "    ")
         # + f"_out_{f_name}._foralls = ...\n"
         # + f"_out_{f_name}._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
         + f"{f_name} = _out_{f_name}\n"
