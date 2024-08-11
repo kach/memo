@@ -20,9 +20,9 @@ def speaker[u: U, r: R](beta, t):
     speaker: chooses(u in U, wpp=imagine[
         listener: knows(u),
         listener: chooses(r in R, wpp=listener[u, r](beta, t)),
-        exp(beta * E[listener.r == r])
+        exp(beta * Pr[listener.r == r])
     ])
-    return E[speaker.u == u]
+    return Pr[speaker.u == u]
 
 @memo
 def listener[u: U, r: R](beta, t):
@@ -32,8 +32,8 @@ def listener[u: U, r: R](beta, t):
         speaker: chooses(u in U, wpp=speaker[u, r](beta, t - 1) if t > 0 else denotes(u, r))
     ]
     listener: observes [speaker.u] is u
-    listener: chooses(r in R, wpp=E[speaker.r == r])
-    return E[listener.r == r]
+    listener: chooses(r in R, wpp=Pr[speaker.r == r])
+    return Pr[listener.r == r]
 
 beta = 3.
 for t in range(10):

@@ -17,11 +17,11 @@ def scalar[n: N, u: U]():
         speaker: chooses(u in U, wpp=imagine[
             listener: knows(u),
             listener: chooses(n in N, wpp=meaning(n, u)),
-            E[listener.n == n]
+            Pr[listener.n == n]
         ])
     ]
     listener: hears [speaker.u] is u
     listener: chooses(n in N, wpp=E[speaker.n == n])
-    return E[listener.n == n]
+    return Pr[listener.n == n]
 
 print(scalar())
