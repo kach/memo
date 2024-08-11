@@ -524,7 +524,7 @@ def memo_(f):  # type: ignore
 
     io = StringIO()
     ctxt = Context(next_idx=0, io=io, frame=Frame(name=ROOT_FRAME_NAME), idx_history=[])
-    ctxt.emit(HEADER)
+    ctxt.emit("from memo.lib import marg, pad, ffi, jax, jnp")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
     # ic(ctxt.frame.children['alice'].choices.keys())
@@ -559,11 +559,8 @@ def memo_(f):  # type: ignore
         + f"{f_name} = _out_{f_name}\n"
     )
 
-    # for s in stmts:
-    #     print(pprint_stmt(s))
-    # print(pprint_expr(retval))
-    # for i, line in enumerate(out.splitlines()):
-    #     print(f"{i + 1: 5d}  {line}")
+    for i, line in enumerate(out.splitlines()):
+        print(f"{i + 1: 5d}  {line}")
 
     globals_of_caller = inspect.stack()[2].frame.f_globals
     retvals: dict[Any, Any] = {}
