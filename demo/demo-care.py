@@ -14,7 +14,7 @@ maze = '''\
 *--*  *  *--*  *
 |  |     |     |
 *  *--*  *  *  *
-|           |  |
+|     |     |  |
 *--*--*--*--*--*
 '''
 
@@ -161,7 +161,7 @@ def π[b: B, s: S, a: A](t):
             )
         ),
     )
-    return E[ alice.a == a ]
+    return Pr[ alice.a == a ]
 ic('Compiled π')
 
 @cache
@@ -207,7 +207,7 @@ def is_valid_pxy(l):
 def teacher[h: Hid, hor: Horizon, b: B, l: Loc](t):
     cast: [teacher, env]
     teacher: knows(h, hor, b)
-    teacher: chooses(l in Loc, wpp=is_valid_pxy(l) * beta() * exp(
+    teacher: chooses(l in Loc, wpp=is_valid_pxy(l) * 2 * beta() * exp(
         imagine[
             env: knows(l, hor),
             env: chooses(s in S, wpp=s == make_teacher_state(l, hor)),
