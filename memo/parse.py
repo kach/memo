@@ -447,6 +447,14 @@ def memo_(f):  # type: ignore
 
     for tp in f.type_params:
         assert isinstance(tp, ast.TypeVar)
+        if tp.bound is None:
+            raise MemoError(
+                f"Missing domain for {tp.name}",
+                hint=f"Specify the domain for {tp.name} by writing `{pctxt.loc_name}[{tp.name}: ___, ...]`",
+                user=True,
+                ctxt=None,
+                loc=SourceLocation(pctxt.loc_file, tp.lineno, tp.col_offset, pctxt.loc_name)
+            )
         assert isinstance(tp.bound, ast.Name)
         stmts.append(
             SForAll(
