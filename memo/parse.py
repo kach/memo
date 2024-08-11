@@ -379,7 +379,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             )
 
 
-def memo_(f):  # type: ignore
+def memo_(f, debug_print_compiled=False):  # type: ignore
     try:
         src = inspect.getsource(f)
     except OSError:
@@ -553,14 +553,14 @@ def memo_(f):  # type: ignore
         ""
         + f"""def _out_{f_name}({", ".join(static_parameters)}):\n"""
         + textwrap.indent(io.getvalue(), "    ")
-        + "\n\n"
         # + f"_out_{f_name}._foralls = ...\n"
         # + f"_out_{f_name}._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
         + f"{f_name} = _out_{f_name}\n"
     )
 
-    for i, line in enumerate(out.splitlines()):
-        print(f"{i + 1: 5d}  {line}")
+    if debug_print_compiled:
+        for i, line in enumerate(out.splitlines()):
+            print(f"{i + 1: 5d}  {line}")
 
     globals_of_caller = inspect.stack()[2].frame.f_globals
     retvals: dict[Any, Any] = {}
@@ -568,9 +568,11 @@ def memo_(f):  # type: ignore
     return retvals[f"_out_{f_name}"]
 
 
-def memo(f):  # type: ignore
+def memo(f=None, **kwargs):  # type: ignore
     try:
-        return memo_(f)  # type: ignore
+        if f is None:
+            return lambda f: memo_(f, **kwargs)  # type: ignore
+        return memo_(f, **kwargs)
     except MemoError as e:
         if e.loc:
             e.add_note('')
