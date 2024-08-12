@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NewType, Any, Tuple, Literal
+from typing import NewType, Any, Tuple, Literal, Iterator
 
 from contextlib import contextmanager
 import itertools
@@ -241,6 +241,7 @@ class Context:
     hoisted_buf: Buffer = field(default_factory=Buffer)
     regular_buf: Buffer = field(default_factory=Buffer)
     hoisted: bool = False
+    hoisted_syms: list[str] = field(default_factory=list)
 
     next_idx: int = 0
     _sym: int = -1
@@ -261,17 +262,20 @@ class Context:
 
     def sym(self: Context, hint: str = "") -> str:
         self._sym += 1
-        return f"{hint}_{self._sym}"
+        sym = f"{hint}_{self._sym}"
+        if self.hoisted:
+            self.hoisted_syms.append(sym)
+        return sym
 
     @contextmanager
-    def hoist(self: Context, state: bool = True):
+    def hoist(self: Context, state: bool = True) -> Iterator[None]:
         old_state = self.hoisted
         self.hoisted = state
         yield
         self.hoisted = old_state
 
     @contextmanager
-    def path_depends(self: Context, pc: str):
+    def path_depends(self: Context, pc: str) -> Iterator[None]:
         self.path_condition.append(pc)
         yield
         self.path_condition.pop()
@@ -382,9 +386,8 @@ imagine [
 def eval_expr(e: Expr, ctxt: Context) -> Value:
     match e:
         case ELit(val):
-            out = ctxt.sym("lit")
-            # ctxt.emit(f"{out} = jnp.array({val})")
             with ctxt.hoist():
+                out = ctxt.sym("lit")
                 ctxt.emit(f"{out} = {val}")
             return Value(tag=out, known=True, deps=set(), static=True)
 
@@ -412,12 +415,14 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             args_out = []
             for arg in args:
                 args_out.append(eval_expr(arg, ctxt))
-            out = ctxt.sym(f"ffi_{name}")
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
             static = all(arg.static for arg in args_out)
             with ctxt.hoist(static):
+                out = ctxt.sym(f"ffi_{name}")
                 ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
+                if static:
+                    ctxt.emit(f'{out} = {out}.item()')
             return Value(
                 tag=out,
                 known=known,
@@ -441,11 +446,15 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         loc=arg_node.loc,
                     )
 
-            res = ctxt.sym(f"result_array_{name}")
             with ctxt.hoist():
+                res = ctxt.sym(f"result_array_{name}")
                 ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
                 ctxt.indent()
                 ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)}).transpose()')
+                ctxt.dedent()
+                ctxt.emit('else:')
+                ctxt.indent()
+                ctxt.emit(f'{res} = np.zeros({name}._shape).transpose()')
                 ctxt.dedent()
 
             out_idxs = []
@@ -482,7 +491,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             )
 
         case EOp(op, args):
-            out = ctxt.sym(f"op_{op.name.lower()}")
             if op in [
                 Op.ADD,
                 Op.SUB,
@@ -502,6 +510,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 r = eval_expr(args[1], ctxt)
                 static = l.static and r.static
                 with ctxt.hoist(static):
+                    out = ctxt.sym(f"op_{op.name.lower()}")
                     match op:
                         case Op.ADD:
                             ctxt.emit(f"{out} = {l.tag} + {r.tag}")
@@ -512,17 +521,17 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         case Op.DIV:
                             ctxt.emit(f"{out} = {l.tag} / {r.tag}")
                         case Op.EQ:
-                            ctxt.emit(f"{out} = jnp.equal({l.tag}, {r.tag})")
+                            ctxt.emit(f"{out} = {l.tag} == {r.tag}")
                         case Op.NEQ:
-                            ctxt.emit(f"{out} = jnp.not_equal({l.tag}, {r.tag})")
+                            ctxt.emit(f"{out} = {l.tag} != {r.tag}")
                         case Op.LT:
-                            ctxt.emit(f"{out} = jnp.less({l.tag}, {r.tag})")
+                            ctxt.emit(f"{out} = {l.tag} < {r.tag}")
                         case Op.LTE:
-                            ctxt.emit(f"{out} = jnp.less_equal({l.tag}, {r.tag})")
+                            ctxt.emit(f"{out} = {l.tag} <= {r.tag}")
                         case Op.GT:
-                            ctxt.emit(f"{out} = jnp.greater({l.tag}, {r.tag})")
+                            ctxt.emit(f"{out} = {l.tag} > {r.tag}")
                         case Op.GTE:
-                            ctxt.emit(f"{out} = jnp.greater_equal({l.tag}, {r.tag})")
+                            ctxt.emit(f"{out} = {l.tag} >= {r.tag}")
                         case Op.AND:
                             ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                         case Op.OR:
@@ -536,8 +545,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             elif op in [Op.EXP, Op.ABS, Op.LOG, Op.UADD, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
-                static = l.static
+                static = l.static and op in [Op.UADD, Op.NEG, Op.INV]
                 with ctxt.hoist(static):
+                    out = ctxt.sym(f"op_{op.name.lower()}")
                     match op:
                         case Op.EXP:
                             ctxt.emit(f"{out} = jnp.exp({l.tag})")
@@ -550,25 +560,27 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         case Op.NEG:
                             ctxt.emit(f"{out} = -({l.tag})")
                         case Op.INV:
-                            ctxt.emit(f"{out} = ~({l.tag})")
+                            ctxt.emit(f"{out} = True ^ {l.tag}")
                 return Value(tag=out, known=l.known, deps=l.deps, static=static)
             elif op == Op.ITE:
                 assert len(args) == 3
+                out = ctxt.sym(f"op_{op.name.lower()}")
                 c = eval_expr(args[0], ctxt)
                 if c.static:
-                    ctxt.emit(f"if {c.tag}:")
-                    ctxt.indent()
+                    # ctxt.emit(f"if {c.tag}:")
+                    # ctxt.indent()
                     with ctxt.path_depends(c.tag):
                         t = eval_expr(args[1], ctxt)
-                    ctxt.emit(f"{out} = {t.tag}")
-                    ctxt.dedent()
-                    ctxt.emit("else:")
-                    ctxt.indent()
+                    # ctxt.emit(f"{out} = {t.tag}")
+                    # ctxt.dedent()
+                    # ctxt.emit("else:")
+                    # ctxt.indent()
                     inv_out = eval_expr(EOp(Op.INV, [ELit(c.tag, loc=None)], loc=None), ctxt)
                     with ctxt.path_depends(inv_out.tag):
                         f = eval_expr(args[2], ctxt)
-                    ctxt.emit(f"{out} = {f.tag}")
-                    ctxt.dedent()
+                    # ctxt.emit(f"{out} = {f.tag}")
+                    # ctxt.dedent()
+                    ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
                     return Value(
                         tag=out,
                         known=c.known and t.known and f.known,

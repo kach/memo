@@ -523,8 +523,8 @@ def memo_(f, debug_print_compiled=False, debug_trace=False):  # type: ignore
         )
 
     ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
+    ctxt.hoisted_syms.extend(static_parameters)
     with ctxt.hoist():
-        ctxt.emit("from memo.lib import marg, pad, ffi, jax, jnp")
         if debug_trace:
             ctxt.emit(f"""print(f'--> {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
     for stmt_ in stmts:
@@ -549,18 +549,31 @@ def memo_(f, debug_print_compiled=False, debug_trace=False):  # type: ignore
     ctxt.emit(
         f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)}).transpose()"
     )
-    if debug_trace:
-        ctxt.emit(f"""print(f'<-- {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
+
+    with ctxt.hoist():
+        ctxt.emit(f"""_jit_ = _jit_{f_name}({", ".join(ctxt.hoisted_syms)})""")
+        if debug_trace:
+            ctxt.emit(f"""print(f'<-- {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
+        ctxt.emit(f"""return _jit_""")
     ctxt.emit(f"return {val.tag}")
 
-    out = (
-        ""
-        + f"""def _out_{f_name}({", ".join(static_parameters)}):\n"""
-        + textwrap.indent(ctxt.hoisted_buf.getvalue() + "\n" + ctxt.regular_buf.getvalue(), "    ")
-        # + f"_out_{f_name}._foralls = ...\n"
-        # + f"_out_{f_name}._memo = {repr([z[1:] for z in ctxt.forall_idxs])}\n"
-        + f"{f_name} = _out_{f_name}\n"
-    )
+    out = f"""\
+def _make_{f_name}():
+    from memo.lib import marg, pad, ffi, jax, jnp
+    import functools
+
+    @jax.jit
+    def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
+{textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
+
+    def _out_{f_name}({", ".join(static_parameters)}):
+{textwrap.indent(ctxt.hoisted_buf.getvalue(), "    " * 2)}
+
+    _out_{f_name}._shape = tuple([{", ".join(f"len({p.bound.id})" for p in f.type_params)}])
+    return _out_{f_name}
+
+{f_name} = _make_{f_name}()
+"""
 
     if debug_print_compiled:
         for i, line in enumerate(out.splitlines()):
@@ -569,14 +582,14 @@ def memo_(f, debug_print_compiled=False, debug_trace=False):  # type: ignore
     globals_of_caller = inspect.stack()[2].frame.f_globals
     retvals: dict[Any, Any] = {}
     exec(out, globals_of_caller, retvals)
-    return retvals[f"_out_{f_name}"]
+    return retvals[f"{f_name}"]
 
 
 def memo(f=None, **kwargs):  # type: ignore
     try:
         if f is None:
             return lambda f: memo_(f, **kwargs)  # type: ignore
-        return memo_(f, **kwargs)
+        return memo_(f, **kwargs)  # type: ignore
     except MemoError as e:
         if e.loc:
             e.add_note('')
