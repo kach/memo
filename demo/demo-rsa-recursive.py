@@ -13,7 +13,7 @@ def denotes(u, r):
         [1, 1]
     ])[r, u]
 
-@memo
+@memo(debug_trace=True)
 def speaker[u: U, r: R](beta, t):
     cast: [speaker, listener]
     speaker: knows(r)
@@ -24,7 +24,7 @@ def speaker[u: U, r: R](beta, t):
     ])
     return Pr[speaker.u == u]
 
-@memo(debug_print_compiled=True)
+@memo(debug_trace=True)
 def listener[u: U, r: R](beta, t):
     cast: [listener, speaker]
     listener: thinks[
@@ -36,5 +36,4 @@ def listener[u: U, r: R](beta, t):
     return Pr[listener.r == r]
 
 beta = 3.
-for t in range(10):
-    ic(t, listener(beta, t), speaker(beta, t))
+ic(4, listener(beta, 4))
