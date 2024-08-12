@@ -379,7 +379,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             )
 
 
-def memo_(f, debug_print_compiled=False, debug_trace=False):  # type: ignore
+def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  # type: ignore
     try:
         src = inspect.getsource(f)
     except OSError:
@@ -529,6 +529,11 @@ def memo_(f, debug_print_compiled=False, debug_trace=False):  # type: ignore
             ctxt.emit(f"""print(f' -> {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
+
+    if save_comic is not None:
+        from .comic import comic
+        comic(ctxt.frame, fname=save_comic)
+
     # ic(ctxt.frame.children['alice'].choices.keys())
     val = eval_expr(retval, ctxt)
     if not val.known:
