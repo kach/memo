@@ -17,7 +17,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 @dataclass
 class ParsingContext:
-    cast: list[str]
+    cast: None | list[str]
     static_parameters: list[str]
     loc_name: str
     loc_file: str
@@ -188,7 +188,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         # choice
         case ast.Subscript(value=ast.Name(id=who_id), slice=slice):
-            if who_id not in ctxt.cast:
+            if ctxt.cast is not None and who_id not in ctxt.cast:
                 raise MemoError(
                     f"agent `{who_id}` is not in the cast",
                     hint=f"Did you either misspell `{who_id}`, or forget to include `{who_id}` in the cast?",
@@ -398,7 +398,7 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
     tree = ast.parse(src, filename=src_file)
     ast.increment_lineno(tree, n=lineno - 1)
 
-    cast = []
+    cast = None
     static_parameters = []
 
     match tree:
@@ -416,19 +416,13 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
                     annotation=ast.List(elts=elts),
                     value=None,
                 ):
+                    cast = []
                     for elt in elts:
                         assert isinstance(elt, ast.Name)
                         cast.append(elt.id)
+                    rest_stmts = f.body[1:]
                 case _:
-                    raise MemoError(
-                        "No cast",
-                        hint="The first line of a memo should always declare the cast of agents you will be working with. For example, to declare a memo which reasons about the two agents alice and bob, you would write `cast: [alice, bob]`.",
-                        user=True,
-                        ctxt=None,
-                        loc=SourceLocation(
-                            src_file, first_stmt.lineno, first_stmt.col_offset, f_name
-                        ),
-                    )
+                    rest_stmts = f.body[:]
         case _:
             raise MemoError(
                 "Unknown syntax error",
@@ -466,7 +460,7 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
             )
         )
 
-    for stmt in f.body[1:]:
+    for stmt in rest_stmts:
         loc = SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
         match stmt:
             case ast.AnnAssign(
@@ -487,7 +481,7 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
                     )
                 )
             case ast.AnnAssign(target=ast.Name(id=who), annotation=expr, value=None):
-                if who not in cast:
+                if pctxt.cast is not None and who not in pctxt.cast:
                     raise MemoError(
                         f"agent `{who}` is not in the cast",
                         hint=f"Did you either misspell `{who}`, or forget to include `{who}` in the cast?",
