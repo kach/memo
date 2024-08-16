@@ -4,7 +4,7 @@ Y = [2, 3]
 
 @memo
 def f[x: X]():
-    cast: [alice, bob]
+    # cast: [alice, bob]
     alice: knows(x)
     alice: thinks[ bob: knows(x) ]
     return alice[bob[x]]

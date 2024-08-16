@@ -2,9 +2,11 @@ from .core import *
 import ast, inspect
 from typing import Any, Callable, Literal
 import textwrap
-import os, sys
+import os, sys, platform
 from io import StringIO
 from dataclasses import dataclass
+from .version import __version__
+import jax
 
 try:
     from icecream import ic  # type: ignore
@@ -628,4 +630,8 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
             e.add_note(
                 "[We think this may be a bug in memo: if you don't understand what is going on, please get in touch with us!]"
             )
+        e.add_note("")
+        e.add_note(f"  P.S.: You are currently using...")
+        e.add_note(f"        + memo version {__version__} and JAX version {jax.__version__}")
+        e.add_note(f"        + on Python version {platform.python_version()} on the {platform.system()} platform")
         raise

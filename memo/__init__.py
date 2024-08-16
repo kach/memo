@@ -1,4 +1,3 @@
 from .parse import memo
 from .utils import domain
-
-__version__ = "0.1.3"
+from .version import __version__
