@@ -5,7 +5,6 @@ from .version import __version__
 import textwrap
 import os, sys, platform, inspect
 from io import StringIO
-import jax
 from typing import Any
 
 def codegen(
@@ -127,6 +126,9 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
                 "[We think this may be a bug in memo: if you don't understand what is going on, please get in touch with us!]"
             )
         e.add_note("")
+
+        # Describe environment...
+        import jax
         e.add_note(f"  P.S.: You are currently using...")
         e.add_note(f"        + memo version {__version__} and JAX version {jax.__version__}")
         e.add_note(f"        + on Python version {platform.python_version()} on the {platform.system()} platform")
