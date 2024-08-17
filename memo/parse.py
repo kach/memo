@@ -1,12 +1,8 @@
 from .core import *
+
 import ast, inspect
 from typing import Any, Callable, Literal
-import textwrap
-import os, sys, platform
-from io import StringIO
 from dataclasses import dataclass
-from .version import __version__
-import jax
 
 try:
     from icecream import ic  # type: ignore
@@ -19,6 +15,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 class ParsingContext:
     cast: None | list[str]
     static_parameters: list[str]
+    axes: list[tuple[str, str]]
     loc_name: str
     loc_file: str
 
@@ -381,7 +378,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             )
 
 
-def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  # type: ignore
+def parse_memo(f):  # type: ignore
     try:
         src = inspect.getsource(f)
     except OSError:
@@ -435,6 +432,7 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
     pctxt = ParsingContext(
         cast=cast,
         static_parameters=static_parameters,
+        axes=[],
         loc_name=f_name,
         loc_file=src_file,
     )
@@ -459,6 +457,7 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
                 loc=None
             )
         )
+        pctxt.axes.append((tp.name, tp.bound.id))
 
     for stmt in rest_stmts:
         loc = SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
@@ -518,113 +517,4 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
             loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name),
         )
 
-    ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
-    ctxt.hoisted_syms.extend(static_parameters)
-    with ctxt.hoist():
-        if debug_trace:
-            ctxt.emit(f"""print(f' -> {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
-    for stmt_ in stmts:
-        eval_stmt(stmt_, ctxt)
-
-    val = eval_expr(retval, ctxt)
-    if not val.known:
-        ic(val.deps)
-        raise MemoError(
-            "Returning a value that the observer has uncertainty over",
-            hint="TODO",
-            ctxt=ctxt,
-            user=True,
-            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name)  # TODO loc of return stmt
-        )
-    squeeze_axes = [
-        -1 - i
-        for i in range(ctxt.next_idx)
-        if i not in [z[0] for z in ctxt.forall_idxs]
-    ]
-    ctxt.emit(f"{val.tag} = jnp.array({val.tag})")
-    ctxt.emit(
-        f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)}).transpose()"
-    )
-
-    with ctxt.hoist():
-        ctxt.emit(f"""_jit_ = _jit_{f_name}({", ".join(ctxt.hoisted_syms)})""")
-        if debug_trace:
-            ctxt.emit(f"""print(f'<-  {pctxt.loc_name}({{ {", ".join(static_parameters)} }})')""")
-        ctxt.emit(f"""return _jit_""")
-    ctxt.emit(f"return {val.tag}")
-
-    out = f"""\
-def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, jax, jnp
-    import functools
-
-    @jax.jit
-    def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
-{textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
-
-    def _out_{f_name}({", ".join(static_parameters)}):
-{textwrap.indent(ctxt.hoisted_buf.getvalue(), "    " * 2)}
-
-    _out_{f_name}._shape = tuple([{", ".join(f"len({p.bound.id})" for p in f.type_params)}])
-    return _out_{f_name}
-
-{f_name} = _make_{f_name}()
-"""
-
-    if debug_print_compiled:
-        for i, line in enumerate(out.splitlines()):
-            print(f"{i + 1: 5d}  {line}")
-
-    if save_comic is not None:
-        from .comic import comic
-        comic(ctxt.frame, val, fname=save_comic)
-
-    globals_of_caller = inspect.stack()[2].frame.f_globals
-    retvals: dict[Any, Any] = {}
-    exec(out, globals_of_caller, retvals)
-    return retvals[f"{f_name}"]
-
-
-def memo(f=None, **kwargs):  # type: ignore
-    try:
-        if f is None:
-            return lambda f: memo_(f, **kwargs)  # type: ignore
-        return memo_(f, **kwargs)  # type: ignore
-    except MemoError as e:
-        if e.loc:
-            e.add_note('')
-            e.add_note(
-                f"    at: @memo {e.loc.name} in {os.path.basename(e.loc.file)}, line {e.loc.line}, column {e.loc.offset + 1}"
-            )
-        if e.hint is not None:
-            e.add_note('')
-            for line in textwrap.wrap(
-                e.hint, initial_indent="  hint: ", subsequent_indent="        "
-            ):
-                e.add_note(line)
-        if e.ctxt:  # TODO
-            e.add_note('')
-            frame_name = f"{e.ctxt.frame.name}"
-            z = e.ctxt.frame
-            while z.parent is not None and z.parent.name != ROOT_FRAME_NAME:
-                z = z.parent
-                frame_name += f", as modeled by {z.name}"
-            ctxt_note = f'''\
-This error was encountered in the frame of {frame_name}.
-
-In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ctxt.frame.choices)} choices: {", ".join([v if k == Name("self") else f"{k}.{v}" for k, v in e.ctxt.frame.choices.keys()])}.
-'''
-            for line in textwrap.wrap(
-                ctxt_note, initial_indent="  ctxt: ", subsequent_indent="        "
-            ):
-                e.add_note(line)
-        if not e.user:
-            e.add_note("")
-            e.add_note(
-                "[We think this may be a bug in memo: if you don't understand what is going on, please get in touch with us!]"
-            )
-        e.add_note("")
-        e.add_note(f"  P.S.: You are currently using...")
-        e.add_note(f"        + memo version {__version__} and JAX version {jax.__version__}")
-        e.add_note(f"        + on Python version {platform.python_version()} on the {platform.system()} platform")
-        raise
+    return pctxt, stmts, retval
