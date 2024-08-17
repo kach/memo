@@ -3,11 +3,19 @@ from .parse import *
 from .version import __version__
 
 import textwrap
-import os, sys, platform
+import os, sys, platform, inspect
 from io import StringIO
 import jax
+from typing import Any
 
-def codegen(pctxt, stmts, retval, debug_print_compiled=False, debug_trace=False, save_comic=None):
+def codegen(
+    pctxt: ParsingContext,
+    stmts: list[Stmt],
+    retval: Expr,
+    debug_print_compiled: bool=False,
+    debug_trace: bool=False,
+    save_comic: str|None=None
+) -> Any:
     f_name = pctxt.loc_name
     ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
     ctxt.hoisted_syms.extend(pctxt.static_parameters)
@@ -19,13 +27,12 @@ def codegen(pctxt, stmts, retval, debug_print_compiled=False, debug_trace=False,
 
     val = eval_expr(retval, ctxt)
     if not val.known:
-        ic(val.deps)
         raise MemoError(
             "Returning a value that the observer has uncertainty over",
             hint="TODO",
             ctxt=ctxt,
             user=True,
-            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name)  # TODO loc of return stmt
+            loc=retval.loc
         )
     squeeze_axes = [
         -1 - i
@@ -76,7 +83,7 @@ def _make_{f_name}():
     return retvals[f"{f_name}"]
 
 
-def memo_(f, **kwargs):
+def memo_(f, **kwargs):  # type: ignore
     pctxt, stmts, retval = parse_memo(f)
     return codegen(pctxt, stmts, retval, **kwargs)
 
