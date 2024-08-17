@@ -25,18 +25,18 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
     match expr:
         case ast.Constant(value=val):
             assert isinstance(val, float) or isinstance(val, int)
-            return ELit(value=val, loc=loc)
+            return ELit(value=val, loc=loc, static=True)
 
         case ast.Call(func=ast.Name(id="exp"), args=[e1]):
-            return EOp(op=Op.EXP, args=[parse_expr(e1, ctxt)], loc=loc)
+            return EOp(op=Op.EXP, args=[parse_expr(e1, ctxt)], loc=loc, static=False)
         case ast.Call(func=ast.Name(id="abs"), args=[e1]):
-            return EOp(op=Op.ABS, args=[parse_expr(e1, ctxt)], loc=loc)
+            return EOp(op=Op.ABS, args=[parse_expr(e1, ctxt)], loc=loc, static=False)
         case ast.Call(func=ast.Name(id="log"), args=[e1]):
-            return EOp(op=Op.LOG, args=[parse_expr(e1, ctxt)], loc=loc)
+            return EOp(op=Op.LOG, args=[parse_expr(e1, ctxt)], loc=loc, static=False)
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
             return EFFI(
-                name=ffi_name, args=[parse_expr(arg, ctxt) for arg in ffi_args], loc=loc
+                name=ffi_name, args=[parse_expr(arg, ctxt) for arg in ffi_args], loc=loc, static=False
             )
 
         # memo call single arg
@@ -52,6 +52,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=[(Id("..."), Name(source_name), Id(source_id))],
                 loc=loc,
+                static=False
             )
 
         case ast.Call(
@@ -66,6 +67,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=[(Id("..."), Name("self"), Id(source_id))],
                 loc=loc,
+                static=False
             )
 
         # memo call multi arg
@@ -87,10 +89,13 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 args=[parse_expr(arg, ctxt) for arg in args],
                 ids=ids,
                 loc=loc,
+                static=False
             )
 
         # operators
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
+            e1_ = parse_expr(e1, ctxt)
+            e2_ = parse_expr(e2, ctxt)
             return EOp(
                 op={
                     ast.Eq: Op.EQ,
@@ -100,11 +105,9 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ast.Gt: Op.GT,
                     ast.GtE: Op.GTE
                 }[op.__class__],
-                args=[
-                    parse_expr(e1, ctxt),
-                    parse_expr(e2, ctxt),
-                ],
+                args=[e1_, e2_],
                 loc=loc,
+                static=e1_.static and e2_.static
             )
 
         case ast.UnaryOp(op=op, operand=operand):
@@ -117,9 +120,12 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 }[op.__class__],
                 args=[o_expr],
                 loc=loc,
+                static=o_expr.static
             )
 
         case ast.BinOp(left=e1, op=op, right=e2):
+            e1_ = parse_expr(e1, ctxt)
+            e2_ = parse_expr(e2, ctxt)
             return EOp(
                 op={
                     ast.Add: Op.ADD,
@@ -127,11 +133,9 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ast.Mult: Op.MUL,
                     ast.Div: Op.DIV,
                 }[op.__class__],
-                args=[
-                    parse_expr(e1, ctxt),
-                    parse_expr(e2, ctxt),
-                ],
+                args=[e1_, e2_],
                 loc=loc,
+                static=e1_.static and e2_.static
             )
 
         case ast.BoolOp(op=op, values=values):
@@ -144,32 +148,32 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     loc=loc,
                 )
             e1, e2 = values
+            e1_ = parse_expr(e1, ctxt)
+            e2_ = parse_expr(e2, ctxt)
             return EOp(
                 op={ast.And: Op.AND, ast.Or: Op.OR}[op.__class__],
-                args=[
-                    parse_expr(e1, ctxt),
-                    parse_expr(e2, ctxt),
-                ],
+                args=[e1_, e2_],
                 loc=loc,
+                static=e1_.static and e2_.static
             )
 
         case ast.IfExp(test=test, body=body, orelse=orelse):
             c_expr = parse_expr(test, ctxt)
             t_expr = parse_expr(body, ctxt)
             f_expr = parse_expr(orelse, ctxt)
-            return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr], loc=loc)
+            return EOp(op=Op.ITE, args=[c_expr, t_expr, f_expr], loc=loc, static=c_expr.static and t_expr.static and f_expr.static)
 
         # literals
         case ast.Name(id=id):
             if id in ctxt.static_parameters:
-                return ELit(id, loc=loc)
-            return EChoice(id=Id(id), loc=loc)
+                return ELit(id, loc=loc, static=True)
+            return EChoice(id=Id(id), loc=loc, static=False)
 
         # expected value
         case ast.Subscript(value=ast.Name(id="E" | "Pr"), slice=rv_expr):
             assert not isinstance(rv_expr, ast.Slice)
             assert not isinstance(rv_expr, ast.Tuple)
-            return EExpect(expr=parse_expr(rv_expr, ctxt), loc=loc)
+            return EExpect(expr=parse_expr(rv_expr, ctxt), loc=loc, static=False)
 
         # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):
@@ -181,7 +185,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ) if expr_ is not None:
                         stmts.extend(parse_stmt(expr_, who_, ctxt))
             assert not isinstance(elts[-1], ast.Slice)
-            return EImagine(do=stmts, then=parse_expr(elts[-1], ctxt), loc=loc)
+            return EImagine(do=stmts, then=parse_expr(elts[-1], ctxt), loc=loc, static=False)
 
         # choice
         case ast.Subscript(value=ast.Name(id=who_id), slice=slice):
@@ -195,9 +199,9 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 )
             assert not isinstance(slice, ast.Slice)
             assert not isinstance(slice, ast.Tuple)
-            return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt), loc=loc)
+            return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt), loc=loc, static=False)
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
-            if who_id not in ctxt.cast and who_id != "self":
+            if ctxt.cast is not None and who_id not in ctxt.cast and who_id != "self":
                 raise MemoError(
                     f"agent `{who_id}` is not in the cast",
                     hint=f"Did you either misspell `{who_id}`, or forget to include `{who_id}` in the cast?",
@@ -205,7 +209,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ctxt=None,
                     loc=loc,
                 )
-            return EWith(who=Name(who_id), expr=EChoice(Id(attr), loc=loc), loc=loc)
+            return EWith(who=Name(who_id), expr=EChoice(Id(attr), loc=loc, static=False), loc=loc, static=False)
 
         case _:
             raise MemoError(
@@ -378,7 +382,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             )
 
 
-def parse_memo(f):  # type: ignore
+def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
     try:
         src = inspect.getsource(f)
     except OSError:

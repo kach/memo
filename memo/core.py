@@ -54,7 +54,6 @@ class Value:
     tag: str
     known: bool
     deps: set[tuple[Name, Id]]
-    static: bool
 
 
 @dataclass
@@ -90,9 +89,12 @@ ROOT_FRAME_NAME = Name("observer")
 class SyntaxNode:
     loc: SourceLocation | None
 
+@dataclass(frozen=True, kw_only=True)
+class ExprSyntaxNode(SyntaxNode):
+    static: bool
 
 @dataclass(frozen=True)
-class ELit(SyntaxNode):
+class ELit(ExprSyntaxNode):
     value: float | str
 
 
@@ -123,42 +125,42 @@ Op = Enum(
 
 
 @dataclass(frozen=True)
-class EOp(SyntaxNode):
+class EOp(ExprSyntaxNode):
     op: Op
     args: list[Expr]
 
 
 @dataclass(frozen=True)
-class EFFI(SyntaxNode):
+class EFFI(ExprSyntaxNode):
     name: str
     args: list[Expr]
 
 
 @dataclass(frozen=True)
-class EMemo(SyntaxNode):
+class EMemo(ExprSyntaxNode):
     name: str
     args: list[Expr]
     ids: list[Tuple[Id, Name, Id]]
 
 
 @dataclass(frozen=True)
-class EChoice(SyntaxNode):
+class EChoice(ExprSyntaxNode):
     id: Id
 
 
 @dataclass(frozen=True)
-class EExpect(SyntaxNode):
+class EExpect(ExprSyntaxNode):
     expr: Expr
 
 
 @dataclass(frozen=True)
-class EWith(SyntaxNode):
+class EWith(ExprSyntaxNode):
     who: Name
     expr: Expr
 
 
 @dataclass(frozen=True)
-class EImagine(SyntaxNode):
+class EImagine(ExprSyntaxNode):
     do: list[Stmt]
     then: Expr
 
@@ -389,7 +391,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             with ctxt.hoist():
                 out = ctxt.sym("lit")
                 ctxt.emit(f"{out} = {val}")
-            return Value(tag=out, known=True, deps=set(), static=True)
+            return Value(tag=out, known=True, deps=set())
 
         case EChoice(id):
             if (Name("self"), id) not in ctxt.frame.choices:
@@ -408,7 +410,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             # out = ctxt.sym("ch")
             # ctxt.emit(f"{out} = {ch.tag}")
             return Value(
-                tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)]), static=False
+                tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)])
             )
 
         case EFFI(name, args):
@@ -417,34 +419,26 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 args_out.append(eval_expr(arg, ctxt))
             known = all(arg.known for arg in args_out)
             deps = set().union(*(arg.deps for arg in args_out))
-            static = all(arg.static for arg in args_out)
-            with ctxt.hoist(static):
+            with ctxt.hoist(e.static):
                 out = ctxt.sym(f"ffi_{name}")
                 ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
-                if static:
+                if e.static:
                     ctxt.emit(f'{out} = {out}.item()')
-            return Value(
-                tag=out,
-                known=known,
-                deps=deps,
-                static=static,
-            )
+            return Value(tag=out, known=known, deps=deps)
 
         case EMemo(name, args, ids):
             args_out = []
             with ctxt.hoist():
                 for arg in args:
                     args_out.append(eval_expr(arg, ctxt))
-
-            for arg_val, arg_node in zip(args_out, args):
-                if not arg_val.static:
-                    raise MemoError(
-                        "parameter not statically known",
-                        hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
-                        user=True,
-                        ctxt=None,
-                        loc=arg_node.loc,
-                    )
+                    if not arg.static:
+                        raise MemoError(
+                            "parameter not statically known",
+                            hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
+                            user=True,
+                            ctxt=ctxt,
+                            loc=arg.loc,
+                        )
 
             with ctxt.hoist():
                 res = ctxt.sym(f"result_array_{name}")
@@ -486,8 +480,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 # deps=set.union(
                 #     *(ctxt.frame.choices[sn, si].wpp_deps for _, sn, si in ids)
                 # ),
-                deps=set((sn, si) for _, sn, si in ids),
-                static=False,
+                deps=set((sn, si) for _, sn, si in ids)
             )
 
         case EOp(op, args):
@@ -508,8 +501,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 assert len(args) == 2
                 l = eval_expr(args[0], ctxt)
                 r = eval_expr(args[1], ctxt)
-                static = l.static and r.static
-                with ctxt.hoist(static):
+                with ctxt.hoist(e.static):
                     out = ctxt.sym(f"op_{op.name.lower()}")
                     match op:
                         case Op.ADD:
@@ -539,14 +531,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 return Value(
                     tag=out,
                     known=l.known and r.known,
-                    deps=l.deps | r.deps,
-                    static=static,
+                    deps=l.deps | r.deps
                 )
             elif op in [Op.EXP, Op.ABS, Op.LOG, Op.UADD, Op.NEG, Op.INV]:
                 assert len(args) == 1
                 l = eval_expr(args[0], ctxt)
-                static = l.static and op in [Op.UADD, Op.NEG, Op.INV]
-                with ctxt.hoist(static):
+                with ctxt.hoist(e.static):
                     out = ctxt.sym(f"op_{op.name.lower()}")
                     match op:
                         case Op.EXP:
@@ -561,42 +551,33 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                             ctxt.emit(f"{out} = -({l.tag})")
                         case Op.INV:
                             ctxt.emit(f"{out} = True ^ {l.tag}")
-                return Value(tag=out, known=l.known, deps=l.deps, static=static)
+                return Value(tag=out, known=l.known, deps=l.deps)
             elif op == Op.ITE:
                 assert len(args) == 3
-                out = ctxt.sym(f"op_{op.name.lower()}")
-                c = eval_expr(args[0], ctxt)
-                if c.static:
-                    # ctxt.emit(f"if {c.tag}:")
-                    # ctxt.indent()
-                    with ctxt.path_depends(c.tag):
+                with ctxt.hoist(e.static):
+                    out = ctxt.sym(f"op_{op.name.lower()}")
+                    c = eval_expr(args[0], ctxt)
+                    if args[0].static:
+                        with ctxt.path_depends(c.tag):
+                            t = eval_expr(args[1], ctxt)
+                        inv_out = eval_expr(EOp(Op.INV, [ELit(c.tag, loc=None, static=True)], loc=None, static=True), ctxt)
+                        with ctxt.path_depends(inv_out.tag):
+                            f = eval_expr(args[2], ctxt)
+                        ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
+                        return Value(
+                            tag=out,
+                            known=c.known and t.known and f.known,
+                            deps=c.deps | t.deps | f.deps
+                        )
+                    else:
                         t = eval_expr(args[1], ctxt)
-                    # ctxt.emit(f"{out} = {t.tag}")
-                    # ctxt.dedent()
-                    # ctxt.emit("else:")
-                    # ctxt.indent()
-                    inv_out = eval_expr(EOp(Op.INV, [ELit(c.tag, loc=None)], loc=None), ctxt)
-                    with ctxt.path_depends(inv_out.tag):
                         f = eval_expr(args[2], ctxt)
-                    # ctxt.emit(f"{out} = {f.tag}")
-                    # ctxt.dedent()
-                    ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
-                    return Value(
-                        tag=out,
-                        known=c.known and t.known and f.known,
-                        deps=c.deps | t.deps | f.deps,
-                        static=t.static and f.static,
-                    )
-                else:
-                    t = eval_expr(args[1], ctxt)
-                    f = eval_expr(args[2], ctxt)
-                    ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
-                    return Value(
-                        tag=out,
-                        known=c.known and t.known and f.known,
-                        deps=c.deps | t.deps | f.deps,
-                        static=False,
-                    )
+                        ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
+                        return Value(
+                            tag=out,
+                            known=c.known and t.known and f.known,
+                            deps=c.deps | t.deps | f.deps
+                        )
             else:
                 raise NotImplementedError
 
@@ -625,8 +606,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 tag=out,
                 known=True,
                 # deps={(name, id) for (name, id) in val_.deps if ctxt.frame.choices[(name, id)].known}
-                deps=deps,
-                static=False,
+                deps=deps
             )
 
         case EWith(who, expr):
@@ -667,7 +647,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in reversed(sorted(deps)))
             except Exception:
                 raise
-            return Value(tag=val_.tag, known=known, deps=deps, static=False)
+            return Value(tag=val_.tag, known=known, deps=deps)
 
         case EImagine(do, then):
             ctxt.emit(f"# {ctxt.frame.name} imagines")
@@ -716,8 +696,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             val_ = Value(  ## ??
                 tag=val_.tag,
                 known=val_.known,
-                deps=new_deps,
-                static=val_.static,
+                deps=new_deps
             )
 
             # if we do something like env.knows(a) within imagine, then
