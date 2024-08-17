@@ -133,13 +133,13 @@ from matplotlib import pyplot as plt
 
 plt.figure(figsize=(7, 3))
 plt.subplot(1, 2, 1)
-z = ic(V(10))
+z = V(10)
 plt.plot(B, z)
 plt.xlabel('P(hungry)')
 plt.title('Value')
 
 plt.subplot(1, 2, 2)
-z = ic(π(10))
+z = π(10)
 plt.plot(B, z, label=['feed', 'sing', 'ignore'])
 plt.xlabel('P(hungry)')
 plt.title('Policy')

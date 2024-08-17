@@ -526,10 +526,6 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
 
-    if save_comic is not None:
-        from .comic import comic
-        comic(ctxt.frame, fname=save_comic)
-
     # ic(ctxt.frame.children['alice'].choices.keys())
     val = eval_expr(retval, ctxt)
     if not val.known:
@@ -579,6 +575,10 @@ def _make_{f_name}():
     if debug_print_compiled:
         for i, line in enumerate(out.splitlines()):
             print(f"{i + 1: 5d}  {line}")
+
+    if save_comic is not None:
+        from .comic import comic
+        comic(ctxt.frame, val, fname=save_comic)
 
     globals_of_caller = inspect.stack()[2].frame.f_globals
     retvals: dict[Any, Any] = {}
