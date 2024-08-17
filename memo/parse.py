@@ -526,7 +526,6 @@ def memo_(f, debug_print_compiled=False, debug_trace=False, save_comic=None):  #
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
 
-    # ic(ctxt.frame.children['alice'].choices.keys())
     val = eval_expr(retval, ctxt)
     if not val.known:
         ic(val.deps)
