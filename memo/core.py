@@ -448,7 +448,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 ctxt.dedent()
                 ctxt.emit('else:')
                 ctxt.indent()
-                ctxt.emit(f'{res} = np.zeros({name}._shape).transpose()')
+                ctxt.emit(f'{res} = jnp.zeros({name}._shape).transpose()')
                 ctxt.dedent()
 
             out_idxs = []
