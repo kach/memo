@@ -20,7 +20,7 @@ def codegen(
     ctxt.hoisted_syms.extend(pctxt.static_parameters)
     with ctxt.hoist():
         if debug_trace:
-            ctxt.emit(f"""print(f' -> {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters)} }})')""")
+            ctxt.emit(f"""print(f' --> {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters)} }})')""")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
 
@@ -46,7 +46,7 @@ def codegen(
     with ctxt.hoist():
         ctxt.emit(f"""_jit_ = _jit_{f_name}({", ".join(ctxt.hoisted_syms)})""")
         if debug_trace:
-            ctxt.emit(f"""print(f'<-  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters)} }})')""")
+            ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters)} }}) has shape {{ _jit_.shape }}')""")
         ctxt.emit(f"""return _jit_""")
     ctxt.emit(f"return {val.tag}")
 
