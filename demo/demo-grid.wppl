@@ -57,7 +57,7 @@ var policy = dp.cache(function(s, g, t) {
          var s_ = Tr(s, a)
          return V(s_, g, t-1)
        })))))
-    factor(value) // factor(beta * value)
+    factor(2 * value) // factor(beta * value)
 
     return a
   })
@@ -74,10 +74,15 @@ var V = dp.cache(function(s, g, t) {
     }))))}))
 })
 
-var out = map(
-  function(s) {
-    return V(s, 0, 200)
-  }, S
-)
+// Run with webppl demo-grid.wppl -- <t>
+var t = argv._[1];
+console.log('t = ' + t.toString()); // toString() guards against undefined!
 
-console.log(out)
+var out = map(
+  function(g) { return map(
+    function(s) {
+      return V(s, g, t)
+    }, S)
+  }, G);
+
+out[1][1]

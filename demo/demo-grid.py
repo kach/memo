@@ -5,6 +5,9 @@ import jax
 import jax.numpy as np
 import matplotlib.pyplot as plt
 
+import sys
+sys.setrecursionlimit(1_000_000)
+
 from memo import memo
 
 H = 10
@@ -60,7 +63,7 @@ def R(s, a, g):
 
 @jax.jit
 def is_terminating(s, g):
-    return False  # s == g
+    return s == g
 
 
 @cache
@@ -121,9 +124,18 @@ def invplan[s: S, a: A]():
     observer: observes [alice.a] is a
     return observer[E[alice.g == 0]]
 
+if len(sys.argv) > 1:
+    t = int(sys.argv[1])
+    print('t =', t)
+    v = V(t)
+    print(v[1, 1])
+    exit()
+
+t = 100
 
 plt.subplot(1, 2, 1)
-value_fn = V(200).transpose().reshape((2, H, W))[0]
+value_fn = V(t).transpose().reshape((2, H, W))[0]
+
 ic(value_fn)
 p = plt.imshow(
     value_fn * (1 - maze.reshape((H, W))),
@@ -132,7 +144,7 @@ p = plt.imshow(
 )
 plt.colorbar(p)
 
-policy = π(200).transpose().reshape(2, 4, H, W)[0]
+policy = π(t).transpose().reshape(2, 4, H, W)[0]
 policy = policy.argmax(axis=0)
 
 directions = coord_actions[policy]
