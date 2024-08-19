@@ -53,7 +53,6 @@ def codegen(
     out = f"""\
 def _make_{f_name}():
     from memo.lib import marg, pad, ffi, jax, jnp
-    import functools
 
     @jax.jit
     def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
