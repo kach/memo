@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import time
 
 def marg(t, dims):
     if dims == ():
@@ -22,3 +23,12 @@ def ffi(f, *args):
         return jax.vmap(f)(*args).reshape(target_shape)
     else:
         raise NotImplementedError
+
+def check_domains(tgt, src):  # TODO make this nicer
+    if len(tgt) > len(src):
+        raise Exception("Not enough arguments to memo call!")
+    if len(src) > len(tgt):
+        raise Exception("Too many arguments to memo call!")
+    for i, (t, s) in enumerate(zip(tgt, src)):
+        if t != s:
+            raise Exception(f"Domain mismatch in memo call argument {i + 1}: {t} != {s}.")
