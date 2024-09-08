@@ -34,4 +34,4 @@ def listener[u: U, r: R](beta, t):
     return Pr[listener.r == r]
 
 beta = 3.
-ic(4, listener(beta, 4))
+ic(4, listener(beta, 4, compute_cost=True))
