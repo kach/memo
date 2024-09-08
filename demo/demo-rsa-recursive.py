@@ -13,9 +13,8 @@ def denotes(u, r):
         [1, 1]
     ])[r, u]
 
-@memo(debug_print_compiled=True, debug_trace=True, save_comic="speaker.dot")
+@memo
 def speaker[u: U, r: R](beta, t):
-    cast: [speaker, listener]
     speaker: knows(r)
     speaker: chooses(u in U, wpp=imagine[
         listener: knows(u),
@@ -24,9 +23,8 @@ def speaker[u: U, r: R](beta, t):
     ])
     return Pr[speaker.u == u]
 
-@memo(debug_print_compiled=True, debug_trace=True, save_comic="listener.dot")
+@memo
 def listener[u: U, r: R](beta, t):
-    cast: [listener, speaker]
     listener: thinks[
         speaker: given(r in R, wpp=1),
         speaker: chooses(u in U, wpp=speaker[u, r](beta, t - 1) if t > 0 else denotes(u, r))
