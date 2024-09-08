@@ -392,10 +392,17 @@ imagine [
     raise NotImplementedError
 
 
-def assemble_tags(tags, compute_cost):
+def assemble_tags(tags, **kwargs):
+    kwarg_thunk = ', '.join(
+        f'{k}={v}' for k, v in kwargs.items()
+    )
+    posarg_thunk = ', '.join(tags)
+
     if len(tags) == 0:
-        return f"compute_cost={compute_cost}"
-    return f"{', '.join(tags)}, compute_cost={compute_cost}"
+        return kwarg_thunk
+    if len(kwargs) == 0:
+        return posarg_thunk
+    return f"{posarg_thunk}, {kwarg_thunk}"
 
 
 def eval_expr(e: Expr, ctxt: Context) -> Value:
@@ -484,7 +491,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
                 ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
                 ctxt.indent()
-                ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], compute_cost=True)})')
+                ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, compute_cost='compute_cost')})')
                 ctxt.emit(f"if compute_cost: aux.cost += res_aux.cost")
                 ctxt.dedent()
                 ctxt.emit('else:')
