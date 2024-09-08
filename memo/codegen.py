@@ -61,28 +61,31 @@ if compute_cost:
         transcendentals=_cost_.get('transcendentals', 0),
         bytes=_cost_.get('bytes accessed', 0)
     )
-    cost_ += _cost_['flops'] + _cost_['transcendentals']
-    _out_ = (_res_, cost_)
+    aux.cost += _cost_['flops'] + _cost_['transcendentals']
 """)
         if debug_trace:
             ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }}) has shape {{ _res_.shape }}')""")
             ctxt.emit(f"""\
 if compute_cost:
-    print(f'     cost = {{cost_}} operations')
+    print(f'     cost = {{aux.cost}} operations')
 """)
             ctxt.emit(f"""print(f'     time = {{time.time() - _time_:.6f}} sec')""")
-        ctxt.emit(f"""return _out_""")
+        ctxt.emit(f"""return (_out_, aux) if return_aux else _out_""")
     ctxt.emit(f"return {val.tag}")
 
     out = f"""\
 def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time
+    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo
 
     @jax.jit
     def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
-    def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, compute_cost=False):
+    def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, return_aux=False, compute_cost=False):
+        aux = AuxInfo()
+        if compute_cost:
+            return_aux = True
+            aux.cost = 0.
 {textwrap.indent(ctxt.hoisted_buf.getvalue(), "    " * 2)}
 
     _out_{f_name}._shape = tuple([{", ".join(f"len({p[1]})" for p in pctxt.axes)}])

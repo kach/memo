@@ -1,6 +1,11 @@
 import jax
 import jax.numpy as jnp
 import time
+from dataclasses import dataclass
+
+@dataclass
+class AuxInfo:
+    cost: float | None = None
 
 def marg(t, dims):
     if dims == ():

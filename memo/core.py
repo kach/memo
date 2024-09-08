@@ -456,6 +456,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
                 ctxt.indent()
                 ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], compute_cost=True)})')
+                ctxt.emit(f'{res} = {res}.cost')
                 ctxt.dedent()
                 ctxt.emit('else:')
                 ctxt.indent()
@@ -479,19 +480,18 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
             with ctxt.hoist():
                 res = ctxt.sym(f"result_array_{name}")
-                res_cost = ctxt.sym(f"result_cost_{name}")
                 doms = [ctxt.frame.choices[source_name, source_id].domain for _, source_name, source_id in ids]
                 ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
                 ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
                 ctxt.indent()
-                ctxt.emit(f'{res}, {res_cost} = {name}({assemble_tags([arg.tag for arg in args_out], compute_cost=True)})')
+                ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], compute_cost=True)})')
+                ctxt.emit(f"if compute_cost: aux.cost += res_aux.cost")
                 ctxt.dedent()
                 ctxt.emit('else:')
                 ctxt.indent()
-                ctxt.emit(f'{res}, {res_cost} = jnp.zeros({name}._shape), 0')
+                ctxt.emit(f'{res} = jnp.zeros({name}._shape)')
                 ctxt.dedent()
                 ctxt.emit(f"{res} = {res}.transpose()")
-                ctxt.emit(f"cost_ += {res_cost}")
 
             out_idxs = []
             for target_id, source_name, source_id in reversed(ids):
