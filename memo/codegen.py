@@ -19,8 +19,10 @@ def codegen(
     ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
     ctxt.hoisted_syms.extend(pctxt.static_parameters)
     with ctxt.hoist():
+        ctxt.emit(f"cost_ = 0")
         if debug_trace:
-            ctxt.emit(f"""print(f' --> {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters)} }})')""")
+            ctxt.emit(f"""_time_ = time.time()""")
+            ctxt.emit(f"""print(f' --> {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }})')""")
     for stmt_ in stmts:
         eval_stmt(stmt_, ctxt)
 
@@ -44,24 +46,50 @@ def codegen(
     )
 
     with ctxt.hoist():
-        ctxt.emit(f"""_jit_ = _jit_{f_name}({", ".join(ctxt.hoisted_syms)})""")
+        ctxt.emit(f"""\
+_lowered_ = _jit_{f_name}.lower({", ".join(ctxt.hoisted_syms)})
+_res_ = _lowered_.compile()({", ".join(ctxt.hoisted_syms)})
+_out_ = _res_
+""")
+
+        ctxt.emit(f"""\
+if compute_cost:
+    #  https://jax.readthedocs.io/en/latest/aot.html
+    _cost_ = _lowered_.cost_analysis()
+    _cost_ = dict(
+        flops=_cost_.get('flops', 0),
+        transcendentals=_cost_.get('transcendentals', 0),
+        bytes=_cost_.get('bytes accessed', 0)
+    )
+    aux.cost += _cost_['flops'] + _cost_['transcendentals']
+""")
         if debug_trace:
-            ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters)} }}) has shape {{ _jit_.shape }}')""")
-        ctxt.emit(f"""return _jit_""")
+            ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }}) has shape {{ _res_.shape }}')""")
+            ctxt.emit(f"""\
+if compute_cost:
+    print(f'     cost = {{aux.cost}} operations')
+""")
+            ctxt.emit(f"""print(f'     time = {{time.time() - _time_:.6f}} sec')""")
+        ctxt.emit(f"""return (_out_, aux) if return_aux else _out_""")
     ctxt.emit(f"return {val.tag}")
 
     out = f"""\
 def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, jax, jnp
+    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo
 
     @jax.jit
     def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
-    def _out_{f_name}({", ".join(pctxt.static_parameters)}):
+    def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, return_aux=False, compute_cost=False):
+        aux = AuxInfo()
+        if compute_cost:
+            return_aux = True
+            aux.cost = 0.
 {textwrap.indent(ctxt.hoisted_buf.getvalue(), "    " * 2)}
 
     _out_{f_name}._shape = tuple([{", ".join(f"len({p[1]})" for p in pctxt.axes)}])
+    _out_{f_name}._doms = tuple([{", ".join(f"{repr(p[1])}" for p in pctxt.axes)}])
     return _out_{f_name}
 
 {f_name} = _make_{f_name}()
@@ -131,4 +159,5 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
         e.add_note(f"  P.S.: You are currently using...")
         e.add_note(f"        + memo version {__version__} and JAX version {jax.__version__}")
         e.add_note(f"        + on Python version {platform.python_version()} on the {platform.system()} platform")
+
         raise

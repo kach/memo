@@ -165,7 +165,13 @@ class EImagine(ExprSyntaxNode):
     then: Expr
 
 
-Expr = ELit | EOp | EFFI | EMemo | EChoice | EExpect | EWith | EImagine
+@dataclass(frozen=True)
+class ECost(ExprSyntaxNode):
+    name: str
+    args: list[Expr]
+
+
+Expr = ELit | EOp | EFFI | EMemo | EChoice | EExpect | EWith | EImagine | ECost
 
 
 @dataclass(frozen=True)
@@ -247,7 +253,6 @@ class Context:
 
     next_idx: int = 0
     _sym: int = -1
-    idx_history: list[str] = field(default_factory=list)
     path_condition: list[str] = field(default_factory=list)
 
     def current_buf(self: Context) -> Buffer:
@@ -382,7 +387,22 @@ def pprint_expr(e: Expr) -> str:
 imagine [
 {stmts_block}
 ]"""
+        case ECost(name, args):
+            return f"(cost @ {name}({', '.join(pprint_expr(arg) for arg in args)}))"
     raise NotImplementedError
+
+
+def assemble_tags(tags, **kwargs):
+    kwarg_thunk = ', '.join(
+        f'{k}={v}' for k, v in kwargs.items()
+    )
+    posarg_thunk = ', '.join(tags)
+
+    if len(tags) == 0:
+        return kwarg_thunk
+    if len(kwargs) == 0:
+        return posarg_thunk
+    return f"{posarg_thunk}, {kwarg_thunk}"
 
 
 def eval_expr(e: Expr, ctxt: Context) -> Value:
@@ -426,6 +446,31 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     ctxt.emit(f'{out} = {out}.item()')
             return Value(tag=out, known=known, deps=deps)
 
+        case ECost(name, args):
+            args_out = []
+            with ctxt.hoist():
+                for arg in args:
+                    args_out.append(eval_expr(arg, ctxt))
+                    if not arg.static:
+                        raise MemoError(
+                            "parameter not statically known",
+                            hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
+                            user=True,
+                            ctxt=ctxt,
+                            loc=arg.loc,
+                        )
+                res = ctxt.sym(f"result_cost_{name}")
+                ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
+                ctxt.indent()
+                ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], compute_cost=True)})')
+                ctxt.emit(f'{res} = {res}.cost')
+                ctxt.dedent()
+                ctxt.emit('else:')
+                ctxt.indent()
+                ctxt.emit(f'{res} = 0')
+                ctxt.dedent()
+            return Value(tag=res, known=True, deps=set())
+
         case EMemo(name, args, ids):
             args_out = []
             with ctxt.hoist():
@@ -442,14 +487,18 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
             with ctxt.hoist():
                 res = ctxt.sym(f"result_array_{name}")
+                doms = [ctxt.frame.choices[source_name, source_id].domain for _, source_name, source_id in ids]
+                ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
                 ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
                 ctxt.indent()
-                ctxt.emit(f'{res} = {name}({", ".join(arg.tag for arg in args_out)}).transpose()')
+                ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, compute_cost='compute_cost')})')
+                ctxt.emit(f"if compute_cost: aux.cost += res_aux.cost")
                 ctxt.dedent()
                 ctxt.emit('else:')
                 ctxt.indent()
-                ctxt.emit(f'{res} = jnp.zeros({name}._shape).transpose()')
+                ctxt.emit(f'{res} = jnp.zeros({name}._shape)')
                 ctxt.dedent()
+                ctxt.emit(f"{res} = {res}.transpose()")
 
             out_idxs = []
             for target_id, source_name, source_id in reversed(ids):
@@ -730,7 +779,6 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             assert ctxt.frame.name == ROOT_FRAME_NAME
             idx = ctxt.next_idx
             ctxt.next_idx += 1
-            ctxt.idx_history.append(f"forall {id}")
             tag = ctxt.sym(f"forall_{id}")
             ctxt.emit(
                 f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
@@ -744,7 +792,6 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.frame.ensure_child(who)
             idx = ctxt.next_idx
             ctxt.next_idx += 1
-            ctxt.idx_history.append(f"{who}.{id}")
             tag = ctxt.sym(f"{who}_{id}")
             ctxt.emit(f"""# {who} choose {id}""")
             ctxt.emit(

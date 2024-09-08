@@ -34,9 +34,22 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         case ast.Call(func=ast.Name(id="log"), args=[e1]):
             return EOp(op=Op.LOG, args=[parse_expr(e1, ctxt)], loc=loc, static=False)
 
+        case ast.BinOp(
+            left=ast.Name(id="cost"),
+            op=ast.MatMult(),
+            right=ast.Call(func=ast.Name(id=f_name), args=args)
+        ):
+            return ECost(
+                name=f_name,
+                args=[parse_expr(arg, ctxt) for arg in args],
+                loc=loc,
+                static=False
+            )
+
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
+            ffi_args_parsed = [parse_expr(arg, ctxt) for arg in ffi_args]
             return EFFI(
-                name=ffi_name, args=[parse_expr(arg, ctxt) for arg in ffi_args], loc=loc, static=False
+                name=ffi_name, args=ffi_args_parsed, loc=loc, static=all(arg.static for arg in ffi_args_parsed)
             )
 
         # memo call single arg
