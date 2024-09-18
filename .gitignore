@@ -7,3 +7,4 @@ scratch/*
 figures.key
 out.png
 demo/*-aux
+demo/*.dot
