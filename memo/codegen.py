@@ -47,14 +47,13 @@ def codegen(
 
     with ctxt.hoist():
         ctxt.emit(f"""\
-_lowered_ = _jit_{f_name}.lower({", ".join(ctxt.hoisted_syms)})
-_res_ = _lowered_.compile()({", ".join(ctxt.hoisted_syms)})
-_out_ = _res_
+_out_ = _jit_{f_name}({", ".join(ctxt.hoisted_syms)})
 """)
 
         ctxt.emit(f"""\
 if compute_cost:
     #  https://jax.readthedocs.io/en/latest/aot.html
+    _lowered_ = _jit_{f_name}.lower({", ".join(ctxt.hoisted_syms)})
     _cost_ = _lowered_.cost_analysis()
     _cost_ = dict(
         flops=_cost_.get('flops', 0),
@@ -64,7 +63,7 @@ if compute_cost:
     aux.cost += _cost_['flops'] + _cost_['transcendentals']
 """)
         if debug_trace:
-            ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }}) has shape {{ _res_.shape }}')""")
+            ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }}) has shape {{ _out_.shape }}')""")
             ctxt.emit(f"""\
 if compute_cost:
     print(f'     cost = {{aux.cost}} operations')
