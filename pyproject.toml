@@ -25,3 +25,16 @@ packages = ["memo"]
 
 [tool.setuptools.dynamic]
 version = {attr = "memo.__version__"}
+
+[tool.mypy]
+strict = true
+exclude = [
+  "demo/.*",
+  "utils\\.py",
+  "comic\\.py",
+  "lib\\.py"
+]
+
+[[tool.mypy.overrides]]
+module = [ "memo.*" ]
+follow_imports = "skip"  # or "error"

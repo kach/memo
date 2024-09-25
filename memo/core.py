@@ -392,7 +392,7 @@ imagine [
     raise NotImplementedError
 
 
-def assemble_tags(tags, **kwargs):
+def assemble_tags(tags: list[str], **kwargs: Any) -> str:
     kwarg_thunk = ', '.join(
         f'{k}={v}' for k, v in kwargs.items()
     )
