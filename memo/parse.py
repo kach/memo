@@ -1,6 +1,6 @@
 from .core import *
 
-import ast, inspect
+import ast, inspect, textwrap, re
 from typing import Any, Callable, Literal
 from dataclasses import dataclass
 
@@ -17,11 +17,12 @@ class ParsingContext:
     static_parameters: list[str]
     axes: list[tuple[str, str]]
     loc_name: str
+    loc_dedent: int
     loc_file: str
 
 
 def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
-    loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
+    loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset + ctxt.loc_dedent, ctxt.loc_name)
     match expr:
         case ast.Constant(value=val):
             assert isinstance(val, float) or isinstance(val, int)
@@ -235,7 +236,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
 
 def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
-    loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
+    loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset + ctxt.loc_dedent, ctxt.loc_name)
     match expr:
         case ast.Call(
             func=ast.Name(id="chooses" | "given"),
@@ -397,7 +398,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
 
 def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
     try:
-        src = inspect.getsource(f)
+        rawsrc = inspect.getsource(f)
     except OSError:
         raise MemoError(
             "Python couldn't find your memo source code",
@@ -409,6 +410,12 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
     src_file = inspect.getsourcefile(f)
     assert src_file is not None
     lines, lineno = inspect.getsourcelines(f)
+
+    src = textwrap.dedent(rawsrc)  # borrowed from Exo's parser!
+    lead_raw = re.match("^(.*)", rawsrc)
+    lead_src = re.match("^(.*)", src)
+    assert lead_raw is not None and lead_src is not None
+    n_dedent = len(lead_raw.group()) - len(lead_src.group())
     tree = ast.parse(src, filename=src_file)
     ast.increment_lineno(tree, n=lineno - 1)
 
@@ -443,7 +450,7 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
                 hint=None,
                 user=False,
                 ctxt=None,
-                loc=SourceLocation(src_file, f.lineno, f.col_offset, "??"),
+                loc=SourceLocation(src_file, f.lineno, f.col_offset + n_dedent, "??"),
             )
 
     pctxt = ParsingContext(
@@ -451,6 +458,7 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
         static_parameters=static_parameters,
         axes=[],
         loc_name=f_name,
+        loc_dedent=n_dedent,
         loc_file=src_file,
     )
     stmts: list[Stmt] = []
@@ -464,7 +472,7 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
                 hint=f"Specify the domain for {tp.name} by writing `{pctxt.loc_name}[{tp.name}: ___, ...]`",
                 user=True,
                 ctxt=None,
-                loc=SourceLocation(pctxt.loc_file, tp.lineno, tp.col_offset, pctxt.loc_name)
+                loc=SourceLocation(pctxt.loc_file, tp.lineno, tp.col_offset + pctxt.loc_dedent, pctxt.loc_name)
             )
         assert isinstance(tp.bound, ast.Name)
         stmts.append(
@@ -477,7 +485,7 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
         pctxt.axes.append((tp.name, tp.bound.id))
 
     for stmt in rest_stmts:
-        loc = SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset, pctxt.loc_name)
+        loc = SourceLocation(pctxt.loc_file, stmt.lineno, stmt.col_offset + pctxt.loc_dedent, pctxt.loc_name)
         match stmt:
             case ast.AnnAssign(
                 target=ast.Name(id="forall"),
@@ -531,7 +539,7 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
             hint=f"All memos should end with a return statement",
             user=True,
             ctxt=None,
-            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name),
+            loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset + pctxt.loc_dedent, pctxt.loc_name),
         )
 
     return pctxt, stmts, retval
