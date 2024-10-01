@@ -1,0 +1,41 @@
+// Adapted from https://agentmodels.org/chapters/7-multi-agent.html
+
+var locationPrior = function() {
+  if (flip(0.55)) {
+    return 'popular-bar';
+  } else {
+    return 'unpopular-bar';
+  }
+}
+
+/*
+var locationPrior = function() {
+  return randomInteger(100);
+}
+*/
+
+var alice = dp.cache(function(depth) {
+  return Infer({ model() {
+    var myLocation = locationPrior();
+    var bobLocation = sample(bob(depth - 1));
+    condition(myLocation === bobLocation);
+    return myLocation;
+  }});
+});
+
+var bob = dp.cache(function(depth) {
+  return Infer({ model() {
+    var myLocation = locationPrior();
+    if (depth === 0) {
+      return myLocation;
+    } else {
+      var aliceLocation = sample(alice(depth));
+      condition(myLocation === aliceLocation);
+      return myLocation;
+    }
+  }});
+});
+
+alice(1).getDist();
+// timeit(function() { alice(100).getDist() });
+// https://github.com/stuhlmueller/webppl-timeit
