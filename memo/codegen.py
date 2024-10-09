@@ -5,7 +5,8 @@ from .version import __version__
 import textwrap
 import os, sys, platform, inspect
 from io import StringIO
-from typing import Any
+from typing import Any, Optional, Callable
+import warnings
 
 def codegen(
     pctxt: ParsingContext,
@@ -13,7 +14,9 @@ def codegen(
     retval: Expr,
     debug_print_compiled: bool=False,
     debug_trace: bool=False,
-    save_comic: str|None=None
+    save_comic: Optional[str]=None,
+    install_module: Optional[Callable[[str], Any]] = None,
+    cache: bool = False
 ) -> Any:
     f_name = pctxt.loc_name
     ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
@@ -75,11 +78,13 @@ if compute_cost:
     out = f"""\
 def _make_{f_name}():
     from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo
+    from functools import cache
 
     @jax.jit
     def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
+{"    @cache" if cache else ""}
     def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, return_aux=False, compute_cost=False):
         aux = AuxInfo()
         if compute_cost:
@@ -103,6 +108,13 @@ def _make_{f_name}():
         comic(ctxt.frame, val, fname=save_comic)
 
     globals_of_caller = inspect.stack()[3].frame.f_globals
+    locals_of_caller  = inspect.stack()[3].frame.f_locals
+    if globals_of_caller != locals_of_caller and install_module is None:
+        warnings.warn(f"memo works best in the global (module) scope. Defining memos within function definitions is currently not officially supported, though if you know what you are doing then go ahead and do it!")
+    if install_module is not None:
+        ret = install_module(out)[f"{f_name}"]
+        return None #ret
+
     retvals: dict[Any, Any] = {}
     exec(out, globals_of_caller, retvals)
     return retvals[f"{f_name}"]
