@@ -66,7 +66,6 @@ def V[b: B](t):
             E[ future_alice[ V[b_](t - 1) ] ]
         ])
     ] ]
-ic("Compiled V")
 
 @cache
 @memo
@@ -118,32 +117,16 @@ def belief_update[b: B, b_: B, a: A, o: O]():
     return E[alice.b_ == b_]
 
 
-
-
 from matplotlib import pyplot as plt
-
-# z = belief_update()
-# print(z.shape)
-# for o in range(2):
-#     for a in range(3):
-#         plt.subplot(2, 3, o * 3 + a + 1)
-#         plt.plot(B, z[o, a, :, 12])
-#         plt.title(f'o={o}, a={a}')
-#         plt.xlabel('P(hungry)')
-
-plt.figure(figsize=(7, 3))
-plt.subplot(1, 2, 1)
-z = V(10)
-plt.plot(B, z)
-plt.xlabel('P(hungry)')
-plt.title('Value')
-
-plt.subplot(1, 2, 2)
-z = π(10)
-plt.plot(B, z, label=['feed', 'sing', 'ignore'])
-plt.xlabel('P(hungry)')
-plt.title('Policy')
-
-plt.tight_layout()
+plt.figure(figsize=(3, 2))
+v = V(10)
+p = π(10)
+plt.plot(B[p[:, 0] == 1], v[p[:, 0] == 1], label='feed')
+plt.plot(B[p[:, 1] == 1], v[p[:, 1] == 1], ':', label='sing')
+plt.plot(B[p[:, 2] == 1], v[p[:, 2] == 1], '--', label='ignore')
 plt.legend()
-plt.savefig('out.png')
+plt.xlabel('Belief state, P(hungry)')
+plt.ylabel('Long-term reward')
+plt.title('Crying baby POMDP solution')
+plt.tight_layout()
+plt.savefig('../paper/fig/pomdp.pdf')
