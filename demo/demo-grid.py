@@ -14,7 +14,6 @@ H = 21
 W = 21
 S = np.arange(H * W)
 G = np.array([0, H * W - 1])
-# G = np.array([130, H * W - 130])
 A = np.array([0, 1, 2, 3])  # left, right, up, down
 
 coord_actions = np.array([
@@ -24,17 +23,12 @@ coord_actions = np.array([
     [0, +1],
 ])
 
-# fmt: off
 maze_raw = np.array(1 - plt.imread('../paper/fig/logo-maze.png'), dtype=int); maze = maze_raw.reshape(-1)
 # maze = np.zeros(H * W)
-# fmt: on
-
 
 @jax.jit
 def Tr(s, a, s_):
-    x = s % W
-    y = s // W
-
+    x, y = s % W, s // W
     next_coords = np.array([x, y]) + coord_actions[a]
     next_state = (
         + 1 * np.clip(next_coords[0], 0, W - 1)
@@ -45,12 +39,9 @@ def Tr(s, a, s_):
         + 1.0 * ((maze[next_state] == 1) & (s == s_))
     )
 
-
 @jax.jit
 def R(s, a, g):
-    """Reward of 1 for being on the goal state."""
     return 1.0 * (s == g) - 0.1
-
 
 @jax.jit
 def is_terminating(s, g):
