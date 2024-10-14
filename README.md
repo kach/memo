@@ -1,6 +1,6 @@
 ![memo's logo](./assets/logo.png)
 
-memo is a new probabilistic programming language for expressing computational cognitive models involving **sophisticated recursive reasoning**, and for performing **fast enumerative inference** on such models. memo inherits from the tradition of WebPPL-based Bayesian modeling (see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities (including GPUs!). As a result, models are often significantly simpler to express (we've seen codebases shrink by a **factor of 3x or more**), and dramatically faster to execute and fit to data (we've seen **speedups of 3,000x or more**).
+memo is a new probabilistic programming language for expressing computational cognitive models involving **recursive reasoning about reasoning**, and for performing **fast enumerative inference** on such models. memo inherits from the tradition of WebPPL-based Bayesian modeling (see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities (including GPUs!). As a result, models are often significantly simpler to express (we've seen codebases shrink by a **factor of 3x or more**), and dramatically faster to execute and fit to data (we've seen **speedups of 3,000x or more**).
 
 memo stands for: mental modeling, memoized matrix operations, model-expressed-model-optimized, and metacognitive memos.
 
@@ -33,7 +33,7 @@ This repository also includes several classical examples of recursive reasoning 
 
 **When should I use memo rather than Gen or WebPPL?**
 
-memo's core competence is fast tabular/enumerative inference on models with recursive reasoning. That covers a wide range of common models: from RSA, to POMDP planning (value iteration = tabular operations), to inverse planning. In general, if you are making nested queries, we recommend using memo.
+memo's core competence is fast tabular/enumerative inference on models with recursive reasoning about reasoning. That covers a wide range of common models: from RSA, to POMDP planning (value iteration = tabular operations), to inverse planning. In general, if you are making nested queries, we recommend using memo.
 
 There are however two particular cases where you may prefer another PPL:
 1. If you are interested specifically in modeling a sophisticated inference scheme, such as MCMC, particle filters, or variational inference, then we recommend trying Gen. _(But make sure you really need those tools — the fast enumerative inference provided by memo is often sufficient for many common kinds of models!)_
