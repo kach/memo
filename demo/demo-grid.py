@@ -81,3 +81,49 @@ if len(sys.argv) > 1:
     v = Q(t).max(axis=1)
     print(time.time() - t0)
     exit()
+
+t = 100
+
+plt.subplot(1, 2, 1)
+q_fn = Q(t).transpose().reshape((2, 4, H, W))[0]
+value_fn = q_fn.max(axis=0)
+
+ic(value_fn)
+
+p = plt.imshow(
+    value_fn * (1 - maze.reshape((H, W))),
+    origin="upper",
+    cmap="PuRd_r",
+)
+plt.colorbar(p)
+
+policy = q_fn.argmax(axis=0)
+
+directions = coord_actions[policy]
+plt.quiver(
+    np.arange(W),
+    np.arange(H),
+    directions[:, :, 0],
+    -directions[:, :, 1],
+    color="red",
+)
+plt.axis("off")
+
+
+plt.subplot(1, 2, 2)
+posterior = invplan().transpose()
+plt.imshow(
+    1 - maze.reshape((H, W)),
+    origin="upper",
+    cmap="gray",
+)
+
+plt.quiver(np.arange(W), np.arange(H), -np.ones((H, W)), np.zeros((H, W)), posterior[0].reshape((H, W)), cmap="coolwarm", clim=(0, 1))
+plt.quiver(np.arange(W), np.arange(H), np.ones((H, W)), np.zeros((H, W)), posterior[1].reshape((H, W)), cmap="coolwarm", clim=(0, 1))
+plt.quiver(np.arange(W), np.arange(H), np.zeros((H, W)), np.ones((H, W)), posterior[2].reshape((H, W)), cmap="coolwarm", clim=(0, 1))
+plt.quiver(np.arange(W), np.arange(H), np.zeros((H, W)), -np.ones((H, W)), posterior[3].reshape((H, W)), cmap="coolwarm", clim=(0, 1))
+
+plt.gca().add_patch(plt.Rectangle((-0.5, -0.5), W, H, fill="tab:gray", ec="black", linewidth=5, alpha=0.25))
+
+plt.axis("off")
+plt.savefig('out.png')
