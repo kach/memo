@@ -146,6 +146,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ast.Sub: Op.SUB,
                     ast.Mult: Op.MUL,
                     ast.Div: Op.DIV,
+                    ast.Pow: Op.POW
                 }[op.__class__],
                 args=[e1_, e2_],
                 loc=loc,
@@ -187,7 +188,13 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         case ast.Subscript(value=ast.Name(id="E" | "Pr"), slice=rv_expr):
             assert not isinstance(rv_expr, ast.Slice)
             assert not isinstance(rv_expr, ast.Tuple)
-            return EExpect(expr=parse_expr(rv_expr, ctxt), loc=loc, static=False)
+            return EExpect(expr=parse_expr(rv_expr, ctxt), reduction="expectation", loc=loc, static=False)
+
+        # variance
+        case ast.Subscript(value=ast.Name(id="Var"), slice=rv_expr):
+            assert not isinstance(rv_expr, ast.Slice)
+            assert not isinstance(rv_expr, ast.Tuple)
+            return EExpect(expr=parse_expr(rv_expr, ctxt), reduction="variance", loc=loc, static=False)
 
         # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):

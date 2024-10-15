@@ -105,6 +105,7 @@ Op = Enum(
         "SUB",
         "MUL",
         "DIV",
+        "POW",
         "EQ",
         "NEQ",
         "LT",
@@ -151,6 +152,7 @@ class EChoice(ExprSyntaxNode):
 @dataclass(frozen=True)
 class EExpect(ExprSyntaxNode):
     expr: Expr
+    reduction: Literal["expectation", "variance"]
 
 
 @dataclass(frozen=True)
@@ -330,6 +332,8 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} * {pprint_expr(args[1])})"
                 case Op.DIV:
                     return f"({pprint_expr(args[0])} / {pprint_expr(args[1])})"
+                case Op.POW:
+                    return f"({pprint_expr(args[0])} ** {pprint_expr(args[1])})"
                 case Op.EQ:
                     return f"({pprint_expr(args[0])} == {pprint_expr(args[1])})"
                 case Op.NEQ:
@@ -538,6 +542,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 Op.SUB,
                 Op.MUL,
                 Op.DIV,
+                Op.POW,
                 Op.EQ,
                 Op.NEQ,
                 Op.LT,
@@ -561,6 +566,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                             ctxt.emit(f"{out} = {l.tag} * {r.tag}")
                         case Op.DIV:
                             ctxt.emit(f"{out} = {l.tag} / {r.tag}")
+                        case Op.POW:
+                            ctxt.emit(f"{out} = {l.tag} ** {r.tag}")
                         case Op.EQ:
                             ctxt.emit(f"{out} = {l.tag} == {r.tag}")
                         case Op.NEQ:
@@ -630,11 +637,12 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             else:
                 raise NotImplementedError
 
-        case EExpect(expr):
+        case EExpect(expr, reduction):
             val_ = eval_expr(expr, ctxt)
             if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
                 warnings.warn(f"Redundant expectation {pprint_expr(e)}, not marginalizing")
-                return val_
+                if reduction == "expectation":
+                    return val_
             idxs_to_marginalize = tuple(set(
                 # TODO: ideally, dedup by looking at frame.conditions
                 c.idx for _, c in ctxt.frame.choices.items() if not c.known
@@ -642,9 +650,14 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ctxt.emit(f"# {ctxt.frame.name} expectation")
 
             out = ctxt.sym("exp")
-            ctxt.emit(
-                f"{out} = marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize})"
-            )
+            if reduction == "expectation":
+                ctxt.emit(
+                    f"{out} = marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize})"
+                )
+            elif reduction == "variance":
+                ctxt.emit(
+                    f"{out} = marg({ctxt.frame.ll} * {val_.tag} ** 2, {idxs_to_marginalize}) - marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize}) ** 2"
+                )
             deps = ({  # TODO: this lets in too many deps!!
                 c for c, _ in ctxt.frame.choices.items()
                 if ctxt.frame.choices[c].known
