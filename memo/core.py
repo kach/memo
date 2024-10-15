@@ -838,11 +838,10 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
                 )
             elif s.reduction == "maximize":
-                argmax_tag = ctxt.sym(f"{id}_argmax")
-                ctxt.emit(f"{argmax_tag} = jnp.argmax({id_ll}, {-1 - idx})")
-                ctxt.emit(
-                    f"{id_ll} = jnp.nan_to_num(jax.nn.one_hot({argmax_tag}, len({domain}), dtype=jnp.float32, axis={-1 - idx}))"
-                )
+                ctxt.emit(f"{id_ll} = jnp.where(jnp.isclose({id_ll}, jnp.max({id_ll}, axis={-1 - idx})), jnp.ones_like({id_ll}), jnp.zeros_like({id_ll}))")
+                # ctxt.emit(f"{id_ll} = sparse.BCOO.fromdense(jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},))), nse=jnp.count_nonzero({id_ll}))")
+                ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))")
+                ctxt.emit(f"print({id_ll})")
             if ctxt.frame.ll is None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")

@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+from jax.experimental import sparse
 import time
 from dataclasses import dataclass
 

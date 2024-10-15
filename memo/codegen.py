@@ -13,7 +13,8 @@ def codegen(
     retval: Expr,
     debug_print_compiled: bool=False,
     debug_trace: bool=False,
-    save_comic: str|None=None
+    save_comic: str|None=None,
+    nojit: bool=False,
 ) -> Any:
     f_name = pctxt.loc_name
     ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
@@ -74,9 +75,9 @@ if compute_cost:
 
     out = f"""\
 def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo
+    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, sparse, time, AuxInfo
 
-    @jax.jit
+    {'@jax.jit' if not nojit else ''}
     def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
