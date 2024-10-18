@@ -55,6 +55,16 @@ Note that JAX has some unintuitive behaviors. We recommend reading [this guide](
 
 Did you accidentally pip-install the (unrelated) package [memo](https://pypi.org/project/memo/) instead of [memo-lang](https://pypi.org/project/memo-lang/)?
 
+**I installed memo on my Mac, but running models gives a weird JAX error about "AVX".**
+
+The common cause of this is that you have a modern Mac (with an ARM processor), but an old version of Python (compiled for x86). We recommend the following installation strategy on ARM-based Macs:
+1. Do not use conda.
+2. Install Homebrew. Make sure you have the ARM version of brew: `brew --prefix` should be `/opt/homebrew`, and `brew config` should say `Rosetta 2: false`. If this is not the case, you have the x86 version of brew, which you should uninstall.
+3. Install Python via `brew install python3`. Ensure that `python3 --version` works as expected, and that `which python3` points to something in `/opt/homebrew/bin/`.
+4. In your project directory, create a virtual environment via `python3 -m venv venv`.
+5. Activate the virtual environment via `. venv/bin/activate`. Your prompt should now begin with `(venv)`.
+6. Install memo via `pip install memo-lang`.
+
 **Can I run memo on Apple's "metal" platform?**
 
 Yes! See this issue for details: https://github.com/kach/memo/issues/66
