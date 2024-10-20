@@ -21,3 +21,19 @@ def bob[b: Bar](depth):
 for i in range(1, 10):
     print(f'alice({i}) =', alice(i))
     print(f'bob({i}) =', bob(i))
+
+
+@memo
+def alice_confidence(depth):
+    alice: thinks[ bob: chooses(b in Bar, wpp=bob[b](depth - 1)) ]
+    alice: chooses(b in Bar, wpp=prior(b) * Pr[b == bob.b])
+    return E[alice[Pr[b == bob.b]]]
+
+@memo
+def obs_confidence(depth):
+    alice: chooses(b in Bar, wpp=alice[b](depth))
+    bob: chooses(b in Bar, wpp=bob[b](depth))
+    return Pr[alice.b == bob.b]
+
+for i in range(1, 10):
+    print(alice_confidence(i), obs_confidence(i))
