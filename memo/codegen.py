@@ -79,6 +79,7 @@ def _make_{f_name}():
 
     {'@jax.jit' if not nojit else ''}
     def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
+{textwrap.indent("nse = 1", "    " * 2)}
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
     def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, return_aux=False, compute_cost=False):
