@@ -1,10 +1,13 @@
-var H = 10
-var W = 5
+var H = 21
+var W = 21
 var make_states = function(i) {
   return i == 1 ? [0] : make_states(i - 1).concat([i - 1])
 }
+var make_blank_maze = function(n) {
+  return n == 0 ? [] : make_blank_maze(n - 1).concat([0])
+}
 var S = make_states(H * W)
-var G = [0, 4]
+var G = [0, 7]
 var A = [0, 1, 2, 3]  // left, right, up, down
 
 var coord_actions = [
@@ -14,18 +17,7 @@ var coord_actions = [
     [0, -1],
 ]
 
-var maze = [
-    0, 0, 0, 0, 0,
-    0, 1, 0, 1, 0,
-    0, 1, 1, 1, 0,
-    0, 1, 0, 1, 0,
-    0, 1, 0, 1, 0,
-    0, 1, 0, 1, 0,
-    0, 1, 0, 1, 0,
-    0, 1, 0, 0, 0,
-    0, 1, 0, 0, 0,
-    0, 0, 0, 0, 0,
-]
+var maze = make_blank_maze(H * W);
 
 var Tr = function(s, a) {
     var x = s % W
@@ -33,10 +25,10 @@ var Tr = function(s, a) {
 
     var next_x = x + coord_actions[a][0]
     var next_y = y + coord_actions[a][1]
-    
+
     var next_x = next_x < 0 ? 0 : (next_x > W - 1 ? W - 1 : next_x)
     var next_y = next_y < 0 ? 0 : (next_y > H - 1 ? H - 1 : next_y)
-    
+
     var next_state = next_x + W * next_y
     return maze[next_state] == 1 ? s : next_state
 }
@@ -50,7 +42,7 @@ var is_terminating = function(s, g) {
 }
 
 var policy = dp.cache(function(s, g, t) {
-  return Infer(function() {
+  return Infer({method: 'enumerate', model: function() {
     var a = uniformDraw(A)
     var value = R(s, a, g) + (t <= 0 ? 0. : (
        is_terminating(s, g) ? 0.0 : (0.9 * expectation(Infer(function() {
@@ -60,29 +52,29 @@ var policy = dp.cache(function(s, g, t) {
     factor(2 * value) // factor(beta * value)
 
     return a
-  })
+  }})
 })
 
 var V = dp.cache(function(s, g, t) {
-  return expectation(Infer(function() {
+  return expectation(Infer({method: 'enumerate', model: function() {
     var a = sample(policy(s, g, t))
     return R(s, a, g) + (t <= 0 ?
       0.0 : (is_terminating(s, g) ? 0. :
       0.9 * expectation(Infer(function() {
         var s_ = Tr(s, a)
         return V(s_, g, t-1)
-    }))))}))
+    }))))}}))
 })
 
-// Run with webppl demo-grid.wppl -- <t>
+// Run with webppl --require webppl-timeit demo-grid.wppl -- 1000
 var t = argv._[1];
 console.log('t = ' + t.toString()); // toString() guards against undefined!
 
-var out = map(
+var out = function () { return map(
   function(g) { return map(
     function(s) {
       return V(s, g, t)
     }, S)
   }, G);
-
-out[1][1]
+}
+console.log(timeit(out)['runtimeInMilliseconds']);
