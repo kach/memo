@@ -817,6 +817,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             if (Name("self"), id) not in wpp_val.deps and not isinstance(wpp, ELit):
                 warnings.warn(f"When {who} chooses {id}, the probability doesn't depend on the value of {id}, and is thus the same for all values of {id}. As a result, the choice will effectively be uniform after normalization. Are you sure this is what you want? (A uniform choice is more easily expressed with wpp=1.)")
             ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
+
             ctxt.frame = old_frame
 
             new_deps = set()
@@ -837,11 +838,13 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 ctxt.emit(
                     f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
                 )
+                ctxt.emit(f"nse = locals().get('nse', 1) * len({domain})")
             elif s.reduction == "maximize":
-                ctxt.emit(f"{id_ll} = jnp.where(jnp.isclose({id_ll}, jnp.max({id_ll}, axis={-1 - idx})), jnp.ones_like({id_ll}), jnp.zeros_like({id_ll}))")
-                # ctxt.emit(f"{id_ll} = sparse.BCOO.fromdense(jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},))), nse=jnp.count_nonzero({id_ll}))")
-                ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))")
-                ctxt.emit(f"print({id_ll})")
+                argmax_tag = ctxt.sym(f"{id}_argmax")
+                ctxt.emit(f"{argmax_tag} = jnp.argmax({id_ll}, {-1 - idx})")
+                ctxt.emit(
+                    f"{id_ll} = sparse.BCOO.fromdense(jnp.nan_to_num(jax.nn.one_hot({argmax_tag}, len({domain}), dtype=jnp.float32, axis={-1 - idx})), nse=locals().get('nse', 1))"
+                )
             if ctxt.frame.ll is None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")
