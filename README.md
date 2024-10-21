@@ -68,3 +68,35 @@ The common cause of this is that you have a modern Mac (with an ARM processor), 
 
 Yes! See this issue for details: https://github.com/kach/memo/issues/66
 </details>
+
+
+<details><summary>Some of my output array's dimensions are unexpectedly of size 1.</summary>
+
+memo attempts to minimize redundant computation. If the output of your model doesn't depend on an input axis, then instead of repeating the computation along that axis, memo will set that axis to size 1. The idea is that [broadcasting](https://numpy.org/doc/stable/user/basics.broadcasting.html) will keep the array compatible with downstream computations.
+
+As an example, consider the following models:
+
+```python
+X = np.arange(10)
+
+@memo
+def f[a: X, b: X]():
+    return a
+f().shape  # (10, 1) because output is independent of b
+
+@memo
+def f[a: X, b: X]():
+    return b
+f().shape  # (1, 10) because output is independent of a
+
+@memo
+def f[a: X, b: X]():
+    return a + b
+f().shape  # (10, 10) because output depends on a and b
+
+@memo
+def f[a: X, b: X]():
+    return 999
+f().shape  # (1, 1) because output depends on neither a nor b
+```
+</details>
