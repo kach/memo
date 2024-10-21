@@ -17,14 +17,14 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 
 ## Getting started
 
-Once you have installed memo, take a look at the [Memonomicon](./Memonomicon.ipynb) for a tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent.
+Once you have installed memo, take a look at the [Memonomicon](./demo/Memonomicon.ipynb) for a tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent.
 
 This repository also includes several classical examples of recursive reasoning models implemented in memo:
 - [Scalar implicature](./demo/demo-scalar.py), analogous to the example on the front page of WebPPL.org. (This example is explained in more detail in the Memonomicon.)
 - [Rational Speech Acts](./demo/demo-rsa.py) (RSA), with the recursion explicitly unrolled.
 - [Rational Speech Acts](./demo/demo-rsa-recursive.py) with recursive calls.
 - [A grid-world MDP](./demo/demo-grid.py) with planning and inverse planning.
-- [A POMDP](./demo/demo-pomdp.py) with belief-space planning.
+- [A classic POMDP](./demo/demo-pomdp.py) with belief-space planning.
 - [A visual convention-formation model](./demo/demo-7segment.ipynb) that
   highlights memo's interoperability with the JAX ecosystem, including deep
   learning, graphics, simulation, etc.
