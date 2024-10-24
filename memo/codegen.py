@@ -171,4 +171,4 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
         e.add_note(f"        + memo version {__version__} and JAX version {jax.__version__}")
         e.add_note(f"        + on Python version {platform.python_version()} on the {platform.system()} platform")
 
-        raise
+        raise e.with_traceback(None)

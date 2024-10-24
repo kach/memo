@@ -821,8 +821,8 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             wpp_val = eval_expr(wpp, ctxt)
             if not wpp_val.known:
                 raise MemoError(
-                    "Uncertain about wpp",
-                    hint=f"{who} is uncertain about the value of the 'wpp' expression that {who} is using to choose {id}. Hence, {who} cannot compute the probabilities needed to make the choice. Perhaps you meant to take an expected value somewhere, using E[...]?",
+                    "Choice based on uncertain expression",
+                    hint=f"{who} is uncertain about the value of the expression (wpp/to_maximize) that {who} is using to choose {id}. Hence, {who} cannot compute the probabilities needed to make the choice. Perhaps you meant to take an expected value somewhere, using E[...]?",
                     user=True,
                     ctxt=ctxt,
                     loc=s.loc
