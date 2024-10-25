@@ -33,7 +33,7 @@ def codegen(
     if not val.known:
         raise MemoError(
             "Returning a value that the observer has uncertainty over",
-            hint="TODO",
+            hint="Did you mean to use E[...] after your return statement?",
             ctxt=ctxt,
             user=True,
             loc=retval.loc
@@ -121,15 +121,9 @@ def _make_{f_name}():
 
 
 def memo_(f, **kwargs):  # type: ignore
-    pctxt, stmts, retval = parse_memo(f)
-    return codegen(pctxt, stmts, retval, **kwargs)
-
-
-def memo(f=None, **kwargs):  # type: ignore
     try:
-        if f is None:
-            return lambda f: memo_(f, **kwargs)  # type: ignore
-        return memo_(f, **kwargs)  # type: ignore
+        pctxt, stmts, retval = parse_memo(f)
+        return codegen(pctxt, stmts, retval, **kwargs)
     except MemoError as e:
         if e.loc:
             e.add_note('')
@@ -172,3 +166,8 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
         e.add_note(f"        + on Python version {platform.python_version()} on the {platform.system()} platform")
 
         raise e.with_traceback(None)
+
+def memo(f=None, **kwargs):  # type: ignore
+    if f is None:
+        return lambda f: memo_(f, **kwargs)  # type: ignore
+    return memo_(f, **kwargs)  # type: ignore
