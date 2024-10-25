@@ -1,7 +1,7 @@
 .ipynb_checkpoints/
 .DS_Store
 __pycache__/
-paper/*
+paper/
 scratch/*
 .env/
 .cpu_env
