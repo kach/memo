@@ -310,26 +310,20 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                                 loc=loc,
                             )
                         )
-            return stmts
 
-        case ast.Call(
-            func=ast.Name(id="knows"),
-            args=[
-                ast.Attribute(
-                    value=ast.Name(id=source_who),
-                    attr=source_id,
-                )
-            ],
-            keywords=[],
-        ):
-            return [
-                SKnows(
-                    who=Name(who),
-                    source_who=Name(source_who),
-                    source_id=Id(source_id),
-                    loc=loc,
-                )
-            ]
+                    case ast.Attribute(
+                        value=ast.Name(id=source_who),
+                        attr=source_id,
+                    ):
+                        stmts.append(
+                            SKnows(
+                                who=Name(who),
+                                source_who=Name(source_who),
+                                source_id=Id(source_id),
+                                loc=loc,
+                            )
+                        )
+            return stmts
 
         # observes with/without self
         case ast.Compare(

@@ -965,12 +965,16 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     ctxt=ctxt,
                     loc=s.loc
                 )
-            ctxt.frame.children[who].choices[source_addr] = ctxt.frame.choices[source_addr]
-            ctxt.frame.children[who].choices[source_addr].known = True
+            ctxt.frame.children[who].choices[source_addr] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
             ctxt.frame.children[who].conditions[source_addr] = source_addr
 
-            ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
-            ctxt.frame.conditions[(who, source_id)] = (ctxt.frame.name, source_id)  ## TODO generalize
+            if source_who == "self":
+                ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
+                ctxt.frame.conditions[(who, source_id)] = (ctxt.frame.name, source_id)
+            else:
+                ctxt.frame.children[who].ensure_child(source_who)
+                ctxt.frame.children[who].children[source_who].choices[("self", source_id)] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
+                ctxt.frame.children[who].children[source_who].conditions[("self", source_id)] = (source_who, source_id)
             ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
 
         case _:
