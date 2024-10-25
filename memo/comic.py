@@ -25,7 +25,7 @@ def comic_frame_nodes(frame: Frame, retval: Value, io: StringIO) -> None:
     print(f'''{frame_name(frame)}_dummy[style=invis];''', file=io)
 
     for c in frame.children.values():
-        print(f'''{frame_name(frame)}_dummy -> {frame_name(c)}_dummy[ltail={frame_name(frame)}, lhead={frame_name(c)}];''', file=io)
+        print(f'''{frame_name(frame)}_dummy -> {frame_name(c)}_dummy[ltail={frame_name(frame)}, lhead={frame_name(c)}, arrowhead="tee"];''', file=io)
 
     for (who, id), ch in frame.choices.items():
         color = "lightblue" if ch.known else "orange"
