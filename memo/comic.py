@@ -42,11 +42,11 @@ def comic(frame: Frame, retval: Value, fname: str) -> None:
     comic_frame_edges(frame, retval, io)
     print('}', file=io)
 
-    with open(fname, 'w') as f:
+    with open(f'{fname}.dot', 'w') as f:
         io.seek(0)
         shutil.copyfileobj(io, f)
     if shutil.which('dot') is not None:
-        os.system(f'dot {fname} -Tpng -o {fname}.png')
+        os.system(f'dot {fname}.dot -Tpng -o {fname}.png')
         # os.remove(fname)
     else:
         print(f"memo couldn't find a graphviz installation, so it only produced the .dot file. If you don't have graphviz installed, you can paste the .dot file into an online editor, such as https://dreampuf.github.io/GraphvizOnline/")

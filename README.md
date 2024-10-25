@@ -103,5 +103,6 @@ f().shape  # (1, 1) because output depends on neither a nor b
 
 <details><summary>How can I visualize what's going on with my model in "comic-book" format?</summary>
 
-Use `@memo(save_comic="filename.dot")` instead of just `@memo`. memo will produce a [Graphviz](https://graphviz.org/) `.dot` file that you can [render online](https://dreampuf.github.io/GraphvizOnline/). If you have Graphviz installed, memo will also automatically render a `.png` file for you.
+Use `@memo(save_comic="filename")` instead of just `@memo`. memo will produce a [Graphviz](https://graphviz.org/) `filename.dot` file that you can [render online](https://dreampuf.github.io/GraphvizOnline/). If you have Graphviz installed, memo will also automatically render a `filename.png` file for you.
+
 </details>
