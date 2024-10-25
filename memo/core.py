@@ -114,6 +114,7 @@ Op = Enum(
         "GTE",
         "AND",
         "OR",
+        "XOR",
         "EXP",
         "ABS",
         "LOG",
@@ -350,6 +351,8 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} & {pprint_expr(args[1])})"
                 case Op.OR:
                     return f"({pprint_expr(args[0])} | {pprint_expr(args[1])})"
+                case Op.XOR:
+                    return f"({pprint_expr(args[0])} ^ {pprint_expr(args[1])})"
                 case Op.EXP:
                     return f"exp({pprint_expr(args[0])})"
                 case Op.ABS:
@@ -551,6 +554,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 Op.GTE,
                 Op.AND,
                 Op.OR,
+                Op.XOR
             ]:
                 assert len(args) == 2
                 l = eval_expr(args[0], ctxt)
@@ -584,6 +588,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                             ctxt.emit(f"{out} = {l.tag} & {r.tag}")
                         case Op.OR:
                             ctxt.emit(f"{out} = {l.tag} | {r.tag}")
+                        case Op.XOR:
+                            ctxt.emit(f"{out} = {l.tag} ^ {r.tag}")
                 return Value(
                     tag=out,
                     known=l.known and r.known,
