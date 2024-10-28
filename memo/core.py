@@ -700,7 +700,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             marginal = ctxt.sym("marginal")
             ctxt.emit(f"{marginal} = marg({ctxt.frame.ll}, {idxs_to_marginalize}, keepdims=False)")
             ctxt.emit(
-                f"{out} = -jnp.sum({marginal} * jnp.log({marginal}))"
+                f"{out} = -jnp.sum({marginal} * jnp.nan_to_num(jnp.log({marginal})))"
             )
             return Value(
                 tag=out,
