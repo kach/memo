@@ -155,9 +155,10 @@ class EExpect(ExprSyntaxNode):
     expr: Expr
     reduction: Literal["expectation", "variance"]
 
+
 @dataclass(frozen=True)
 class EEntropy(ExprSyntaxNode):
-    exprs: list[Expr]
+    rvs: list[tuple[Name, Id]]
 
 
 @dataclass(frozen=True)
@@ -389,8 +390,8 @@ def pprint_expr(e: Expr) -> str:
             return f"{id}"
         case EExpect(expr):
             return f"E[ {pprint_expr(expr)} ]"
-        case EEntropy(expr):
-            return f"H[ {pprint_expr(expr)} ]"
+        case EEntropy(rvs):
+            return f"H[ {[z[0] + '.' + z[1] for z in rvs ]} ]"
         case EWith(who, expr):
             return f"{who}[ {pprint_expr(expr)} ]"
         case EImagine(do, then):
@@ -683,25 +684,16 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 deps=deps
             )
 
-        case EEntropy(exprs):
-            idxs_to_marginalize = set(c.idx for _, c in ctxt.frame.choices.items() if not c.known) # marginalize over everything except target variables first
-            deps = set()
-            for expr in exprs:
-                val_ = eval_expr(expr, ctxt)
-                if len(val_.deps) > 1:
-                    raise MemoError(
-                        "Entropy element expression depends on multiple choices",
-                        hint="To calculate the entropy of multiple values, separate them with a comma, e.g. H[alice.x, alice.y].",
-                        user=True,
-                        ctxt=ctxt,
-                        loc=expr.loc
-                    )
-                if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
-                    warnings.warn(f"Redundant expectation {pprint_expr(e)}, not marginalizing")
-                deps |= set(c for c in val_.deps if ctxt.frame.choices[c].known)
-                id = next(iter(val_.deps))
-                idxs_to_marginalize.remove(ctxt.frame.choices[id].idx)
-            idxs_to_marginalize = tuple(idxs_to_marginalize)
+        case EEntropy(rvs):
+            for rv in rvs:
+                if ctxt.frame.choices[rv].known:
+                    warnings.warn(f'Why are you taking the entropy of known variable {rv[0]}.{rv[1]}?')
+            idxs_to_marginalize = tuple(
+                c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n not in rvs)
+            )
+            deps = {
+                n for n, c in ctxt.frame.choices.items() if c.known and (n not in rvs)
+            }
             ctxt.emit(f"# {ctxt.frame.name} entropy")
 
             out = ctxt.sym("entropy")
@@ -710,10 +702,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ctxt.emit(
                 f"{out} = -jnp.sum({marginal} * jnp.log({marginal}))"
             )
-            # deps = ({  # TODO: this lets in too many deps!!
-            #     c for c, _ in ctxt.frame.choices.items()
-            #     if ctxt.frame.choices[c].known
-            # })
             return Value(
                 tag=out,
                 known=True,
