@@ -239,6 +239,9 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             assert not isinstance(elts[-1], ast.Slice)
             return EImagine(do=stmts, then=parse_expr(elts[-1], ctxt), loc=loc, static=False)
 
+        case ast.Subscript(value=ast.Name("imagine"), slice=elt):
+            return EImagine(do=[], then=parse_expr(elt, ctxt), loc=loc, static=False)
+
         # choice
         case ast.Subscript(value=ast.Name(id=who_id), slice=slice):
             if ctxt.cast is not None and who_id not in ctxt.cast:
