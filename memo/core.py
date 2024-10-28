@@ -687,20 +687,28 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
         case EEntropy(rvs):
             for rv in rvs:
                 if ctxt.frame.choices[rv].known:
-                    warnings.warn(f'Why are you taking the entropy of known variable {rv[0]}.{rv[1]}?')
-            idxs_to_marginalize = tuple(
+                    raise MemoError(
+                        "Taking entropy of known variable",
+                        hint=f"{rv[0]}.{rv[1]} is already known to {ctxt.frame.name}, so its entropy is zero.",
+                        user=True,
+                        ctxt=ctxt,
+                        loc=e.loc
+                    )
+            idxs_a = tuple(
                 c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n not in rvs)
             )
-            deps = {
-                n for n, c in ctxt.frame.choices.items() if c.known and (n not in rvs)
-            }
+            deps = {n for n, c in ctxt.frame.choices.items() if c.known}
             ctxt.emit(f"# {ctxt.frame.name} entropy")
 
             out = ctxt.sym("entropy")
             marginal = ctxt.sym("marginal")
-            ctxt.emit(f"{marginal} = marg({ctxt.frame.ll}, {idxs_to_marginalize}, keepdims=False)")
+            ctxt.emit(f"{marginal} = marg({ctxt.frame.ll}, {idxs_a})")
+
+            idxs_b = tuple(
+                c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n in rvs)
+            )
             ctxt.emit(
-                f"{out} = -jnp.sum({marginal} * jnp.nan_to_num(jnp.log({marginal})))"
+                f"{out} = -marg({marginal} * jnp.nan_to_num(jnp.log({marginal})), {idxs_b})"
             )
             return Value(
                 tag=out,
