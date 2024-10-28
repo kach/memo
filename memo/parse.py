@@ -207,47 +207,33 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             )
 
         # entropy
-        case ast.Subscript(value=ast.Name(id="H" | "Entropy"), slice=slice):
-            match slice:
-                case ast.Attribute(value=who, attr=choice):
-                    expr = EWith(
-                        who=Name(who.id),
-                        expr=EChoice(Id(choice), loc=loc, static=False),
-                        loc=loc,
-                        static=False,
-                    )
-                    return EEntropy(exprs=[expr], loc=loc, static=False)
+        case ast.Subscript(value=ast.Name(id="H"), slice=rv_expr):
+            match rv_expr:
+                case ast.Attribute(value=ast.Name(id=who_), attr=choice):
+                    return EEntropy(rvs=[(Name(who_), Id(choice))], loc=loc, static=False)
                 case ast.Tuple(elts=elts):
-                    exprs = []
+                    rvs = []
                     for elt in elts:
                         match elt:
-                            case ast.Attribute(value=who_, attr=choice):
-                                expr = EWith(
-                                    who=Name(who_.id),
-                                    expr=EChoice(Id(choice), loc=loc, static=False),
-                                    loc=loc,
-                                    static=False,
-                                )
-                                exprs.append(expr)
+                            case ast.Attribute(value=ast.Name(id=who_), attr=choice):
+                                rvs.append((Name(who_), Id(choice)))
                             case _:
                                 raise MemoError(
-                                    f"you can only take the entropy of named variables, memo instead received {ast.dump(elt)}",
-                                    hint=f"you should only be calculating the entropy of expressions like `alice.x`",
+                                    f"Unexpected variable in H[...]",
+                                    hint=f"You can only calculate the entropy of other agents' choices, e.g. alice.x",
                                     user=True,
                                     ctxt=None,
                                     loc=loc,
                                 )
-                    return EEntropy(exprs=exprs, loc=loc, static=False)
+                    return EEntropy(rvs=rvs, loc=loc, static=False)
                 case _:
                     raise MemoError(
-                        f"you can only take the entropy of named variables, memo instead received {ast.dump(slice)}",
-                        hint=f"you should only be calculating the entropy of expressions like `alice.x`",
+                        f"Unexpected variable in H[...]",
+                        hint=f"You can only calculate the entropy of other agents' choices, e.g. alice.x",
                         user=True,
                         ctxt=None,
                         loc=loc,
                     )
-            # return EEntropy(expr=parse_expr(rv_expr, ctxt), reduction="entropy", loc=loc, static=False)
-            # only allow EWith exprs as an argument to entropy
 
         # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):
