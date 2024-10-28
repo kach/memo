@@ -105,7 +105,7 @@ def _make_{f_name}():
 
     if save_comic is not None:
         from .comic import comic
-        comic(ctxt.frame, val, fname=save_comic)
+        comic(ctxt.frame, fname=save_comic)
 
     globals_of_caller = inspect.stack()[3].frame.f_globals
     locals_of_caller  = inspect.stack()[3].frame.f_locals
