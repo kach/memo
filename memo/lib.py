@@ -7,10 +7,10 @@ from dataclasses import dataclass
 class AuxInfo:
     cost: float | None = None
 
-def marg(t, dims, keepdims=True):
+def marg(t, dims):
     if dims == ():
         return t
-    return t.sum(axis=tuple(-1 - d for d in dims), keepdims=keepdims)
+    return t.sum(axis=tuple(-1 - d for d in dims), keepdims=True)
 
 def pad(t, total):
     count = total - len(t.shape)
