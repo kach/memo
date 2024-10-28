@@ -47,12 +47,15 @@ def eig[q: Q]():
         bob: chooses(n_blu in N, wpp=1),
         bob: chooses(a in A, wpp=respond(q, a, n_red + n_blu))
     ]
-    return alice[ H[bob.n_red, bob.n_blu] - imagine[
+    return alice[ imagine[
         future_alice: observes [bob.a] is bob.a,
-        E[future_alice[ H[bob.n_red, bob.n_blu] ]]
+        # EIG = entropy minus conditional entropy
+        H[bob.n_red, bob.n_blu] - E[future_alice[ H[bob.n_red, bob.n_blu] ]]
     ] ]
 
 z = eig()
+
+## print questions and EIGs in sorted order
 import inspect
 q_names = [inspect.getsource(q_).strip()[10:-1] for q_ in Qs]
 for eig_, q_ in reversed(sorted(list(zip(z, q_names)))):

@@ -695,7 +695,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         loc=e.loc
                     )
             idxs_a = tuple(
-                c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n not in rvs)
+                set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n not in rvs))
             )
             deps = {n for n, c in ctxt.frame.choices.items() if c.known}
             ctxt.emit(f"# {ctxt.frame.name} entropy")
@@ -705,7 +705,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ctxt.emit(f"{marginal} = marg({ctxt.frame.ll}, {idxs_a})")
 
             idxs_b = tuple(
-                c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n in rvs)
+                set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n in rvs))
             )
             ctxt.emit(
                 f"{out} = -marg({marginal} * jnp.nan_to_num(jnp.log({marginal})), {idxs_b})"
@@ -779,8 +779,10 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             for k in future_frame.conditions.keys():
                 future_frame.conditions[k] = k
 
-            # alice should know all of future_alice's choices
+            # alice should know all of future_alice's own choices
             for name, id in list(current_frame_copy.choices.keys()):
+                if name != 'self':
+                    continue
                 current_frame_copy.choices[future_name, id] = copy.deepcopy(current_frame_copy.choices[name, id])
                 current_frame_copy.conditions[future_name, id] = (name, id)
 
