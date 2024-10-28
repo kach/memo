@@ -13,7 +13,8 @@ from memo import memo
 import jax
 import jax.numpy as np
 
-is_prime = np.array([0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0])
+is_prime  = np.array([0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0])
+is_square = np.array([1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0])
 Qs = [
     lambda n: n == 7,
     lambda n: n == 12,
@@ -26,6 +27,7 @@ Qs = [
     lambda n: n % 4 == 0,
     lambda n: n % 5 == 0,
     lambda n: is_prime[n],
+    lambda n: is_square[n],
 ]
 
 N = np.arange(1, 6 + 1)  # single die's outcomes
