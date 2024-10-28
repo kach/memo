@@ -208,6 +208,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         # entropy
         case ast.Subscript(value=ast.Name(id="H"), slice=rv_expr):
+            assert not isinstance(rv_expr, ast.Slice)
             match rv_expr:
                 case ast.Attribute(value=ast.Name(id=who_), attr=choice):
                     return EEntropy(rvs=[(Name(who_), Id(choice))], loc=loc, static=False)
