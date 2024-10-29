@@ -55,3 +55,29 @@ class domain(list):
     def unpack(self, z, k):
         assert k in self.keys
         return (z // self.place_values[k]) % self.place_moduli[k]
+
+
+import importlib.abc, importlib.util
+
+class StringLoader(importlib.abc.SourceLoader):
+    def __init__(self, data):
+        self.data = data
+    def get_source(self, fullname):
+        return self.data
+    def get_data(self, path):
+        return self.data.encode("utf-8")
+    def get_filename(self, fullname):
+        return "<dynamic>"
+
+def make_module(name):
+    loader = StringLoader('''
+def install(x):
+    exec(x, globals())
+    return globals()
+    ''')
+    spec = importlib.util.spec_from_loader(name, loader, origin="built-in")
+    module = importlib.util.module_from_spec(spec)
+    # import sys
+    # sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
