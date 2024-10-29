@@ -3,6 +3,8 @@ import jax.numpy as jnp
 import time
 from dataclasses import dataclass
 
+from .core import MemoError
+
 @dataclass
 class AuxInfo:
     cost: float | None = None
@@ -27,7 +29,13 @@ def ffi(f, *args):
     if isinstance(f, jax.lib.xla_extension.PjitFunction):
         return jax.vmap(f)(*args).reshape(target_shape)
     else:
-        raise NotImplementedError
+        raise MemoError(
+            f"Tried to call non-JAX function `{f.__name__}`. Use @jax.jit to mark as JAX.",
+            hint=f"You tried to call {f}, which is not decorated with @jax.jit.",
+            user=True,
+            ctxt=None,
+            loc=None
+        )
 
 def check_domains(tgt, src):  # TODO make this nicer
     if len(tgt) > len(src):
