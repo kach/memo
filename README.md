@@ -5,7 +5,7 @@ memo is a new probabilistic programming language for expressing computational co
 memo stands for: mental modeling, memoized matrix operations, model-expressed-model-optimized, and metacognitive memos.
 
 > [!NOTE]
-> memo is currently in "public beta". Though we have many active users, there may be some sharp edges and the language may occasionally change in backward-incompatible ways. We are on track to offer a first _stable_ release of memo in February 2025. For updates on memo's development, we encourage you to subscribe to our low-traffic monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).
+> For updates on memo's development, we encourage you to subscribe to our low-traffic monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).
 
 ## Installing memo
 
