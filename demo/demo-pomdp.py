@@ -101,16 +101,14 @@ def π[b: B, a: A](t):
     return E[ alice.a == a ]
 
 
-@memo
+@memo  # not used above, just an example of how you would implement this
 def belief_update[b: B, b_: B, a: A, o: O]():
-    cast: [alice, env]
-    alice: knows(b)
-    alice: knows(a)
+    alice: knows(b, a)
     alice: thinks[
-        env: knows(b),
+        env: knows(b, a),
         env: chooses(s in S, wpp=get_belief(b, s)),
-        env: knows(a),
-        env: chooses(o in O, wpp=Obs(o, s, a))
+        env: chooses(s_ in S, wpp=Tr(s, a, s_)),
+        env: chooses(o in O, wpp=Obs(o, s_, a))
     ]
     alice: observes [env.o] is o
     alice: chooses(b_ in B, wpp=exp(-100.0 * abs(E[env.s == 0] - b_)))
