@@ -1,6 +1,6 @@
 # Index of demos
 
-## Language
+## Language (RSA)
 
 - [Lewis game](./demo-rsa.py)
 - [Scalar implicature](./demo-scalar.py)
