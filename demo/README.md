@@ -11,6 +11,7 @@
 - [Schelling game](./demo-schelling.py)
 - [Ultimatum game](./demo-ultimatum.ipynb)
 - [Guess 2/3 of average](./demo-23.ipynb)
+- [Bayesian Persuasion](./demo-persuasion.ipynb)
 
 ## Planning
 
