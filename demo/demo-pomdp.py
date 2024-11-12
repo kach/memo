@@ -3,14 +3,24 @@ import jax
 import jax.numpy as np
 from icecream import ic
 from functools import cache
+from enum import IntEnum
 
 ''' Baby POMDP '''
 # https://algorithmsbook.com/files/appendix-f.pdf
 
+class S(IntEnum):
+    Hungry = 0
+    Sated = 1
 
-S = [0, 1]     # hungry, sated
-A = [0, 1, 2]  # feed, sing, ignore
-O = [0, 1]     # crying, quiet
+class A(IntEnum):
+    Feed = 0
+    Sing = 1
+    Ignore = 2
+
+class O(IntEnum):
+    Crying = 0
+    Quiet = 1
+
 B = np.linspace(0, 1, 50)  # P(hungry)
 
 @jax.jit
