@@ -1,6 +1,6 @@
 # Index of demos
 
-## Language (RSA)
+## Language (variations on RSA)
 
 - [Lewis game](./demo-rsa.py)
 - [Scalar implicature](./demo-scalar.py)
@@ -15,16 +15,16 @@
   (this demo uses memo to fit a model to real-world data collected by the New York Times)
 - [Bayesian Persuasion](./demo-persuasion.ipynb)
 
-## Planning
+## Planning and inverse planning
 
 - [MDP (gridworld)](./demo-mdp.py)
 - [POMDP (crying baby)](./demo-pomdp.py)
 - [Takeaway](./demo-takeaway.ipynb)  
   (this demo shows how to reflect on cost of computation in memo)
 
-## Information
+## Information theoretic calculations
 
-- [Expected information gain](./demo-eig.py)
+- [Expected information gain](./demo-eig.ipynb)
 - [Empowerment](./demo-empowerment.py)
 
 ## Puzzles
