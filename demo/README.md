@@ -2,25 +2,26 @@
 
 ## Language (variations on RSA)
 
-- [Lewis game](./demo-rsa.py)
-- [Scalar implicature](./demo-scalar.py)
-- [7-segment displays](./demo-7segment.ipynb)  
-  (this demo shows how memo can interface with deep learning and computer vision)
+- [Lewis game](./demo-rsa.py) (discussed in paper)
+- [Scalar implicature](./demo-scalar.py) (discussed in paper)
+- [7-segment displays](./demo-7segment.ipynb) (discussed in paper)  
+  (we show how memo can interface with deep learning and computer vision)
 
 ## Economic games
 
-- [Schelling game](./demo-schelling.ipynb)
+- [Schelling game](./demo-schelling.ipynb) (discussed in paper)  
 - [Ultimatum game](./demo-ultimatum.ipynb)
 - [Guess 2/3 of average](./demo-23.ipynb)  
-  (this demo uses memo to fit a model to real-world data collected by the New York Times)
-- [Bayesian Persuasion](./demo-persuasion.ipynb)
+  (we use memo to fit a model to real-world data collected by the New York Times)
+- [Bayesian Persuasion](./demo-persuasion.ipynb)  
+  (we use memo to recover a result presented in a classic paper on persuasion)
 
 ## Planning and inverse planning
 
-- [MDP (gridworld)](./demo-mdp.ipynb)
-- [POMDP (crying baby)](./demo-pomdp.py)
-- [Takeaway](./demo-takeaway.ipynb)  
-  (this demo shows how to reflect on cost of computation in memo)
+- [MDP (gridworld)](./demo-mdp.ipynb) (discussed in paper)
+- [POMDP (crying baby)](./demo-pomdp.py) (discussed in paper)
+- [Takeaway](./demo-takeaway.ipynb) (discussed in paper)  
+  (we use memo to reflect on cost of computation and make inferences about _whether_ someone is thinking)
 
 ## Information theoretic calculations
 
