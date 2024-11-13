@@ -9,7 +9,7 @@
 
 ## Economic games
 
-- [Schelling game](./demo-schelling.py)
+- [Schelling game](./demo-schelling.ipynb)
 - [Ultimatum game](./demo-ultimatum.ipynb)
 - [Guess 2/3 of average](./demo-23.ipynb)  
   (this demo uses memo to fit a model to real-world data collected by the New York Times)
