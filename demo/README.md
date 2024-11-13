@@ -17,7 +17,7 @@
 
 ## Planning and inverse planning
 
-- [MDP (gridworld)](./demo-mdp.py)
+- [MDP (gridworld)](./demo-mdp.ipynb)
 - [POMDP (crying baby)](./demo-pomdp.py)
 - [Takeaway](./demo-takeaway.ipynb)  
   (this demo shows how to reflect on cost of computation in memo)

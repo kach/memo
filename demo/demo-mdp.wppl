@@ -7,7 +7,7 @@ var make_blank_maze = function(n) {
   return n == 0 ? [] : make_blank_maze(n - 1).concat([0])
 }
 var S = make_states(H * W)
-var G = [0, 7]
+var G = [0, H * W - 1]
 var A = [0, 1, 2, 3]  // left, right, up, down
 
 var coord_actions = [
@@ -41,6 +41,8 @@ var is_terminating = function(s, g) {
     return s == g
 }
 
+
+// Adapted from https://agentmodels.org/chapters/3b-mdp-gridworld.html
 var policy = dp.cache(function(s, g, t) {
   return Infer({method: 'enumerate', model: function() {
     var a = uniformDraw(A)
