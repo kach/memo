@@ -3,6 +3,7 @@ import jax
 import jax.numpy as np
 from enum import IntEnum
 
+## Boilerplate - define U, R, and denotes.
 class U(IntEnum):  # utterance space
     GREEN  = 0b0001
     PINK   = 0b0010
@@ -18,7 +19,8 @@ class R(IntEnum):  # referent space
 def denotes(u, r):
     return (u & r) != 0
 
-@memo  # recursive RSA model
+## Recursive RSA model
+@memo
 def L[u: U, r: R](beta, t):
     listener: thinks[
         speaker: given(r in R, wpp=1),

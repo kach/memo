@@ -21,6 +21,7 @@ class O(IntEnum):
     Crying = 0
     Quiet = 1
 
+# Belief space, discretized into 50 possible belief states
 B = np.linspace(0, 1, 50)  # P(hungry)
 
 @jax.jit
@@ -124,7 +125,7 @@ def belief_update[b: B, b_: B, a: A, o: O]():
     alice: chooses(b_ in B, wpp=exp(-100.0 * abs(E[env.s == 0] - b_)))
     return E[alice.b_ == b_]
 
-
+# Make the figure in the paper
 from matplotlib import pyplot as plt
 plt.figure(figsize=(3, 2))
 v = V(10)
