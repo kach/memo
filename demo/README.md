@@ -22,6 +22,7 @@
 - [POMDP (crying baby)](./demo-pomdp.ipynb) (discussed in paper)
 - [Takeaway](./demo-takeaway.ipynb) (discussed in paper)  
   (we use memo to reflect on cost of computation and make inferences about _whether_ someone is thinking)
+- [Perturbation confusion](./demo-pc.ipynb) (discussed in paper)
 
 ## Information theoretic calculations
 
