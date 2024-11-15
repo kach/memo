@@ -15,6 +15,7 @@
   (we use memo to fit a model to real-world data collected by the New York Times)
 - [Bayesian Persuasion](./demo-persuasion.ipynb)  
   (we use memo to recover a result presented in a classic paper on persuasion)
+- [Risk aversion](./demo-risk-aversion.ipynb)
 
 ## Planning and inverse planning
 
