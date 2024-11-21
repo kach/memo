@@ -499,6 +499,16 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                             loc=arg.loc,
                         )
 
+            for _, source_name, source_id in ids:
+                if (source_name, source_id) not in ctxt.frame.choices:
+                    raise MemoError(
+                        "Unknown choice referenced in a memo call",
+                        hint=f"{ctxt.frame.name} does not yet model {source_name}'s choice of {source_id}.",
+                        user=True,
+                        ctxt=ctxt,
+                        loc=e.loc
+                    )
+
             with ctxt.hoist():
                 res = ctxt.sym(f"result_array_{name}")
                 doms = [ctxt.frame.choices[source_name, source_id].domain for _, source_name, source_id in ids]
