@@ -21,6 +21,10 @@ Once you have installed memo, take a look at the [Memonomicon](./demo/Memonomico
 
 This repository also includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
 
+For background on the theory of decision making under uncertainty, e.g. MDPs and POMDPs, we recommending consulting _Decision Making Under Uncertainty_ as a reference. You can read the entire book for free online [here](https://algorithmsbook.com/decisionmaking/).
+
+For background on Bayesian models of theory of mind, we recommend consulting chapter 14 of _Bayesian Models of Cognition_ as a reference. You can read the published version [here](https://mitpress.ublish.com/ebook/bayesian-models-of-cognition-reverse-engineering-the-mind-preview/12799/341) and a PDF preprint [here](https://www.tomerullman.org/papers/BBB_chapter14.pdf).
+
 ## FAQ
 
 <details><summary>When should I use memo rather than Gen or WebPPL?</summary>
