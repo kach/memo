@@ -128,9 +128,7 @@ def memo_(f, **kwargs):  # type: ignore
     except MemoError as e:
         if e.loc:
             e.add_note('')
-            e.add_note(
-                f"    at: @memo {e.loc.name} in {os.path.basename(e.loc.file)}, line {e.loc.line}, column {e.loc.offset + 1}"
-            )
+            e.add_note(f"  file: \"{os.path.basename(e.loc.file)}\", line {e.loc.line}, in @memo {e.loc.name}")
             e.add_note(f"    {linecache.getline(e.loc.file, e.loc.line)[:-1]}")
             e.add_note(f"    {' ' * e.loc.offset}^")
         if e.hint is not None:
@@ -164,9 +162,12 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
 
         # Describe environment...
         import jax
-        e.add_note(f"  P.S.: You are currently using memo {__version__}, JAX {jax.__version__}, Python {platform.python_version()} on {platform.system()}.")
+        e.add_note(f"  info: You are using memo {__version__}, JAX {jax.__version__}, Python {platform.python_version()} on {platform.system()}.")
 
-        raise e.with_traceback(None)
+        print('memo error:', e.message)
+        print('\n'.join(e.__notes__))
+        exit(1)
+        # raise e.with_traceback(None)
 
 def memo(f=None, **kwargs):  # type: ignore
     if f is None:
