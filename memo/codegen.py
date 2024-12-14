@@ -7,6 +7,7 @@ import os, sys, platform, inspect
 from io import StringIO
 from typing import Any, Optional, Callable
 import warnings
+import linecache
 
 def codegen(
     pctxt: ParsingContext,
@@ -130,6 +131,8 @@ def memo_(f, **kwargs):  # type: ignore
             e.add_note(
                 f"    at: @memo {e.loc.name} in {os.path.basename(e.loc.file)}, line {e.loc.line}, column {e.loc.offset + 1}"
             )
+            e.add_note(f"    {linecache.getline(e.loc.file, e.loc.line)[:-1]}")
+            e.add_note(f"    {' ' * e.loc.offset}^")
         if e.hint is not None:
             e.add_note('')
             for line in textwrap.wrap(
@@ -161,9 +164,7 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
 
         # Describe environment...
         import jax
-        e.add_note(f"  P.S.: You are currently using...")
-        e.add_note(f"        + memo version {__version__} and JAX version {jax.__version__}")
-        e.add_note(f"        + on Python version {platform.python_version()} on the {platform.system()} platform")
+        e.add_note(f"  P.S.: You are currently using memo {__version__}, JAX {jax.__version__}, Python {platform.python_version()} on {platform.system()}.")
 
         raise e.with_traceback(None)
 
