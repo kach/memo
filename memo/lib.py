@@ -45,3 +45,42 @@ def check_domains(tgt, src):  # TODO make this nicer
     for i, (t, s) in enumerate(zip(tgt, src)):
         if t != s:
             raise Exception(f"Domain mismatch in memo call argument {i + 1}: {t} != {s}.")
+
+
+
+def pprint_table(f, z):
+    def pprint(val):
+        if isinstance(val, jnp.ndarray):
+            return str(val.item())
+        from enum import Enum
+        if isinstance(val, Enum):
+            return f'{val.name} ({val.value})'
+        return str(val)
+
+    rows = []
+    rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + (f"{f.__name__[5:]}[{', '.join(f._axes)}]",))  # header
+    import itertools
+    for row in itertools.product(*[enumerate(v) for v in f._vals]):
+        idx = tuple([r[0] for r in row])
+        lead = tuple([pprint(r[1]) for r in row])
+        rows.append(lead + (pprint(z[idx]),))
+
+    widths = []
+    for col in range(len(rows[0])):
+        widths.append(max([len(row[col]) for row in rows]))
+
+    def hr():
+        for w, c in zip(widths, rows[0]):
+            print('+', end='-')
+            print('-' * w, end='-')
+        print('-+')
+
+    hr()
+    for ri, row in enumerate(rows):
+        for w, c in zip(widths, row):
+            print('|', end=' ')
+            print(c + ' ' * (w - len(c)), end=' ')
+        print(' |')
+        if ri == 0:
+            hr()
+    hr()

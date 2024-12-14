@@ -73,12 +73,13 @@ if compute_cost:
     print(f'     cost = {{aux.cost}} operations')
 """)
             ctxt.emit(f"""print(f'     time = {{time.time() - _time_:.6f}} sec')""")
+        ctxt.emit(f"if print_table: pprint_table(_out_{f_name}, _out_)")
         ctxt.emit(f"""return (_out_, aux) if return_aux else _out_""")
     ctxt.emit(f"return {val.tag}")
 
     out = f"""\
 def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo
+    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo, pprint_table
     from functools import cache
 
     @jax.jit
@@ -86,7 +87,7 @@ def _make_{f_name}():
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
 {"    @cache" if cache else ""}
-    def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, return_aux=False, compute_cost=False):
+    def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, return_aux=False, compute_cost=False, print_table=False):
         aux = AuxInfo()
         if compute_cost:
             return_aux = True
@@ -94,7 +95,9 @@ def _make_{f_name}():
 {textwrap.indent(ctxt.hoisted_buf.getvalue(), "    " * 2)}
 
     _out_{f_name}._shape = tuple([{", ".join(f"len({p[1]})" for p in pctxt.axes)}])
+    _out_{f_name}._axes = tuple([{", ".join(f"{repr(p[0])}" for p in pctxt.axes)}])
     _out_{f_name}._doms = tuple([{", ".join(f"{repr(p[1])}" for p in pctxt.axes)}])
+    _out_{f_name}._vals = tuple([{", ".join(f"{p[1]}" for p in pctxt.axes)}])
     return _out_{f_name}
 
 {f_name} = _make_{f_name}()
@@ -127,7 +130,6 @@ def memo_(f, **kwargs):  # type: ignore
         return codegen(pctxt, stmts, retval, **kwargs)
     except MemoError as e:
         if e.loc:
-            e.add_note('')
             e.add_note(f"  file: \"{os.path.basename(e.loc.file)}\", line {e.loc.line}, in @memo {e.loc.name}")
             e.add_note(f"    {linecache.getline(e.loc.file, e.loc.line)[:-1]}")
             e.add_note(f"    {' ' * e.loc.offset}^")
