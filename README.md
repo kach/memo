@@ -17,7 +17,7 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 
 ## Getting started
 
-Once you have installed memo, take a look at the [Memonomicon](./demo/Memonomicon.ipynb) for a tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent. You can also watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material.
+Once you have installed memo, take a look at the [Memonomicon](./demo/Memonomicon.ipynb) for a tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent. You can also watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material. The [Handbook](./Handbook.pdf) provides quick reference for memo's syntactic constructs (but is not a tutorial).
 
 This repository also includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
 
