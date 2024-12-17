@@ -54,7 +54,7 @@ def pprint_table(f, z):
             return str(val.item())
         from enum import Enum
         if isinstance(val, Enum):
-            return f'{val.name} ({val.value})'
+            return f'{val.name}'
         return str(val)
 
     rows = []

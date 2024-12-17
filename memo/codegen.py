@@ -166,10 +166,27 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
         import jax
         e.add_note(f"  info: You are using memo {__version__}, JAX {jax.__version__}, Python {platform.python_version()} on {platform.system()}.")
 
-        print('memo error:', e.message)
-        print('\n'.join(e.__notes__))
-        exit(1)
-        # raise e.with_traceback(None)
+        raise e.with_traceback(None) from None
+
+import sys, traceback
+old_excepthook = sys.excepthook
+def new_excepthook(typ, val, tb):
+    if typ is MemoError:
+        return traceback.print_exception(val, limit=0)
+    old_excepthook(typ, val, tb)
+sys.excepthook = new_excepthook
+
+try:
+    ipython = get_ipython()
+    old_showtraceback = ipython.showtraceback
+    def new_showtraceback(*args, **kwargs):
+        info = sys.exc_info()
+        if info[0] is MemoError:
+            return traceback.print_exception(info[1], limit=0)
+        old_showtraceback(sys.exc_info(), **kwargs)
+    ipython.showtraceback = new_showtraceback
+except NameError:
+    pass
 
 def memo(f=None, **kwargs):  # type: ignore
     if f is None:
