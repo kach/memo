@@ -15,6 +15,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 class ParsingContext:
     cast: None | list[str]
     static_parameters: list[str]
+    static_defaults: list[None | str]
     axes: list[tuple[str, str]]
     loc_name: str
     loc_file: str
@@ -162,23 +163,25 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             )
 
         case ast.BoolOp(op=op, values=values):
-            if len(values) != 2:
+            if len(values) < 2:
                 raise MemoError(
-                    f"Incorrect number of arguments to logical operator {op}",
+                    f"Unexpectedly few arguments to logical operator {op}",
                     hint=None,
                     user=False,
                     ctxt=None,
                     loc=loc,
                 )
-            e1, e2 = values
-            e1_ = parse_expr(e1, ctxt)
-            e2_ = parse_expr(e2, ctxt)
-            return EOp(
-                op={ast.And: Op.AND, ast.Or: Op.OR}[op.__class__],
-                args=[e1_, e2_],
-                loc=loc,
-                static=e1_.static and e2_.static
-            )
+            the_op = {ast.And: Op.AND, ast.Or: Op.OR}[op.__class__]
+            out = parse_expr(values[-1], ctxt)
+            for val in reversed(values[:-1]):
+                val_ = parse_expr(val, ctxt)
+                out = EOp(
+                    op=the_op,
+                    args=[val_, out],
+                    loc=loc,
+                    static=val_.static and out.static
+                )
+            return out
 
         case ast.IfExp(test=test, body=body, orelse=orelse):
             c_expr = parse_expr(test, ctxt)
@@ -463,16 +466,22 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
     ast_increment_colno(tree, n_dedent)
 
     cast = None
-    static_parameters = []
+    static_parameters: list[str] = []
+    static_defaults: list[None | str] = []
 
     match tree:
         case ast.FunctionDef(name=f_name) as f:
             # print(ast.dump(f, include_attributes=True, indent=2))
-            for arg in f.args.args:
+            num_required_args = len(f.args.args) - len(f.args.defaults)
+            for arg_i, arg in enumerate(f.args.args):
                 # assert isinstance(arg.annotation, ast.Name) and arg.annotation.id in ['float']
                 # should always be true, see https://docs.python.org/3.8/library/ast.html#ast.parse
                 assert arg.type_comment is None
                 static_parameters.append(arg.arg)
+                if arg_i < num_required_args:
+                    static_defaults.append(None)
+                else:
+                    static_defaults.append(ast.unparse(f.args.defaults[arg_i - num_required_args]))
             first_stmt = f.body[0]
             match first_stmt:
                 case ast.AnnAssign(
@@ -499,6 +508,7 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
     pctxt = ParsingContext(
         cast=cast,
         static_parameters=static_parameters,
+        static_defaults=static_defaults,
         axes=[],
         loc_name=f_name,
         loc_file=src_file,

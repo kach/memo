@@ -9,6 +9,16 @@ from typing import Any, Optional, Callable
 import warnings
 import linecache
 
+def make_static_parameter_list(pctxt: ParsingContext) -> str:
+    out = ''
+    for sp, sd in zip(pctxt.static_parameters, pctxt.static_defaults):
+        if sd is None:
+            out += f'{sp}'
+        else:
+            out += f'{sp}={sd}'
+        out += ', '
+    return out
+
 def codegen(
     pctxt: ParsingContext,
     stmts: list[Stmt],
@@ -87,7 +97,7 @@ def _make_{f_name}():
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
 {"    @cache" if cache else ""}
-    def _out_{f_name}({", ".join(pctxt.static_parameters)}{", " if len(pctxt.static_parameters) > 0 else ""}*, return_aux=False, compute_cost=False, print_table=False):
+    def _out_{f_name}({make_static_parameter_list(pctxt)}*, return_aux=False, compute_cost=False, print_table=False):
         aux = AuxInfo()
         if compute_cost:
             return_aux = True
@@ -177,7 +187,7 @@ def new_excepthook(typ, val, tb):
 sys.excepthook = new_excepthook
 
 try:
-    ipython = get_ipython()
+    ipython = get_ipython()  # type: ignore
     old_showtraceback = ipython.showtraceback
     def new_showtraceback(*args, **kwargs):
         info = sys.exc_info()
