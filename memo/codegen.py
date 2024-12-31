@@ -54,10 +54,10 @@ def codegen(
         for i in range(ctxt.next_idx)
         if i not in [z[0] for z in ctxt.forall_idxs]
     ]
-    ctxt.emit(f"{val.tag} = jnp.array({val.tag})")
-    ctxt.emit(
-        f"{val.tag} = pad({val.tag}, {ctxt.next_idx}).squeeze(axis={tuple(squeeze_axes)}).transpose()"
-    )
+    ctxt.emit(f"# prepare output")
+    ctxt.emit(f"{val.tag} = jnp.array({val.tag})  # ensure output is an array")
+    ctxt.emit(f"{val.tag} = pad({val.tag}, {ctxt.next_idx})")
+    ctxt.emit(f"{val.tag} = {val.tag}.squeeze(axis={tuple(squeeze_axes)}).transpose()")
 
     with ctxt.hoist():
         ctxt.emit(f"""\

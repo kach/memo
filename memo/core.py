@@ -997,9 +997,8 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"{ctxt.frame.children[who].ll} = jnp.swapaxes(pad({ctxt.frame.children[who].ll}, {ctxt.next_idx}), -1-{sidx}, -1-{tidx})"
             )
-            ctxt.frame.children[who].choices[target_addr].idx = ctxt.frame.choices[
-                source_addr
-            ].idx
+            ctxt.frame.children[who].choices[target_addr].idx = sidx
+            ctxt.frame.children[who].children[target_who].choices[('self', target_id)].idx = sidx
             ctxt.emit(
                 f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
             )
