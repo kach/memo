@@ -110,3 +110,7 @@ f().shape  # (1, 1) because output depends on neither a nor b
 Use `@memo(save_comic="filename")` instead of just `@memo`. memo will produce a [Graphviz](https://graphviz.org/) `filename.dot` file that you can [render online](https://dreampuf.github.io/GraphvizOnline/). If you have Graphviz installed, memo will also automatically render a `filename.png` file for you.
 
 </details>
+
+<details><summary>How can I get model outputs in pandas/xarray format?</summary>
+Pass in the <code>return_pandas=True</code> or <code>return_xarray=True</code> keyword arguments to your model. Your model will then return a tuple: the first argument will be the raw array, and the second argument will have a <code>.pandas</code> or <code>.xarray</code> property, respectively.
+</details>
