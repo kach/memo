@@ -476,7 +476,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 res = ctxt.sym(f"result_cost_{name}")
                 ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
                 ctxt.indent()
-                ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], compute_cost=True)})')
+                ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], return_cost=True)})')
                 ctxt.emit(f'{res} = {res}.cost')
                 ctxt.dedent()
                 ctxt.emit('else:')
@@ -515,8 +515,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
                 ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
                 ctxt.indent()
-                ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, compute_cost='compute_cost')})')
-                ctxt.emit(f"if compute_cost: aux.cost += res_aux.cost")
+                ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, return_cost='return_cost')})')
+                ctxt.emit(f"if return_cost: aux.cost += res_aux.cost")
                 ctxt.dedent()
                 ctxt.emit('else:')
                 ctxt.indent()
@@ -998,7 +998,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 f"{ctxt.frame.children[who].ll} = jnp.swapaxes(pad({ctxt.frame.children[who].ll}, {ctxt.next_idx}), -1-{sidx}, -1-{tidx})"
             )
             ctxt.frame.children[who].choices[target_addr].idx = sidx
-            ctxt.frame.children[who].children[target_who].choices[('self', target_id)].idx = sidx
+            ctxt.frame.children[who].children[target_who].choices[(Name('self'), target_id)].idx = sidx
             ctxt.emit(
                 f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
             )

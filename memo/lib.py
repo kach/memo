@@ -2,12 +2,15 @@ import jax
 import jax.numpy as jnp
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from .core import MemoError
 
 @dataclass
 class AuxInfo:
     cost: float | None = None
+    pandas: Any | None = None
+    xarray: Any | None = None
 
 def marg(t, dims):
     if dims == ():
@@ -84,3 +87,48 @@ def pprint_table(f, z):
         if ri == 0:
             hr()
     hr()
+
+
+def make_pandas_data(f, z):
+    import itertools
+    def pprint(val):
+        if isinstance(val, jnp.ndarray):
+            return val.item()
+        from enum import Enum
+        if isinstance(val, Enum):
+            return val.name
+        return val
+
+    data = dict()
+    for ax, dom in zip(f._axes, f._doms):
+        data[f"{ax}"] = list()
+    data[f"{f.__name__[5:]}"] = list()
+
+
+    for row in itertools.product(*[enumerate(v) for v in f._vals]):
+        idx = tuple([r[0] for r in row])
+        lead = tuple([pprint(r[1]) for r in row])
+        row_data = lead + (pprint(z[idx]),)
+
+        for (dom, val) in zip(data.keys(), row_data):
+            data[dom].append(val)
+
+    import pandas as pd
+    return pd.DataFrame(data)
+
+
+def make_xarray_data(f, z):
+    def parse(val):
+        if isinstance(val, jnp.ndarray):
+            return val.item()
+        from enum import Enum
+        if isinstance(val, Enum):
+            return val.name
+        return val
+
+    coords = {}
+    for (ax, dom, vals) in zip(f._axes, f._doms, f._vals):
+        coords[f"{ax}"] = [parse(v) for v in vals]
+
+    import xarray as xr
+    return xr.DataArray(name=f"{f.__name__[5:]}", data=z, coords=coords)

@@ -65,7 +65,7 @@ _out_ = _jit_{f_name}({", ".join(ctxt.hoisted_syms)})
 """)
 
         ctxt.emit(f"""\
-if compute_cost:
+if return_cost:
     #  https://jax.readthedocs.io/en/latest/aot.html
     _lowered_ = _jit_{f_name}.lower({", ".join(ctxt.hoisted_syms)})
     _cost_ = _lowered_.cost_analysis()
@@ -79,17 +79,19 @@ if compute_cost:
         if debug_trace:
             ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }}) has shape {{ _out_.shape }}')""")
             ctxt.emit(f"""\
-if compute_cost:
+if return_cost:
     print(f'     cost = {{aux.cost}} operations')
 """)
             ctxt.emit(f"""print(f'     time = {{time.time() - _time_:.6f}} sec')""")
         ctxt.emit(f"if print_table: pprint_table(_out_{f_name}, _out_)")
+        ctxt.emit(f"if return_pandas: aux.pandas = make_pandas_data(_out_{f_name}, _out_)")
+        ctxt.emit(f"if return_xarray: aux.xarray = make_xarray_data(_out_{f_name}, _out_)")
         ctxt.emit(f"""return (_out_, aux) if return_aux else _out_""")
     ctxt.emit(f"return {val.tag}")
 
     out = f"""\
 def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo, pprint_table
+    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo, pprint_table, make_pandas_data, make_xarray_data
     from functools import cache
 
     @jax.jit
@@ -97,9 +99,18 @@ def _make_{f_name}():
 {textwrap.indent(ctxt.regular_buf.getvalue(), "    " * 2)}
 
 {"    @cache" if cache else ""}
-    def _out_{f_name}({make_static_parameter_list(pctxt)}*, return_aux=False, compute_cost=False, print_table=False):
+    def _out_{f_name}(
+        {make_static_parameter_list(pctxt)}*,
+        return_aux=False,
+        return_pandas=False,
+        return_xarray=False,
+        return_cost=False,
+        print_table=False
+    ):
         aux = AuxInfo()
-        if compute_cost:
+        if return_pandas or return_xarray:
+            return_aux = True
+        if return_cost:
             return_aux = True
             aux.cost = 0.
 {textwrap.indent(ctxt.hoisted_buf.getvalue(), "    " * 2)}
