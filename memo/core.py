@@ -244,8 +244,22 @@ class SKnows(SyntaxNode):
     source_who: Name
     source_id: Id
 
+@dataclass(frozen=True)
+class SSnapshot(SyntaxNode):
+    who: Name
+    true: Name
+    alias: Name
 
-Stmt = SPass | SChoose | SObserve | SWith | SShow | SForAll | SKnows
+Stmt = (
+    SPass
+    | SChoose
+    | SObserve
+    | SWith
+    | SShow
+    | SForAll
+    | SKnows
+    | SSnapshot
+)
 
 
 class Buffer:
@@ -336,6 +350,8 @@ def pprint_stmt(s: Stmt) -> str:
             return f"given: {id} in {domain}"
         case SKnows(who, source_who, source_id):
             return f"{who}: knows({source_who}.{source_id})"
+        case SSnapshot(who, true, alias):
+            return f"{who}: snaps({alias}={true})"
     raise NotImplementedError(s)
 
 
@@ -771,6 +787,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     deps.add((who, id))
                 elif (who_, id) in ctxt.frame.children[who].conditions:
                     z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
+                    # ic(who, who_, id, z_who, z_id)
                     deps.add((z_who, z_id))
                 else:
                     ic(ctxt.frame.name, who, pprint_expr(e), who_, id)
@@ -1051,6 +1068,23 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 ctxt.frame.children[who].children[source_who].choices[(Name("self"), source_id)] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
                 ctxt.frame.children[who].children[source_who].conditions[(Name("self"), source_id)] = (source_who, source_id)
             ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
+
+        case SSnapshot(who, true, alias):
+            current_frame = ctxt.frame.children[who]
+            future_frame = copy.deepcopy(
+                current_frame if true == 'self' else current_frame.children[true]
+            )
+            fresh_lls(ctxt, future_frame)
+            future_frame.name = alias
+            future_frame.parent = current_frame
+            current_frame.children[alias] = future_frame
+            for k in future_frame.conditions.keys():
+                future_frame.conditions[k] = k
+            for name, id in list(current_frame.choices.keys()):
+                if name != true:
+                    continue
+                current_frame.choices[alias, id] = copy.deepcopy(current_frame.choices[name, id])
+                current_frame.conditions[alias, id] = (who if true == 'self' else true, id)
 
         case _:
             raise NotImplementedError

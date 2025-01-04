@@ -379,6 +379,31 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                         )
             return stmts
 
+        case ast.Call(
+            func=ast.Name(id="snapshots"),
+            args=[],
+            keywords=kw
+        ):
+            stmts = []
+            for kw_ in kw:
+                if not isinstance(kw_.value, ast.Name):
+                    raise MemoError(
+                        "Inputs to snaps() must be names of agents",
+                        hint=f"`{ast.unparse(kw_.value)}` is not a name",
+                        user=True,
+                        ctxt=None,
+                        loc=loc
+                    )
+                stmts.append(
+                    SSnapshot(
+                        who=Name(who),
+                        true=Name(kw_.value.id),
+                        alias=Name(kw_.arg),
+                        loc=loc
+                    )
+                )
+            return stmts
+
         # observes with/without self
         case ast.Compare(
             left=ast.Subscript(
