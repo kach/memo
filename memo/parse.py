@@ -276,6 +276,17 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 )
             return EWith(who=Name(who_id), expr=EChoice(Id(attr), loc=loc, static=False), loc=loc, static=False)
 
+        case ast.Set(elts):
+            if len(elts) != 1:
+                raise MemoError(
+                    "Inlines {...} should only have one value, not multiple comma-separated ones.",
+                    hint="Double-check for commas!",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
+            return EInline(val=ast.unparse(elts[0]), loc=loc, static=True)
+
         case _:
             raise MemoError(
                 f"Unknown expression syntax",

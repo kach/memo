@@ -178,8 +178,23 @@ class ECost(ExprSyntaxNode):
     name: str
     args: list[Expr]
 
+@dataclass(frozen=True)
+class EInline(ExprSyntaxNode):
+    val: str
 
-Expr = ELit | EOp | EFFI | EMemo | EChoice | EExpect | EEntropy | EWith | EImagine | ECost
+Expr = (
+    ELit
+    | EOp
+    | EFFI
+    | EMemo
+    | EChoice
+    | EExpect
+    | EEntropy
+    | EWith
+    | EImagine
+    | ECost
+    | EInline
+)
 
 
 @dataclass(frozen=True)
@@ -403,6 +418,8 @@ imagine [
 ]"""
         case ECost(name, args):
             return f"(cost @ {name}({', '.join(pprint_expr(arg) for arg in args)}))"
+        case EInline(val):
+            return f"{{{val}}}"
     raise NotImplementedError
 
 
@@ -828,6 +845,14 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ctxt.frame = old_frame
             return val_
 
+        case EInline(val=val):
+            tag = ctxt.sym("inline")
+            ctxt.emit(f'{tag} = {val}')
+            return Value(
+                tag=tag,
+                known=True,
+                deps=set()
+            )
     raise NotImplementedError
 
 
