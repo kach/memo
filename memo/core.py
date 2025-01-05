@@ -247,7 +247,6 @@ class SKnows(SyntaxNode):
 @dataclass(frozen=True)
 class SSnapshot(SyntaxNode):
     who: Name
-    true: Name
     alias: Name
 
 Stmt = (
@@ -350,8 +349,8 @@ def pprint_stmt(s: Stmt) -> str:
             return f"given: {id} in {domain}"
         case SKnows(who, source_who, source_id):
             return f"{who}: knows({source_who}.{source_id})"
-        case SSnapshot(who, true, alias):
-            return f"{who}: snaps({alias}={true})"
+        case SSnapshot(who, alias):
+            return f"{who}: snaps({alias})"
     raise NotImplementedError(s)
 
 
@@ -1069,23 +1068,24 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 ctxt.frame.children[who].children[source_who].conditions[(Name("self"), source_id)] = (source_who, source_id)
             ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
 
-        case SSnapshot(who, true, alias):
+        case SSnapshot(who, alias):
             current_frame = ctxt.frame.children[who]
-            current_frame.ensure_child(true)
-            future_frame = copy.deepcopy(
-                current_frame if true == 'self' else current_frame.children[true]
-            )
+            future_frame = copy.deepcopy(current_frame)
             fresh_lls(ctxt, future_frame)
             future_frame.name = alias
             future_frame.parent = current_frame
             current_frame.children[alias] = future_frame
-            for k in future_frame.conditions.keys():
-                future_frame.conditions[k] = k
-            for name, id in list(current_frame.choices.keys()):
-                if name != true:
-                    continue
-                current_frame.choices[alias, id] = copy.deepcopy(current_frame.choices[name, id])
-                current_frame.conditions[alias, id] = (who if true == 'self' else true, id)
+
+            # alice should be able to deal with all of the choices in future_alice's frame
+            for name, id in list(future_frame.choices.keys()):
+                if name == 'self':
+                    # alice should know about future_alice's own choices
+                    current_frame.choices[alias, id] = copy.deepcopy(future_frame.choices[name, id])
+                    # alice[future_alice.x]  -->  alice.x
+                    current_frame.conditions[alias, id] = (who, id)
+                else:
+                    # map everything else back to alice's own version of that
+                    future_frame.conditions[name, id] = (name, id)
 
         case _:
             raise NotImplementedError
