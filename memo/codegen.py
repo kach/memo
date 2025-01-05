@@ -214,13 +214,13 @@ def memo(f=None, **kwargs):  # type: ignore
         return lambda f: memo_(f, **kwargs)  # type: ignore
     return memo_(f, **kwargs)  # type: ignore
 
-def memo_test(mod, expect='pass', *args, **kwargs):
-    def helper(f):
+def memo_test(mod, expect='pass', *args, **kwargs):  # type: ignore
+    def helper(f):  # type: ignore
         name = f.__name__
         outcome = None
-        err = None
+        err: BaseException
         try:
-            memo(f, install_module=mod.install, **kwargs)
+            memo(f, install_module=mod.install, **kwargs)  # type: ignore
             f = mod.__getattribute__(name)
             f(*args)
         except MemoError as e:
@@ -232,9 +232,9 @@ def memo_test(mod, expect='pass', *args, **kwargs):
         else:
             outcome = 'pass'
         if expect == outcome:
-            print(f'[pass {name}]')
+            print(f'[ pass {name} ]')
             return f
         else:
-            print(f'[fail {name}, {outcome} != {expect}]')
+            print(f'[!fail {name}, {outcome} != {expect} ]')
             raise err
     return helper
