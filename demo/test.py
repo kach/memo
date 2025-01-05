@@ -44,7 +44,7 @@ def inline_memo[x: X]():
     return test_[x]({N})
 
 @memo_test(mod)
-def imagine_unknown_err():
+def imagine_ok():
     return alice[
         imagine[
             bob: chooses(y in X, wpp=1),
@@ -78,3 +78,39 @@ def imagine_unknown_err_expect_future():
             future_alice.y
         ]]
     ]
+
+@memo_test(mod)
+def imagine_knows():
+    alice: chooses(x in X, wpp=1)
+    return E[alice[
+        imagine[
+            world: knows(x),
+            world.x
+        ]
+    ]]
+
+@memo_test(mod)
+def imagine_knows_other[z: X]():
+    alice: chooses(x in X, wpp=1)
+    alice: thinks[ bob: chooses(z in X, wpp=1) ]
+    alice: observes [bob.z] is z
+    return alice[
+        imagine[
+            world: knows(bob.z),
+            world[bob.z]
+        ]
+    ]
+
+@memo_test(mod)
+def imagine_future_stress():
+    alice: chooses(x in X, wpp=1)
+    return E[alice[
+        imagine[
+            world: knows(x),
+            world: chooses(z in X, wpp=1),
+            future_alice: chooses(y in X, wpp=x + y),
+            future_alice: thinks[ world: chooses(z in X, wpp=1) ],
+            future_alice: observes [world.z] is world.z,
+            E[future_alice.y + future_alice[world.z + y] + world.z]
+        ]
+    ]]

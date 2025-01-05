@@ -802,35 +802,17 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
         case EImagine(do, then):
             ctxt.emit(f"# {ctxt.frame.name} imagines")
 
-            future_name = Name(f"future_{ctxt.frame.name}")
+            who = ctxt.frame.name
+
+            if ctxt.frame.parent is not None:
+                ctxt.frame = ctxt.frame.parent
+                eval_stmt(SSnapshot(who, Name(f'future_{who}'), loc=e.loc), ctxt)
+                ctxt.frame = ctxt.frame.children[who]
+
             old_frame = ctxt.frame
-            old_frame.children[future_name] = Frame(
-                name=future_name,
-                parent=old_frame
-            )
-            # this copy is for the "scratchpad"
             current_frame_copy = copy.deepcopy(ctxt.frame)
+            current_frame_copy.name = Name(f'imagined_{who}')
             fresh_lls(ctxt, current_frame_copy)
-
-            # this copy is for the "inner" frame, representing the future self
-            future_frame = copy.deepcopy(current_frame_copy)
-            fresh_lls(ctxt, future_frame)
-            future_frame.name = future_name
-            future_frame.parent = current_frame_copy
-            current_frame_copy.children[future_name] = future_frame
-            # needed so that future_alice deps get correctly translated by EWith
-            for k in future_frame.conditions.keys():
-                future_frame.conditions[k] = k
-
-            # alice should know all of future_alice's own choices
-            for name, id in list(current_frame_copy.choices.keys()):
-                if name != 'self':
-                    continue
-                current_frame_copy.choices[future_name, id] = copy.deepcopy(current_frame_copy.choices[name, id])
-                current_frame_copy.conditions[future_name, id] = (name, id)
-
-                # TODO: is this necessary?
-                old_frame.conditions[future_name, id] = (name, id)
 
             ctxt.frame = current_frame_copy
             for stmt in do:
@@ -839,31 +821,24 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             if not val_.known:
                 raise MemoError(
                     'trying to imagine an unknown value',
-                    hint=f"In this hypothetical imagined world, {ctxt.frame.name} won't be able to compute the return value you requested. Perhaps you meant to wrap it in E[...]?",
+                    hint=f"In this hypothetical imagined world, {who} won't be able to compute the return value you requested. Perhaps you meant to wrap the return value in E[...]?",
                     user=True,
                     ctxt=ctxt,
                     loc=e.then.loc
                 )
 
-            # We only want to "translate" choices made by future self.
-            # There must be a better way of doing this as well.
-            new_deps = {
-                ctxt.frame.conditions.get(d, d) if d[0] == future_name else d
-                for d in val_.deps
-            }
-            # ic(new_deps)
-            val_ = Value(  ## ??
-                tag=val_.tag,
-                known=val_.known,
-                deps=new_deps
-            )
-
-            # if we do something like env.knows(a) within imagine, then
-            # we need some way of "translating" that knowledge back into
-            # the outside world. this is hack, not very robust because it
-            # wouldn't survive multiple consecutive imagine statements, etc.
-            for d in current_frame_copy.conditions.keys():
-                old_frame.conditions[d] = current_frame_copy.conditions[d]
+            new_deps = set()
+            for dep in val_.deps:
+                if dep in old_frame.choices:
+                    new_deps.add(dep)
+                    continue
+                if dep in current_frame_copy.conditions:
+                    # deal with env: knows(a) scenario
+                    if current_frame_copy.conditions[dep][0] == current_frame_copy.name:
+                        new_deps.add((Name('self'), current_frame_copy.conditions[dep][1]))
+                        continue
+                assert False  ## something bad has happened
+            val_ = dataclasses.replace(val_, deps=new_deps)
 
             ctxt.frame = old_frame
             return val_
