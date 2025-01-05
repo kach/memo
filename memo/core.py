@@ -836,7 +836,14 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             for stmt in do:
                 eval_stmt(stmt, ctxt)
             val_ = eval_expr(then, ctxt)
-            # assert val_.known  # TODO: error message? not sure if needed...
+            if not val_.known:
+                raise MemoError(
+                    'trying to imagine an unknown value',
+                    hint=f"In this hypothetical imagined world, {ctxt.frame.name} won't be able to compute the return value you requested. Perhaps you meant to wrap it in E[...]?",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=e.then.loc
+                )
 
             # We only want to "translate" choices made by future self.
             # There must be a better way of doing this as well.
