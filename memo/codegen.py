@@ -213,3 +213,28 @@ def memo(f=None, **kwargs):  # type: ignore
     if f is None:
         return lambda f: memo_(f, **kwargs)  # type: ignore
     return memo_(f, **kwargs)  # type: ignore
+
+def memo_test(mod, expect='pass', *args, **kwargs):
+    def helper(f):
+        name = f.__name__
+        outcome = None
+        err = None
+        try:
+            memo(f, install_module=mod.install, **kwargs)
+            f = mod.__getattribute__(name)
+            f(*args)
+        except MemoError as e:
+            outcome = 'ce'
+            err = e
+        except Exception as e:
+            outcome = 're'
+            err = e
+        else:
+            outcome = 'pass'
+        if expect == outcome:
+            print(f'[pass {name}]')
+            return f
+        else:
+            print(f'[fail {name}, {outcome} != {expect}]')
+            raise err
+    return helper
