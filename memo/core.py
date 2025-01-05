@@ -862,8 +862,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             return val_
 
         case EInline(val=val):
-            tag = ctxt.sym("inline")
-            ctxt.emit(f'{tag} = {val}')
+            with ctxt.hoist():
+                tag = ctxt.sym("inline")
+                ctxt.emit(f'{tag} = {val}')
             return Value(
                 tag=tag,
                 known=True,
