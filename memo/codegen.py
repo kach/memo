@@ -191,7 +191,7 @@ In that frame, {e.ctxt.frame.name} is currently modeling the following {len(e.ct
 
 import sys, traceback
 old_excepthook = sys.excepthook
-def new_excepthook(typ, val, tb):
+def new_excepthook(typ, val, tb):  # type: ignore
     if typ is MemoError:
         return traceback.print_exception(val, limit=0)
     old_excepthook(typ, val, tb)
@@ -200,7 +200,7 @@ sys.excepthook = new_excepthook
 try:
     ipython = get_ipython()  # type: ignore
     old_showtraceback = ipython.showtraceback
-    def new_showtraceback(*args, **kwargs):
+    def new_showtraceback(*args, **kwargs):  # type: ignore
         info = sys.exc_info()
         if info[0] is MemoError:
             return traceback.print_exception(info[1], limit=0)
