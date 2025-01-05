@@ -104,13 +104,21 @@ def imagine_knows_other[z: X]():
 @memo_test(mod)
 def imagine_future_stress():
     alice: chooses(x in X, wpp=1)
+    alice: thinks[ bob: chooses(z in X, wpp=1) ]
     return E[alice[
         imagine[
-            world: knows(x),
+            world: knows(x, bob.z),
             world: chooses(z in X, wpp=1),
             future_alice: chooses(y in X, wpp=x + y),
             future_alice: thinks[ world: chooses(z in X, wpp=1) ],
             future_alice: observes [world.z] is world.z,
-            E[future_alice.y + future_alice[world.z + y] + world.z]
+            E[future_alice.y + future_alice[world.z + y] + world.z + world[bob.z]]
         ]
     ]]
+
+@memo_test(mod)
+def imagine_toplevel():
+    return imagine[
+        alice: chooses(x in X, wpp=1),
+        E[alice.x]
+    ]
