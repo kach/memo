@@ -23,6 +23,25 @@ def observes_call[x: X]():
     return a[ b[ test_[x](0) ] ]
 
 @memo_test(mod)
+def observes_other():
+    alice: thinks[ bob: chooses(x in X, wpp=1) ]
+    charlie: chooses(x in X, wpp=1)
+    alice: observes [bob.x] is charlie.x
+    return E[alice[bob.x]]
+
+@memo_test(mod)
+def observes_other_imagine():
+    alice: thinks[ bob: chooses(x in X, wpp=1) ]
+    charlie: chooses(x in X, wpp=1)
+    alice: observes [bob.x] is charlie.x
+    return E[alice[
+        imagine[
+            env: knows(bob.x),
+            bob.x + 1
+        ]
+    ]]
+
+@memo_test(mod)
 def imagine_ok():
     return alice[
         imagine[
