@@ -380,7 +380,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             return stmts
 
         case ast.Call(
-            func=ast.Name(id="snapshots"),
+            func=ast.Name(id="snaps"),
             args=[],
             keywords=kw
         ):

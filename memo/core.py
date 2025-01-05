@@ -1071,6 +1071,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
 
         case SSnapshot(who, true, alias):
             current_frame = ctxt.frame.children[who]
+            current_frame.ensure_child(true)
             future_frame = copy.deepcopy(
                 current_frame if true == 'self' else current_frame.children[true]
             )
