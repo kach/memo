@@ -86,12 +86,12 @@ if return_cost:
         ctxt.emit(f"if print_table: pprint_table(_out_{f_name}, _out_)")
         ctxt.emit(f"if return_pandas: aux.pandas = make_pandas_data(_out_{f_name}, _out_)")
         ctxt.emit(f"if return_xarray: aux.xarray = make_xarray_data(_out_{f_name}, _out_)")
-        ctxt.emit(f"""return (_out_, aux) if return_aux else _out_""")
+        ctxt.emit(f"""return memo_result(data=_out_, aux=aux) if return_aux else _out_""")
     ctxt.emit(f"return {val.tag}")
 
     out = f"""\
 def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo, pprint_table, make_pandas_data, make_xarray_data
+    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo, memo_result, pprint_table, make_pandas_data, make_xarray_data
     from functools import cache
 
     @jax.jit
