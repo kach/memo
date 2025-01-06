@@ -141,3 +141,20 @@ def imagine_toplevel():
         alice: chooses(x in X, wpp=1),
         E[alice.x]
     ]
+
+mod.install('''
+@jax.jit
+def returns_nonscalar0():
+    return np.array([0, 1])
+@jax.jit
+def returns_nonscalar1(x):
+    return np.array([0, 1])
+''')
+
+@memo_test(mod, expect='ce')
+def ffi_scalar0():
+    return returns_nonscalar0()
+
+@memo_test(mod, expect='ce')
+def ffi_scalar1():
+    return returns_nonscalar1(1.0)

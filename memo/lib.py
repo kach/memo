@@ -24,21 +24,28 @@ def pad(t, total):
     return t
 
 def ffi(f, *args):
-    if len(args) == 0:
-        return f()
-    args = jax.numpy.broadcast_arrays(*args)
-    target_shape = args[0].shape
-    args = [arg.reshape(-1) for arg in args]
-    if isinstance(f, jax.lib.xla_extension.PjitFunction):
-        return jax.vmap(f)(*args).reshape(target_shape)
-    else:
+    if jax.eval_shape(f, *[jax.ShapeDtypeStruct((), jnp.int32) for z in args]).shape != ():
         raise MemoError(
-            f"Tried to call non-JAX function `{f.__name__}`. Use @jax.jit to mark as JAX.",
-            hint=f"You tried to call {f}, which is not decorated with @jax.jit.",
+            f"The function {f.__name__}(...) is not scalar-in-scalar-out. memo can only handle external (@jax.jit) functions that take scalars as input and return a single scalar as output.",
+            hint=None,
             user=True,
             ctxt=None,
             loc=None
         )
+    if len(args) == 0:
+        return f()
+    if not isinstance(f, jax.lib.xla_extension.PjitFunction):
+        raise MemoError(
+            f"Tried to call non-JAX function `{f.__name__}`. Use @jax.jit to mark as JAX.",
+            hint=None,
+            user=True,
+            ctxt=None,
+            loc=None
+        )
+    args = jax.numpy.broadcast_arrays(*args)
+    target_shape = args[0].shape
+    args = [arg.reshape(-1) for arg in args]
+    return jax.vmap(f)(*args).reshape(target_shape)
 
 def check_domains(tgt, src):  # TODO make this nicer
     if len(tgt) > len(src):
