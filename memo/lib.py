@@ -35,8 +35,6 @@ def ffi(f, *args):
             ctxt=None,
             loc=None
         )
-    if len(args) == 0:
-        return f()
     if not isinstance(f, jax.lib.xla_extension.PjitFunction):
         raise MemoError(
             f"Tried to call non-JAX function `{f.__name__}`. Use @jax.jit to mark as JAX.",
@@ -45,6 +43,8 @@ def ffi(f, *args):
             ctxt=None,
             loc=None
         )
+    if len(args) == 0:
+        return f()
     args = jax.numpy.broadcast_arrays(*args)
     target_shape = args[0].shape
     args = [arg.reshape(-1) for arg in args]
