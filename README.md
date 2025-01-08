@@ -17,13 +17,29 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 
 ## Getting started
 
-Once you have installed memo, take a look at the [Memonomicon](./demo/Memonomicon.ipynb) for a tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent. You can also watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material. The [Handbook](./Handbook.pdf) provides quick reference for memo's syntactic constructs (but is not a tutorial).
-
-This repository also includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
+There are now many resources for learning memo.
+1. The [Memonomicon](./demo/Memonomicon.ipynb) gives a brief tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent.
+2. You can also watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material.
+3. The [Handbook](./Handbook.pdf) provides quick reference for memo's syntactic constructs (but is not a tutorial).
+4. This repository includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
 
 For background on the theory of decision making under uncertainty, e.g. MDPs and POMDPs, we recommending consulting _Decision Making Under Uncertainty_ as a reference. You can read the entire book for free online [here](https://algorithmsbook.com/decisionmaking/).
 
 For background on Bayesian models of theory of mind, we recommend consulting chapter 14 of _Bayesian Models of Cognition_ as a reference. You can read the published version [here](https://mitpress.ublish.com/ebook/bayesian-models-of-cognition-reverse-engineering-the-mind-preview/12799/341) and a PDF preprint [here](https://www.tomerullman.org/papers/BBB_chapter14.pdf).
+
+## The memo on memo
+
+An early draft of a paper on memo is available [here](https://cs.stanford.edu/~kach/memo-on-memo.pdf). If you use memo in your work, you are invited to cite this paper:
+
+```bibtex
+@article{chandra2025memo,
+  title={A Domain-Specific Probabilistic Programming Language for Reasoning About Reasoning (or: a memo on memo)},
+  year={2025},
+  author={Kartik Chandra and Tony Chen and Joshua B. Tenenbaum and Jonathan Ragan-Kelley}
+}
+```
+
+I would love to hear about any research using memo. Please don't hesitate to share your work with me!
 
 ## FAQ
 
