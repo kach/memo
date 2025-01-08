@@ -1,27 +1,25 @@
 ![memo's logo](./assets/logo.png)
 
-memo is a new probabilistic programming language for expressing computational cognitive models involving **recursive reasoning about reasoning**, and for performing **fast enumerative inference** on such models. memo inherits from the tradition of WebPPL-based Bayesian modeling (see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities (including GPUs!). As a result, models are often significantly simpler to express (we've seen codebases shrink by a **factor of 3x or more**), and dramatically faster to execute and fit to data (we've seen **speedups of 3,000x or more**).
+memo is a probabilistic programming language for expressing computational cognitive models involving **recursive reasoning about reasoning**. memo inherits from the tradition of WebPPL-based Bayesian modeling (see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities (including GPUs!). As a result, models are often significantly simpler to express (we've seen codebases shrink by a **factor of 3x or more**), and dramatically faster to execute and fit to data (we've seen **speedups of 3,000x or more**).
 
 memo stands for: mental modeling, memoized matrix operations, model-expressed-model-optimized, and metacognitive memos.
 
-> [!NOTE]
-> For updates on memo's development, we encourage you to subscribe to our low-traffic monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).
+For updates on memo's development, we strongly encourage you to subscribe to our low-traffic monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).
 
 ## Installing memo
 
 1. memo is based on Python. Before installing memo, make sure you have Python 3.12 or higher installed. You can check this by running `python --version`.
 2. Next, install [JAX](https://github.com/google/jax), a Python module that memo uses to produce fast, differentiable, GPU-enabled code. If you don't have a GPU, then running `pip install jax` should be enough. Otherwise, please consult the JAX website for installation instructions. You can check if JAX is installed by running `import jax` in Python.
-3. Finally, install memo by running `pip install memo-lang`. You can check if memo is installed by running `from memo import memo` in Python.
-> [!WARNING]
-> Make sure to install `memo-lang`, not `memo`. The latter is a different package, unrelated to this project!
+3. Finally, install memo by running `pip install memo-lang`. You can check if memo is installed by running `from memo import memo` in Python. (Make sure to install `memo-lang`, not `memo`! The latter is a different package, unrelated to this project.)
 
-## Getting started
+## Learning memo
 
-There are now many resources for learning memo.
+There are many resources available for learning memo.
 1. The [Memonomicon](./demo/Memonomicon.ipynb) gives a brief tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent.
 2. You can also watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material.
 3. The [Handbook](./Handbook.pdf) is a complete reference for memo's syntactic constructs.
 4. This repository includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
+5. I am happy to give a short tutorial on memo in your lab. Just email me to ask!
 
 You may also be looking for general resources on the theory behind memo modeling.
 1. For background on the theory of decision making under uncertainty, e.g. MDPs and POMDPs, we recommending consulting _Decision Making Under Uncertainty_ as a reference. You can read the entire book for free online [here](https://algorithmsbook.com/decisionmaking/).
@@ -30,7 +28,7 @@ You may also be looking for general resources on the theory behind memo modeling
 
 ## The memo on memo
 
-An early draft of a paper on memo is available [here](https://cs.stanford.edu/~kach/memo-on-memo.pdf). If you use memo in your work, you are invited to cite this paper:
+An early draft of a paper on memo's design and implementation is available [here](https://cs.stanford.edu/~kach/memo-on-memo.pdf). If you use memo in your work, you are invited to cite this paper:
 
 ```bibtex
 @article{chandra2025memo,
