@@ -28,13 +28,15 @@ You may also be looking for general resources on the theory behind memo modeling
 
 ## The memo on memo
 
-An early draft of a paper on memo's design and implementation is available [here](https://cs.stanford.edu/~kach/memo-on-memo.pdf). If you use memo in your work, you are invited to cite this paper:
+An early draft of a paper on memo's design and implementation is available [here](https://osf.io/preprints/psyarxiv/pt863). If you use memo in your work, you are invited to cite this paper:
 
 ```bibtex
 @article{chandra2025memo,
   title={A Domain-Specific Probabilistic Programming Language for Reasoning About Reasoning (or: a memo on memo)},
   year={2025},
-  author={Kartik Chandra and Tony Chen and Joshua B. Tenenbaum and Jonathan Ragan-Kelley}
+  author={Kartik Chandra and Tony Chen and Joshua B. Tenenbaum and Jonathan Ragan-Kelley},
+  journal={psyarxiv preprint},
+  url={https://doi.org/10.31234/osf.io/pt863}
 }
 ```
 
