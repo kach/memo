@@ -85,6 +85,11 @@ The common cause of this is that you have a modern Mac (with an ARM processor), 
 6. Install memo via `pip install memo-lang`.
 </details>
 
+<details><summary>How do I use memo with a GPU?</summary>
+
+Assuming you have [installed JAX with GPU support](https://jax.readthedocs.io/en/latest/installation.html), all you have to do is plug in your GPU!
+</details>
+
 <details><summary>Can I run memo on Apple's "metal" platform?</summary>
 
 Yes! See this issue for details: https://github.com/kach/memo/issues/66
