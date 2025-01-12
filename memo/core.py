@@ -106,6 +106,7 @@ Op = Enum(
         "MUL",
         "DIV",
         "POW",
+        "MOD",
         "EQ",
         "NEQ",
         "LT",
@@ -370,6 +371,8 @@ def pprint_expr(e: Expr) -> str:
                     return f"({pprint_expr(args[0])} / {pprint_expr(args[1])})"
                 case Op.POW:
                     return f"({pprint_expr(args[0])} ** {pprint_expr(args[1])})"
+                case Op.MOD:
+                    return f"({pprint_expr(args[0])} % {pprint_expr(args[1])})"
                 case Op.EQ:
                     return f"({pprint_expr(args[0])} == {pprint_expr(args[1])})"
                 case Op.NEQ:
@@ -595,6 +598,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 Op.MUL,
                 Op.DIV,
                 Op.POW,
+                Op.MOD,
                 Op.EQ,
                 Op.NEQ,
                 Op.LT,
@@ -621,6 +625,8 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                             ctxt.emit(f"{out} = {l.tag} / {r.tag}")
                         case Op.POW:
                             ctxt.emit(f"{out} = {l.tag} ** {r.tag}")
+                        case Op.MOD:
+                            ctxt.emit(f"{out} = {l.tag} % {r.tag}")
                         case Op.EQ:
                             ctxt.emit(f"{out} = {l.tag} == {r.tag}")
                         case Op.NEQ:
