@@ -44,6 +44,11 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 
 ## FAQ
 
+<details><summary>How do I capitalize memo? Is it Memo? MEMO? MeMo?</summary>
+
+"memo," all-lowercase.
+</details>
+
 <details><summary>When should I use memo rather than Gen or WebPPL?</summary>
 
 memo's core competence is fast tabular/enumerative inference on models with recursive reasoning about reasoning. That covers a wide range of common models: from RSA, to POMDP planning (value iteration = tabular operations), to inverse planning. In general, if you are making nested queries, we recommend using memo.
