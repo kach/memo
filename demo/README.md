@@ -26,6 +26,7 @@
 - [Perturbation confusion](./demo-pc.ipynb) (discussed in paper)
 - [I-POMDP (investment game)](./demo-i-pomdp.ipynb)
   (agents reason about their uncertainty about each other)
+- [Sally-Anne (false belief test)](./demo-sally-anne.ipynb)
 
 ## Information theoretic calculations
 
