@@ -232,6 +232,10 @@ class SShow(SyntaxNode):
     source_who: Name
     source_id: Id
 
+@dataclass(frozen=True)
+class SObserves(SyntaxNode):
+    who: Name
+    what: Expr
 
 @dataclass(frozen=True)
 class SForAll(SyntaxNode):
@@ -254,6 +258,7 @@ Stmt = (
     SPass
     | SChoose
     | SObserve
+    | SObserves  # TODO we need to change this name...
     | SWith
     | SShow
     | SForAll
@@ -978,6 +983,24 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             ctxt.emit(
                 f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
             )
+
+        case SObserves(who, what):
+            ctxt.frame.ensure_child(who)
+            old_frame = ctxt.frame
+            ctxt.frame = ctxt.frame.children[who]
+            if ctxt.frame.ll is None:
+                ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
+                ctxt.emit(f"{ctxt.frame.ll} = 1.0")
+            what_val = eval_expr(what, ctxt)
+            ctxt.emit(f"""# {ctxt.frame.name} factors""")
+            ctxt.emit(
+                f"""{ctxt.frame.ll} = {ctxt.frame.ll} * {what_val.tag}"""
+            )
+            idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
+            ctxt.emit(
+                f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
+            )
+            ctxt.frame = old_frame
 
         case SWith(who, stmt):  # TODO: this could take many "who"s as input
             ctxt.frame.ensure_child(who)

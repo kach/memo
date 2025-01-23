@@ -173,3 +173,26 @@ def ffi_scalar0():
 @memo_test(mod, expect='ce')
 def ffi_scalar1():
     return returns_nonscalar1(1.0)
+
+@memo_test(mod)
+def observes_const():
+    alice: thinks[ bob: chooses(x in X, wpp=1) ]
+    alice: observes [bob.x == 0]
+    return alice[E[bob.x]]
+
+@memo_test(mod)
+def observes_const_float():
+    alice: thinks[ bob: chooses(x in X, wpp=1) ]
+    alice: observes [bob.x / 3]
+    return alice[E[bob.x]]
+
+@memo_test(mod)
+def observes_const_void_choose():
+    alice: chooses(x in X, wpp=1)
+    alice: observes [x / 3]
+    return E[alice.x]
+
+@memo_test(mod)
+def observes_const_void():
+    alice: observes [3.14]
+    return alice[2]

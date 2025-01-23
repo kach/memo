@@ -450,6 +450,12 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             ]
 
         case ast.Subscript(
+            value=ast.Name("observes"),
+            slice=e_
+        ):
+            return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), loc=loc)]
+
+        case ast.Subscript(
             value=ast.Name("thinks"), slice=ast.Slice(lower=ast.Name(who_), upper=expr_)
         ) if expr_ is not None:
             return [
