@@ -5,9 +5,48 @@ from .version import __version__
 import textwrap
 import os, sys, platform, inspect
 from io import StringIO
-from typing import Any, Optional, Callable
+from typing import Any, Optional, Literal, Protocol, overload, cast
+from collections.abc import Callable
 import warnings
 import linecache
+import jax
+
+type Array = jax._src.basearray.Array
+class MemoCompiled(Protocol):
+    @overload
+    def __call__(
+        self,
+        *args: float | Array,
+        return_aux: Literal[False] = ...,
+        return_pandas: bool = ...,
+        return_xarray: bool = ...,
+        return_cost: bool = ...,
+        print_table: bool = ...
+    ) -> Array:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: float | Array,
+        return_aux: Literal[True] = ...,
+        return_pandas: bool = ...,
+        return_xarray: bool = ...,
+        return_cost: bool = ...,
+        print_table: bool = ...
+    ) -> memo_result:
+        ...
+
+    def __call__(
+        self,
+        *args: float | Array,
+        return_aux: bool = False,
+        return_pandas: bool = False,
+        return_xarray: bool = False,
+        return_cost: bool = False,
+        print_table: bool = False
+    ) -> Array | memo_result:
+        ...
 
 def make_static_parameter_list(pctxt: ParsingContext) -> str:
     out = ''
@@ -28,7 +67,7 @@ def codegen(
     save_comic: Optional[str]=None,
     install_module: Optional[Callable[[str], Any]] = None,
     cache: bool = False
-) -> Any:
+) -> MemoCompiled:
     f_name = pctxt.loc_name
     ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
     ctxt.hoisted_syms.extend(pctxt.static_parameters)
@@ -138,14 +177,13 @@ def _make_{f_name}():
         warnings.warn(f"memo works best in the global (module) scope. Defining memos within function definitions is currently not officially supported, though if you know what you are doing then go ahead and do it!")
     if install_module is not None:
         ret = install_module(out)[f"{f_name}"]
-        return None #ret
+        return cast(MemoCompiled, lambda _: print("Call me from inside the module!"))
 
     retvals: dict[Any, Any] = {}
     exec(out, globals_of_caller, retvals)
-    return retvals[f"{f_name}"]
+    return cast(MemoCompiled, retvals[f"{f_name}"])
 
-
-def memo_(f, **kwargs):  # type: ignore
+def memo_(f: Callable[..., Any], **kwargs: Any) -> MemoCompiled:
     try:
         pctxt, stmts, retval = parse_memo(f)
         return codegen(pctxt, stmts, retval, **kwargs)
@@ -209,10 +247,18 @@ try:
 except NameError:
     pass
 
-def memo(f=None, **kwargs):  # type: ignore
+@overload
+def memo(f: None=None, **kwargs: Any) -> Callable[[Callable[..., Any]], MemoCompiled]:
+    ...
+
+@overload
+def memo(f: Callable[..., Any], **kwargs: Any) -> MemoCompiled:
+    ...
+
+def memo(f: None | Callable[..., Any] = None, **kwargs: Any) -> Callable[[Callable[..., Any]], MemoCompiled] | MemoCompiled:
     if f is None:
-        return lambda f: memo_(f, **kwargs)  # type: ignore
-    return memo_(f, **kwargs)  # type: ignore
+        return lambda f: memo_(f, **kwargs)
+    return memo_(f, **kwargs)
 
 def memo_test(mod, expect='pass', *args, **kwargs):  # type: ignore
     def helper(f):  # type: ignore
@@ -220,7 +266,7 @@ def memo_test(mod, expect='pass', *args, **kwargs):  # type: ignore
         outcome = None
         err: BaseException
         try:
-            memo(f, install_module=mod.install, **kwargs)  # type: ignore
+            memo(f, install_module=mod.install, **kwargs)
             f = mod.__getattribute__(name)
             f(*args)
         except MemoError as e:

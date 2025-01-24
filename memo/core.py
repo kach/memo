@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NewType, Any, Tuple, Literal, Iterator
+from typing import NewType, Any, Tuple, Literal, Iterator, NamedTuple
 
 from contextlib import contextmanager
 import itertools
@@ -13,11 +13,24 @@ from io import StringIO
 
 import warnings
 
+import jax
+
 try:
     from icecream import ic  # type: ignore
     ic.configureOutput(includeContext=True)
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
+@dataclass
+class AuxInfo:
+    cost: float | None = None
+    pandas: Any | None = None
+    xarray: Any | None = None
+
+class memo_result(NamedTuple):
+    data: jax._src.basearray.Array
+    aux: AuxInfo
 
 
 @dataclass(frozen=True)

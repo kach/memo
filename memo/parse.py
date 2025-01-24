@@ -501,9 +501,9 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             )
 
 
-def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
+def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr]:
     try:
-        rawsrc = inspect.getsource(f)
+        rawsrc = inspect.getsource(ff)
     except OSError:
         raise MemoError(
             "Python couldn't find your memo source code",
@@ -512,9 +512,9 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
             ctxt=None,
             loc=None
         )
-    src_file = inspect.getsourcefile(f)
+    src_file = inspect.getsourcefile(ff)
     assert src_file is not None
-    lines, lineno = inspect.getsourcelines(f)
+    lines, lineno = inspect.getsourcelines(ff)
 
     src = textwrap.dedent(rawsrc)  # borrowed from Exo's parser!
     lead_raw = re.match("^(.*)", rawsrc)
@@ -562,7 +562,7 @@ def parse_memo(f) -> tuple[ParsingContext, list[Stmt], Expr]:  # type: ignore
                 hint=None,
                 user=False,
                 ctxt=None,
-                loc=SourceLocation(src_file, f.lineno, f.col_offset, "??"),
+                loc=SourceLocation(src_file, tree.lineno, tree.col_offset, "??"),
             )
 
     pctxt = ParsingContext(

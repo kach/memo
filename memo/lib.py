@@ -2,18 +2,8 @@ import jax
 import jax.numpy as jnp
 import time
 from dataclasses import dataclass
-from typing import Any
-from collections import namedtuple
 
-from .core import MemoError
-
-@dataclass
-class AuxInfo:
-    cost: float | None = None
-    pandas: Any | None = None
-    xarray: Any | None = None
-
-memo_result = namedtuple('memo_result', 'data aux')
+from .core import MemoError, AuxInfo, memo_result
 
 def marg(t, dims):
     if dims == ():
