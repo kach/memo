@@ -7,28 +7,31 @@ from .version import __version__
 import textwrap
 import os, sys, platform, inspect
 from io import StringIO
-from typing import Any, Optional, Literal, Protocol, overload, cast
+from typing import Any, Optional, Literal, Protocol, overload, cast, TYPE_CHECKING
 from collections.abc import Callable
 import warnings
 import linecache
+
+if TYPE_CHECKING:
+    import jax
 
 class MemoCompiled(Protocol):
     @overload
     def __call__(
         self,
-        *args: float | Array,
+        *args: float | jax._src.basearray.Array,
         return_aux: Literal[False] = ...,
         return_pandas: bool = ...,
         return_xarray: bool = ...,
         return_cost: bool = ...,
         print_table: bool = ...
-    ) -> Array:
+    ) -> jax._src.basearray.Array:
         ...
 
     @overload
     def __call__(
         self,
-        *args: float | Array,
+        *args: float | jax._src.basearray.Array,
         return_aux: Literal[True] = ...,
         return_pandas: bool = ...,
         return_xarray: bool = ...,
@@ -39,13 +42,13 @@ class MemoCompiled(Protocol):
 
     def __call__(
         self,
-        *args: float | Array,
+        *args: float | jax._src.basearray.Array,
         return_aux: bool = False,
         return_pandas: bool = False,
         return_xarray: bool = False,
         return_cost: bool = False,
         print_table: bool = False
-    ) -> Array | memo_result:
+    ) -> jax._src.basearray.Array | memo_result:
         ...
 
 def make_static_parameter_list(pctxt: ParsingContext) -> str:
