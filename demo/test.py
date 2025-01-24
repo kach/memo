@@ -177,22 +177,22 @@ def ffi_scalar1():
 @memo_test(mod)
 def observes_const():
     alice: thinks[ bob: chooses(x in X, wpp=1) ]
-    alice: observes [bob.x == 0]
+    alice: observes_that [bob.x == 0]
     return alice[E[bob.x]]
 
 @memo_test(mod)
 def observes_const_float():
     alice: thinks[ bob: chooses(x in X, wpp=1) ]
-    alice: observes [bob.x / 3]
+    alice: observes_event(wpp=bob.x / 3)
     return alice[E[bob.x]]
 
 @memo_test(mod)
 def observes_const_void_choose():
     alice: chooses(x in X, wpp=1)
-    alice: observes [x / 3]
+    alice: observes_event(wpp=x / 3)
     return E[alice.x]
 
 @memo_test(mod)
 def observes_const_void():
-    alice: observes [3.14]
+    alice: observes_event(wpp=3.14)
     return alice[2]

@@ -50,7 +50,7 @@ def ffi(f, *args):
     args = [arg.reshape(-1) for arg in args]
     return jax.vmap(f)(*args).reshape(target_shape)
 
-def check_domains(tgt, src):  # TODO make this nicer
+def check_domains(tgt, src):
     if len(tgt) > len(src):
         raise Exception("Not enough arguments to memo call!")
     if len(src) > len(tgt):

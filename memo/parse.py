@@ -449,11 +449,29 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 )
             ]
 
-        case ast.Subscript(
-            value=ast.Name("observes"),
-            slice=e_
+        # case ast.Call(
+        #     func=ast.Name("observes_event"),
+        #     args=[e_],
+        #     keywords=[]
+        # ):
+        #     return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), how="boolean", loc=loc)]
+
+        case ast.Call(
+            func=ast.Name("observes_event"),
+            args=[],
+            keywords=[ast.keyword(arg="wpp", value=e_)]
         ):
-            return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), loc=loc)]
+            return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), how="probability", loc=loc)]
+
+        case ast.Subscript(
+            value=ast.Name("observes_that"),
+            slice=e_
+        ): return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), how="boolean", loc=loc)]
+
+        # case ast.Subscript(
+        #     value=ast.Name("observes_event_wp"),
+        #     slice=e_
+        # ): return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), how="probability", loc=loc)]
 
         case ast.Subscript(
             value=ast.Name("thinks"), slice=ast.Slice(lower=ast.Name(who_), upper=expr_)
