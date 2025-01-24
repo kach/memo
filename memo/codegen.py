@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .core import *
 from .parse import *
 from .version import __version__

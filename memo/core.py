@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import NewType, Any, Tuple, Literal, Iterator, NamedTuple, TYPE_CHECKING
 
 from contextlib import contextmanager
@@ -16,8 +17,6 @@ import warnings
 if TYPE_CHECKING:
     import jax
     type Array = jax._src.basearray.Array
-else:
-    type Array = NoneType
 
 try:
     from icecream import ic  # type: ignore
