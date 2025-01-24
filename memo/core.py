@@ -16,6 +16,8 @@ import warnings
 
 if TYPE_CHECKING:
     import jax
+    import pandas as pd
+    import xarray as xr
     type Array = jax._src.basearray.Array
 
 try:
@@ -27,8 +29,8 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 @dataclass
 class AuxInfo:
     cost: float | None = None
-    pandas: Any | None = None
-    xarray: Any | None = None
+    pandas: pd.DataFrame | None = None
+    xarray: xr.DataArray | None = None
 
 class memo_result(NamedTuple):
     data: Array
