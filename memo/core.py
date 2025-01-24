@@ -16,6 +16,8 @@ import warnings
 if TYPE_CHECKING:
     import jax
     type Array = jax._src.basearray.Array
+else:
+    type Array = NoneType
 
 try:
     from icecream import ic  # type: ignore
