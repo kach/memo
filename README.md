@@ -116,7 +116,7 @@ Yes! See this issue for details: https://github.com/kach/memo/issues/66
 
 <details><summary>VS Code underlines all my memo code in red. It's a bloodbath out there!</summary>
 
-If you write `# type: ignore` at the top of your file (even before the imports), then VS Code will suppress the red lines.
+If you write `# type: ignore` at the top of your file (even before the imports), then VS Code will suppress the red lines. If you use Ruff, additionally add `# ruff: noqa`.
 </details>
 
 <details><summary>Some of my output array's dimensions are unexpectedly of size 1.</summary>
