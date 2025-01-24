@@ -33,7 +33,7 @@ class AuxInfo:
     xarray: xr.DataArray | None = None
 
 class memo_result(NamedTuple):
-    data: jax._src.basearray.Array
+    data: jax.Array
     aux: AuxInfo
 
 
