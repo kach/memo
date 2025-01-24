@@ -9,9 +9,7 @@ from typing import Any, Optional, Literal, Protocol, overload, cast
 from collections.abc import Callable
 import warnings
 import linecache
-import jax
 
-type Array = jax._src.basearray.Array
 class MemoCompiled(Protocol):
     @overload
     def __call__(

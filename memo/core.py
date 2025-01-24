@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NewType, Any, Tuple, Literal, Iterator, NamedTuple
+from typing import NewType, Any, Tuple, Literal, Iterator, NamedTuple, TYPE_CHECKING
 
 from contextlib import contextmanager
 import itertools
@@ -13,14 +13,15 @@ from io import StringIO
 
 import warnings
 
-import jax
+if TYPE_CHECKING:
+    import jax
+    type Array = jax._src.basearray.Array
 
 try:
     from icecream import ic  # type: ignore
     ic.configureOutput(includeContext=True)
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
 
 @dataclass
 class AuxInfo:
@@ -29,7 +30,7 @@ class AuxInfo:
     xarray: Any | None = None
 
 class memo_result(NamedTuple):
-    data: jax._src.basearray.Array
+    data: Array
     aux: AuxInfo
 
 
