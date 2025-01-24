@@ -114,6 +114,11 @@ Yes! See this issue for details: https://github.com/kach/memo/issues/66
 
 ---
 
+<details><summary>VS Code underlines all my memo code in red. It's a bloodbath out there!</summary>
+
+If you write `# type: ignore` at the top of your file (even before the imports), then VS Code will suppress the red lines.
+</details>
+
 <details><summary>Some of my output array's dimensions are unexpectedly of size 1.</summary>
 
 memo attempts to minimize redundant computation. If the output of your model doesn't depend on an input axis, then instead of repeating the computation along that axis, memo will set that axis to size 1. The idea is that [broadcasting](https://numpy.org/doc/stable/user/basics.broadcasting.html) will keep the array compatible with downstream computations.
