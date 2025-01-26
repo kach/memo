@@ -302,7 +302,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
         case ast.Call(
-            func=ast.Name(id="chooses" | "given"),
+            func=ast.Name(id="chooses" | "given" | "draws" | "assigned"),
             args=[
                 ast.Compare(
                     left=ast.Name(id=choice_id),
