@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     import jax
     import pandas as pd
     import xarray as xr
-    type Array = jax._src.basearray.Array
 
 try:
     from icecream import ic  # type: ignore
