@@ -196,3 +196,9 @@ def observes_const_void_choose():
 def observes_const_void():
     alice: observes_event(wpp=3.14)
     return alice[2]
+
+@memo_test(mod)
+def pr_joint():
+    alice: chooses(x in X, wpp=1)
+    alice: chooses(y in X, wpp=1)
+    return Pr[alice.x == 0, alice.y == 0]

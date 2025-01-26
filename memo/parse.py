@@ -196,6 +196,19 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 return ELit(id, loc=loc, static=True)
             return EChoice(id=Id(id), loc=loc, static=False)
 
+        # joint probability
+        case ast.Subscript(value=ast.Name(id="Pr"), slice=ast.Tuple(elts=elts)):
+            rv_expr = parse_expr(elts[0], ctxt)
+            for elt in elts[1:]:
+                elt_ = parse_expr(elt, ctxt)
+                rv_expr = EOp(
+                    op=Op.AND,
+                    args=[rv_expr, elt_],
+                    loc=elt_.loc,
+                    static=rv_expr.static and elt_.static
+                )
+            return EExpect(expr=rv_expr, reduction="expectation", loc=loc, static=False)
+
         # expected value
         case ast.Subscript(value=ast.Name(id="E" | "Pr"), slice=rv_expr):
             assert not isinstance(rv_expr, ast.Slice)
