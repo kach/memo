@@ -325,36 +325,46 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             ],
             keywords=kw
         ):
-            kw_names = set(k.arg for k in kw)
-            if len(kw) == 2 and kw_names == {"wpp", "to_maximize"}:
+            reduction: Literal["normalize", "maximize"]
+            match kw:
+                case [ast.keyword(arg=reduction_name, value=wpp_expr)]:
+                    wpp_expr_ = parse_expr(wpp_expr, ctxt)
+                case _:
+                    raise MemoError(
+                        f"unknown argument(s) to chooses: {[k.arg for k in kw]}",
+                        hint="expected exactly one of: wpp, to_maximize, to_minimize",
+                        user=True,
+                        ctxt=None,
+                        loc=loc
+                    )
+
+            if reduction_name == 'wpp':
+                reduction = 'normalize'
+            elif reduction_name == 'to_maximize':
+                reduction = 'maximize'
+            elif reduction_name == 'to_minimize':
+                reduction = 'maximize'
+                wpp_expr_ = EOp(
+                    op=Op.NEG,
+                    args=[wpp_expr_],
+                    loc=wpp_expr_.loc,
+                    static=wpp_expr_.static
+                )
+            else:
                 raise MemoError(
-                    f"cannot have both `wpp` and `to_maximize` in a chooses/given statement",
-                    hint=f"please choose one or the other >:(",
+                    f"unknown argument(s) to chooses: {[k.arg for k in kw]}",
+                    hint="expected exactly one of: wpp, to_maximize, to_minimize",
                     user=True,
                     ctxt=None,
                     loc=loc
                 )
 
-            reduction: Literal["normalize", "maximize"]
-            match kw:
-                case [ast.keyword(arg="wpp", value=wpp_expr)]:
-                    reduction = "normalize"
-                case [ast.keyword(arg="to_maximize", value=wpp_expr)]:
-                    reduction = "maximize"
-                case _:
-                    raise MemoError(
-                        f"unknown argument(s) to chooses/given: {[k.arg for k in kw]}",
-                        hint=f"expected either `wpp` or `to_maximize`",
-                        user=True,
-                        ctxt=None,
-                        loc=loc
-                    )
             return [
                 SChoose(
                     who=Name(who),
                     id=Id(choice_id),
                     domain=Dom(dom_id),
-                    wpp=parse_expr(wpp_expr, ctxt),
+                    wpp=wpp_expr_,
                     loc=loc,
                     reduction=reduction
                 )
