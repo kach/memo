@@ -31,7 +31,7 @@ Issues = "http://github.com/kach/memo/issues"
 packages = ["memo"]
 
 [tool.setuptools.dynamic]
-version = {attr = "memo.__version__"}
+version = {attr = "memo.version.__version__"}
 
 [tool.mypy]
 strict = true
