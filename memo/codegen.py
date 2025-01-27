@@ -15,6 +15,9 @@ import linecache
 if TYPE_CHECKING:
     import jax
 
+from . import lib
+lib_dir = ', '.join([key for key in dir(lib) if not key.startswith('_')])
+
 class MemoCompiled(Protocol):
     @overload
     def __call__(
@@ -133,8 +136,7 @@ if return_cost:
 
     out = f"""\
 def _make_{f_name}():
-    from memo.lib import marg, pad, ffi, check_domains, jax, jnp, time, AuxInfo, memo_result, pprint_table, make_pandas_data, make_xarray_data
-    from functools import cache
+    from memo.lib import {lib_dir}
 
     @jax.jit
     def _jit_{f_name}({", ".join(ctxt.hoisted_syms)}):
@@ -183,6 +185,7 @@ def _make_{f_name}():
         return cast(MemoCompiled, lambda _: print("Call me from inside the module!"))
 
     retvals: dict[Any, Any] = {}
+
     exec(out, globals_of_caller, retvals)
     return cast(MemoCompiled, retvals[f"{f_name}"])
 

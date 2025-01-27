@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 import time
-from dataclasses import dataclass
+from functools import cache
 
 from .core import MemoError, AuxInfo, memo_result
 
@@ -9,6 +9,11 @@ def marg(t, dims):
     if dims == ():
         return t
     return t.sum(axis=tuple(-1 - d for d in dims), keepdims=True)
+
+def maxx(t, dims):
+    if dims == ():
+        return t
+    return jnp.max(t, axis=tuple(-1 - d for d in dims), keepdims=True)
 
 def pad(t, total):
     count = total - len(t.shape)
