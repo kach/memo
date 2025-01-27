@@ -208,3 +208,18 @@ def pr_joint():
 def choose_many():
     alice: chooses(x in X, y in Y, wpp=1)
     return Pr[alice.x == 0, alice.y == 0]
+
+@memo_test(mod)
+def choose_max():
+    alice: chooses(x in X, y in Y, to_maximize=x + y)
+    return Pr[alice.x == 0, alice.y == 0]
+
+@memo_test(mod)
+def choose_min():
+    alice: chooses(x in X, y in Y, to_minimize=x + y)
+    return Pr[alice.x == 0, alice.y == 0]
+
+@memo_test(mod, expect='ce')
+def choose_err():
+    alice: chooses(x in X, y in Y, to_eat=x + y)
+    return Pr[alice.x == 0, alice.y == 0]
