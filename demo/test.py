@@ -5,6 +5,7 @@ mod.install('''
 import jax
 import jax.numpy as np
 X = np.arange(3)
+Y = np.arange(3)
 N = 5
 
 @jax.jit
@@ -201,4 +202,9 @@ def observes_const_void():
 def pr_joint():
     alice: chooses(x in X, wpp=1)
     alice: chooses(y in X, wpp=1)
+    return Pr[alice.x == 0, alice.y == 0]
+
+@memo_test(mod)
+def choose_many():
+    alice: chooses(x in X, y in Y, wpp=1)
     return Pr[alice.x == 0, alice.y == 0]

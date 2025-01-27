@@ -222,8 +222,7 @@ class SPass(SyntaxNode):
 @dataclass(frozen=True)
 class SChoose(SyntaxNode):
     who: Name
-    id: Id
-    domain: Dom
+    choices: list[tuple[Id, Dom]]
     wpp: Expr
     reduction: Literal["normalize", "maximize"]
 
@@ -353,12 +352,12 @@ def pprint_stmt(s: Stmt) -> str:
     match s:
         case SPass():
             return f""
-        case SChoose(who, id, dom, wpp):
+        case SChoose(who, choices, wpp):
             wpp_str = pprint_expr(wpp)
             if len(wpp_str) > 10:
                 wpp_str = "\n" + textwrap.indent(wpp_str, "  ")
             reduction_str = "wpp" if s.reduction == "normalize" else "to_maximize"
-            return f"{who}: chooses({id} in {dom}, {reduction_str}={wpp_str})"
+            return f"{who}: chooses(..., {reduction_str}={wpp_str})"
         case SObserve(who, id):
             return f"observe {who}.{id}"
         case SWith(who, stmt):
@@ -910,35 +909,42 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             )
             ctxt.forall_idxs.append((idx, id, domain))
 
-        case SChoose(who, id, domain, wpp):
+        case SChoose(who, choices, wpp):
             ctxt.frame.ensure_child(who)
-            idx = ctxt.next_idx
-            ctxt.next_idx += 1
-            tag = ctxt.sym(f"{who}_{id}")
-            ctxt.emit(f"""# {who} choose {id}""")
-            ctxt.emit(
-                f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
-            )
 
             # briefly enter child's frame
             child_frame = ctxt.frame.children[who]
             old_frame = ctxt.frame
             ctxt.frame = child_frame
-            ctxt.frame.choices[(Name("self"), id)] = Choice(
-                tag, idx, True, domain, set()
-            )
-            wpp_val = eval_expr(wpp, ctxt)
-            if not wpp_val.known:
-                raise MemoError(
-                    "Choice based on uncertain expression",
-                    hint=f"{who} is uncertain about the value of the expression (wpp/to_maximize) that {who} is using to choose {id}. Hence, {who} cannot compute the probabilities needed to make the choice. Perhaps you meant to take an expected value somewhere, using E[...]?",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=s.loc
+
+            idx_list = []
+            for id, dom in choices:
+                idx = ctxt.next_idx
+                ctxt.next_idx += 1
+                idx_list.append(idx)
+                tag = ctxt.sym(f"{who}_{id}")
+                ctxt.emit(f"""# {who} choose {id}""")
+                ctxt.emit(
+                    f"{tag} = jnp.array({dom}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
                 )
-            if (Name("self"), id) not in wpp_val.deps and not isinstance(wpp, ELit):
-                warnings.warn(f"When {who} chooses {id}, the probability doesn't depend on the value of {id}, and is thus the same for all values of {id}. As a result, the choice will effectively be uniform after normalization. Are you sure this is what you want? (A uniform choice is more easily expressed with wpp=1.)")
-            ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
+
+                ctxt.frame.choices[(Name("self"), id)] = Choice(
+                    tag, idx, True, dom, set()
+                )
+            wpp_val = eval_expr(wpp, ctxt)
+
+            for id, dom in choices:
+                if not wpp_val.known:
+                    raise MemoError(
+                        "Choice based on uncertain expression",
+                        hint=f"{who} is uncertain about the value of the expression (wpp/to_maximize) that {who} is using to choose {id}. Hence, {who} cannot compute the probabilities needed to make the choice. Perhaps you meant to take an expected value somewhere, using E[...]?",
+                        user=True,
+                        ctxt=ctxt,
+                        loc=s.loc
+                    )
+                if (Name("self"), id) not in wpp_val.deps and not isinstance(wpp, ELit):
+                    warnings.warn(f"When {who} chooses {id}, the probability doesn't depend on the value of {id}. As a result, the choice will effectively be uniform over {id} after normalization. Are you sure this is what you want? (A uniform choice is more easily expressed with wpp=1.)")
+                ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
             ctxt.frame = old_frame
 
             new_deps = set()
@@ -950,21 +956,19 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 else:
                     ic(child_frame.name, child_frame.conditions)
                     assert False, f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}"
-            ctxt.frame.choices[(who, id)] = Choice(tag, idx, False, domain, new_deps)
-            id_ll = ctxt.sym(f"{id}_ll")
-            ctxt.emit(
-                f"{id_ll} = jnp.ones_like({tag}, dtype=jnp.float32) * {wpp_val.tag}"
-            )
-            if s.reduction == "normalize":
-                ctxt.emit(
-                    f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, ({idx},)))"
-                )
-            elif s.reduction == "maximize":
-                argmax_tag = ctxt.sym(f"{id}_argmax")
-                ctxt.emit(f"{argmax_tag} = jnp.argmax({id_ll}, {-1 - idx})")
-                ctxt.emit(
-                    f"{id_ll} = jnp.nan_to_num(jax.nn.one_hot({argmax_tag}, len({domain}), dtype=jnp.float32, axis={-1 - idx}))"
-                )
+            for id, dom in choices:
+                child_choice = ctxt.frame.children[who].choices[Name("self"), id]
+                ctxt.frame.choices[who, id] = Choice(child_choice.tag, child_choice.idx, False, dom, new_deps)
+
+            id_names_concat = '_'.join([id for id, dom in choices])
+            id_ll = ctxt.sym(f"{id_names_concat}_ll")
+            idx_tup = str(tuple(idx_list))
+            shape_tup = ', '.join([f"{ctxt.frame.choices[who, id].tag}.shape" for id, dom in choices])
+            ctxt.emit(f"{id_ll} = jnp.ones(jnp.broadcast_shapes({shape_tup}), dtype=jnp.float32) * {wpp_val.tag}")
+            if s.reduction == "maximize":
+                ctxt.emit(f"{id_ll} = 1.0 * ({id_ll} == maxx({id_ll}, {idx_tup}))")
+            ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, {idx_tup}))")
+
             if ctxt.frame.ll is None:
                 ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
                 ctxt.emit(f"{ctxt.frame.ll} = 1.0")

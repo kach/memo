@@ -316,22 +316,42 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
     match expr:
         case ast.Call(
             func=ast.Name(id="chooses" | "given" | "draws" | "assigned"),
-            args=[
-                ast.Compare(
-                    left=ast.Name(id=choice_id),
-                    comparators=[ast.Name(id=dom_id)],
-                    ops=[ast.In()],
-                )
-            ],
+            args=args,
             keywords=kw
         ):
+            choices: list[tuple[Id, Dom]] = []
+            if len(args) == 0:
+                raise MemoError(
+                    "`chooses` needs at least one choice, but none provided",
+                    hint="Specify a choice as `name in Domain`",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
+            for arg in args:
+                match arg:
+                    case ast.Compare(
+                        left=ast.Name(id=choice_id),
+                        comparators=[ast.Name(id=dom_id)],
+                        ops=[ast.In()],
+                    ):
+                        choices.append((Id(choice_id), Dom(dom_id)))
+                    case _:
+                        raise MemoError(
+                            "Unexpected item in chooses",
+                            hint="Expected a sequence of `name in domain` entries.",
+                            user=True,
+                            ctxt=None,
+                            loc=loc
+                        )
+
             reduction: Literal["normalize", "maximize"]
             match kw:
                 case [ast.keyword(arg=reduction_name, value=wpp_expr)]:
                     wpp_expr_ = parse_expr(wpp_expr, ctxt)
                 case _:
                     raise MemoError(
-                        f"unknown argument(s) to chooses: {[k.arg for k in kw]}",
+                        f"wrong number of keyword arguments to chooses",
                         hint="expected exactly one of: wpp, to_maximize, to_minimize",
                         user=True,
                         ctxt=None,
@@ -352,7 +372,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 )
             else:
                 raise MemoError(
-                    f"unknown argument(s) to chooses: {[k.arg for k in kw]}",
+                    f"unknown keyword argument to chooses: {reduction_name}",
                     hint="expected exactly one of: wpp, to_maximize, to_minimize",
                     user=True,
                     ctxt=None,
@@ -362,8 +382,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             return [
                 SChoose(
                     who=Name(who),
-                    id=Id(choice_id),
-                    domain=Dom(dom_id),
+                    choices=choices,
                     wpp=wpp_expr_,
                     loc=loc,
                     reduction=reduction
