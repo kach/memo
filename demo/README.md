@@ -6,6 +6,7 @@
 - [Scalar implicature](./demo-scalar.py) (discussed in paper)
 - [7-segment displays](./demo-7segment.ipynb) (discussed in paper)  
   (we show how memo can interface with deep learning and computer vision)
+- [Polite speech](./demo-politeness.ipynb)
 
 ## Economic games
 
