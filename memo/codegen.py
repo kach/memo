@@ -27,7 +27,8 @@ class MemoCompiled(Protocol):
         return_pandas: bool = ...,
         return_xarray: bool = ...,
         return_cost: bool = ...,
-        print_table: bool = ...
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
     ) -> jax.Array:
         ...
 
@@ -39,7 +40,8 @@ class MemoCompiled(Protocol):
         return_pandas: bool = ...,
         return_xarray: bool = ...,
         return_cost: bool = ...,
-        print_table: bool = ...
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
     ) -> memo_result:
         ...
 
@@ -50,7 +52,8 @@ class MemoCompiled(Protocol):
         return_pandas: bool = False,
         return_xarray: bool = False,
         return_cost: bool = False,
-        print_table: bool = False
+        print_table: bool = False,
+        **kwargs: jax.typing.ArrayLike
     ) -> jax.Array | memo_result:
         ...
 
