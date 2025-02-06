@@ -26,6 +26,8 @@ You may also be looking for general resources on the theory behind memo modeling
 2. For background on Bayesian models of theory of mind, we recommend consulting chapter 14 of _Bayesian Models of Cognition_ as a reference. You can read the published version [here](https://mitpress.ublish.com/ebook/bayesian-models-of-cognition-reverse-engineering-the-mind-preview/12799/341) and a PDF preprint [here](https://www.tomerullman.org/papers/BBB_chapter14.pdf).
 3. Dae Houlihan (Dartmouth University) is teaching a winter '25 [course](https://comosoco.daeh.info) on computational models of social cognition using memo.
 
+Finally, for live support, we host memOH (**memo office hours**) every Tuesday at 2pm ET. Email Kartik for the zoom link!
+
 ## The memo on memo
 
 An early draft of a paper on memo's design and implementation is available [here](https://osf.io/preprints/psyarxiv/pt863). If you use memo in your work, you are invited to cite this paper:
