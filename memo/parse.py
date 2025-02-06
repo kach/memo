@@ -19,6 +19,7 @@ class ParsingContext:
     axes: list[tuple[str, str]]
     loc_name: str
     loc_file: str
+    qualname: str
 
 
 def ast_increment_colno(tree: ast.AST, n: int) -> None:
@@ -614,6 +615,7 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
         axes=[],
         loc_name=f_name,
         loc_file=src_file,
+        qualname=ff.__qualname__
     )
     stmts: list[Stmt] = []
     retval = None

@@ -173,6 +173,8 @@ def _make_{f_name}():
     return _out_{f_name}
 
 {f_name} = _make_{f_name}()
+{f_name}.__name__ = '{f_name}'
+{f_name}.__qualname__ = '{pctxt.qualname}'
 """
 
     if debug_print_compiled:
