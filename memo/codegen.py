@@ -89,9 +89,9 @@ def codegen(
         eval_stmt(stmt_, ctxt)
 
     val = eval_expr(retval, ctxt)
-    for ax_name, ax_dom in pctxt.axes:
-        if (Name('self'), ax_name) not in val.deps:
-            warnings.warn(f"memo {pctxt.loc_name}'s return value does not depend on axis {ax_name} (of type {ax_dom}). Are you sure this is what you want? Please note that memo will avoid redundant work by returning an array where the dimension along that axis is of length 1.")
+    # for ax_name, ax_dom in pctxt.axes:
+    #     if (Name('self'), ax_name) not in val.deps:
+    #         warnings.warn(f"memo {pctxt.loc_name}'s return value does not depend on axis {ax_name} (of type {ax_dom}). Are you sure this is what you want? Please note that memo will avoid redundant work by returning an array where the dimension along that axis is of length 1.")
 
     if not val.known:
         raise MemoError(
