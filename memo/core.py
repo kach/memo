@@ -199,6 +199,11 @@ class ECost(ExprSyntaxNode):
 class EInline(ExprSyntaxNode):
     val: str
 
+@dataclass(frozen=True)
+class EPosterior(ExprSyntaxNode):
+    query: list[tuple[Name, Id]]
+    var: list[tuple[Name, Id]]
+
 Expr = (
     ELit
     | EOp
@@ -211,6 +216,7 @@ Expr = (
     | EImagine
     | ECost
     | EInline
+    | EPosterior
 )
 
 
@@ -719,7 +725,49 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             else:
                 raise NotImplementedError
 
+        case EPosterior(knw, var):
+            var_idxs = {ctxt.frame.choices[var_].idx for var_ in var}
+            idxs_to_marginalize = tuple(set(
+                c.idx for _, c in ctxt.frame.choices.items() if not (c.known or c.idx in var_idxs)
+            ))
+            out = ctxt.sym("posterior")
+            ctxt.emit(f"{out} = marg({ctxt.frame.ll}, {idxs_to_marginalize})")
+            for knw_, var_ in zip(knw, var):
+                knw_c = ctxt.frame.choices[knw_]
+                var_c = ctxt.frame.choices[var_]
+                ctxt.emit(f"{out} = jnp.swapaxes({out}, -1 - {var_c.idx}, -1 - {knw_c.idx})")
+                ctxt.emit(f"print({out}.shape)")
+            return Value(tag=out, known=True, deps={c for c, cc in ctxt.frame.choices.items() if cc.known})
+
         case EExpect(expr, reduction):
+            knw, var = [], []
+            def check_eposterior(expr_: Expr) -> bool:
+                match expr_:
+                    case EOp(Op.EQ, [EChoice(id=lc), EWith(rw, EChoice(rc))]) if (
+                        ctxt.frame.choices[Name("self"), lc].known and
+                        not ctxt.frame.choices[rw, rc].known and
+                        ctxt.frame.choices[Name("self"), lc].domain == ctxt.frame.choices[rw, rc].domain
+                    ):
+                        knw.append((Name("self"), lc))
+                        var.append((rw, rc))
+                        return True
+                    case EOp(Op.EQ, [EWith(rw, EChoice(rc)), EChoice(id=lc)]) if (
+                        ctxt.frame.choices[Name("self"), lc].known and
+                        not ctxt.frame.choices[rw, rc].known and
+                        ctxt.frame.choices[Name("self"), lc].domain == ctxt.frame.choices[rw, rc].domain
+                    ):
+                        knw.append((Name("self"), lc))
+                        var.append((rw, rc))
+                        return True
+                    case EOp(Op.AND, [fst, snd]) if check_eposterior(fst) and check_eposterior(snd):
+                        return True
+                return False
+            if check_eposterior(expr):
+                return eval_expr(
+                    EPosterior(knw, var, loc=e.loc, static=e.static),
+                    ctxt
+                )
+
             val_ = eval_expr(expr, ctxt)
             if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
                 warnings.warn(f"Redundant expectation {pprint_expr(e)}, not marginalizing")
@@ -745,7 +793,6 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                 if ctxt.frame.choices[c].known
             })
             # deps = set.union(*[ctxt.frame.choices[c].wpp_deps for c in val_.deps]) | set.union(*[ctxt.frame.choices[c].wpp_deps for c in ctxt.frame.conditions.keys()])
-            # ic(deps)
             return Value(
                 tag=out,
                 known=True,
