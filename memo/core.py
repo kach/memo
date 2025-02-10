@@ -732,11 +732,11 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             ))
             out = ctxt.sym("posterior")
             ctxt.emit(f"{out} = marg({ctxt.frame.ll}, {idxs_to_marginalize})")
+            ctxt.emit(f"{out} = pad({out}, {ctxt.next_idx})")
             for knw_, var_ in zip(knw, var):
                 knw_c = ctxt.frame.choices[knw_]
                 var_c = ctxt.frame.choices[var_]
                 ctxt.emit(f"{out} = jnp.swapaxes({out}, -1 - {var_c.idx}, -1 - {knw_c.idx})")
-                ctxt.emit(f"print({out}.shape)")
             return Value(tag=out, known=True, deps={c for c, cc in ctxt.frame.choices.items() if cc.known})
 
         case EExpect(expr, reduction):
