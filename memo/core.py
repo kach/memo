@@ -744,7 +744,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
             def check_eposterior(expr_: Expr) -> bool:
                 match expr_:
                     case EOp(Op.EQ, [EChoice(id=lc), EWith(rw, EChoice(rc))]) if (
+                        (Name("self"), lc) in ctxt.frame.choices and
                         ctxt.frame.choices[Name("self"), lc].known and
+                        (rw, rc) in ctxt.frame.choices and
                         not ctxt.frame.choices[rw, rc].known and
                         ctxt.frame.choices[Name("self"), lc].domain == ctxt.frame.choices[rw, rc].domain
                     ):
@@ -752,7 +754,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         var.append((rw, rc))
                         return True
                     case EOp(Op.EQ, [EWith(rw, EChoice(rc)), EChoice(id=lc)]) if (
+                        (Name("self"), lc) in ctxt.frame.choices and
                         ctxt.frame.choices[Name("self"), lc].known and
+                        (rw, rc) in ctxt.frame.choices and
                         not ctxt.frame.choices[rw, rc].known and
                         ctxt.frame.choices[Name("self"), lc].domain == ctxt.frame.choices[rw, rc].domain
                     ):
