@@ -753,21 +753,26 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
             def check_eposterior(expr_: Expr) -> bool:
                 match expr_:
-                    case EOp(Op.EQ, [EChoice(id=lc), EWith(rw, EChoice(rc))]) if epost_eligible(lc, rw, rc):
+                    case EOp(Op.EQ, (
+                        [EChoice(id=lc), EWith(rw, EChoice(rc))] |
+                        [EWith(rw, EChoice(rc)), EChoice(id=lc)]
+                    )) if epost_eligible(lc, rw, rc):
                         knw.append((Name("self"), lc))
                         var.append((rw, rc))
                         return True
-                    case EOp(Op.EQ, [EWith(rw, EChoice(rc)), EChoice(id=lc)]) if epost_eligible(lc, rw, rc):
-                        knw.append((Name("self"), lc))
-                        var.append((rw, rc))
-                        return True
-                    case EOp(Op.AND, [fst, snd]) if check_eposterior(fst) and check_eposterior(snd):
+                    case EOp(
+                        Op.AND, [fst, snd]
+                    ) if check_eposterior(fst) and check_eposterior(snd):
                         return True
                 return False
             if check_eposterior(expr):
-                axes_distinct = len({ctxt.frame.choices[c].idx for c in knw + var}) == len(knw) + len(var)
+                axes_distinct = len(
+                    {ctxt.frame.choices[c].idx for c in knw + var}
+                ) == len(knw) + len(var)
                 if axes_distinct:
-                    return eval_expr(EPosterior(knw, var, loc=e.loc, static=e.static), ctxt)
+                    return eval_expr(
+                        EPosterior(knw, var, loc=e.loc, static=e.static), ctxt
+                    )
 
             val_ = eval_expr(expr, ctxt)
             if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
