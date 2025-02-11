@@ -66,7 +66,7 @@ def pprint_table(f, z):
         return str(val)
 
     rows = []
-    rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + (f"{f.__name__[5:]}[{', '.join(f._axes)}]",))  # header
+    rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + (f"{f.__name__}[{', '.join(f._axes)}]",))  # header
     import itertools
     for row in itertools.product(*[enumerate(v) for v in f._vals]):
         idx = tuple([r[0] for r in row])
