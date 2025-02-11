@@ -13,6 +13,7 @@ import textwrap
 from io import StringIO
 
 import warnings
+import linecache
 
 if TYPE_CHECKING:
     import jax
@@ -354,120 +355,6 @@ class Context:
     forall_idxs: list[tuple[int, Id, Dom]] = field(default_factory=list)
 
 
-def pprint_stmt(s: Stmt) -> str:
-    match s:
-        case SPass():
-            return f""
-        case SChoose(who, choices, wpp):
-            wpp_str = pprint_expr(wpp)
-            if len(wpp_str) > 10:
-                wpp_str = "\n" + textwrap.indent(wpp_str, "  ")
-            reduction_str = "wpp" if s.reduction == "normalize" else "to_maximize"
-            return f"{who}: chooses(..., {reduction_str}={wpp_str})"
-        case SObserve(who, id):
-            return f"observe {who}.{id}"
-        case SWith(who, stmt):
-            return f"{who}: thinks[ {pprint_stmt(stmt)} ]"
-        case SShow(who, target_who, target_id, source_who, source_id):
-            if source_who == Name("self"):
-                return f"{who}: observes [{target_who}.{target_id}] is {source_id}"
-            else:
-                return f"{who}: observes [{target_who}.{target_id}] is {source_who}.{source_id}"
-        case SForAll(id, domain):
-            return f"given: {id} in {domain}"
-        case SKnows(who, source_who, source_id):
-            return f"{who}: knows({source_who}.{source_id})"
-        case SSnapshot(who, alias):
-            return f"{who}: snaps({alias})"
-    raise NotImplementedError(s)
-
-
-def pprint_expr(e: Expr) -> str:
-    match e:
-        case ELit(a):
-            return f"{a}"
-        case EOp(op, args):
-            match op:
-                case Op.ADD:
-                    return f"({pprint_expr(args[0])} + {pprint_expr(args[1])})"
-                case Op.SUB:
-                    return f"({pprint_expr(args[0])} - {pprint_expr(args[1])})"
-                case Op.MUL:
-                    return f"({pprint_expr(args[0])} * {pprint_expr(args[1])})"
-                case Op.DIV:
-                    return f"({pprint_expr(args[0])} / {pprint_expr(args[1])})"
-                case Op.POW:
-                    return f"({pprint_expr(args[0])} ** {pprint_expr(args[1])})"
-                case Op.MOD:
-                    return f"({pprint_expr(args[0])} % {pprint_expr(args[1])})"
-                case Op.EQ:
-                    return f"({pprint_expr(args[0])} == {pprint_expr(args[1])})"
-                case Op.NEQ:
-                    return f"({pprint_expr(args[0])} != {pprint_expr(args[1])})"
-                case Op.LT:
-                    return f"({pprint_expr(args[0])} < {pprint_expr(args[1])})"
-                case Op.LTE:
-                    return f"({pprint_expr(args[0])} <= {pprint_expr(args[1])})"
-                case Op.GT:
-                    return f"({pprint_expr(args[0])} > {pprint_expr(args[1])})"
-                case Op.GTE:
-                    return f"({pprint_expr(args[0])} >= {pprint_expr(args[1])})"
-                case Op.AND:
-                    return f"({pprint_expr(args[0])} & {pprint_expr(args[1])})"
-                case Op.OR:
-                    return f"({pprint_expr(args[0])} | {pprint_expr(args[1])})"
-                case Op.XOR:
-                    return f"({pprint_expr(args[0])} ^ {pprint_expr(args[1])})"
-                case Op.EXP:
-                    return f"exp({pprint_expr(args[0])})"
-                case Op.ABS:
-                    return f"abs({pprint_expr(args[0])})"
-                case Op.LOG:
-                    return f"log({pprint_expr(args[0])})"
-                case Op.UADD:
-                    return f"(+{pprint_expr(args[0])})"
-                case Op.NEG:
-                    return f"(-{pprint_expr(args[0])})"
-                case Op.INV:
-                    return f"(~{pprint_expr(args[0])})"
-                case Op.ITE:
-                    c_str = pprint_expr(args[0])
-                    t_str = pprint_expr(args[1])
-                    f_str = pprint_expr(args[2])
-                    if len(t_str) + len(f_str) < 40:
-                        return f"(if {c_str} then {t_str} else {f_str})"
-                    return f"""\
-(if {c_str} then
-{textwrap.indent(t_str, '   ')}
- else
-{textwrap.indent(f_str, '   ')})\
-"""
-        case EFFI(name, args):
-            return f"{name}({', '.join(pprint_expr(arg) for arg in args)})"
-        case EMemo(name, args, ids):
-            return "EMEMO"
-        case EChoice(id):
-            return f"{id}"
-        case EExpect(expr):
-            return f"E[ {pprint_expr(expr)} ]"
-        case EEntropy(rvs):
-            return f"H[ {[z[0] + '.' + z[1] for z in rvs ]} ]"
-        case EWith(who, expr):
-            return f"{who}[ {pprint_expr(expr)} ]"
-        case EImagine(do, then):
-            stmts = "\n".join([pprint_stmt(s) for s in do] + [pprint_expr(then)])
-            stmts_block = textwrap.indent(stmts, "  ")
-            return f"""\
-imagine [
-{stmts_block}
-]"""
-        case ECost(name, args):
-            return f"(cost @ {name}({', '.join(pprint_expr(arg) for arg in args)}))"
-        case EInline(val):
-            return f"{{{val}}}"
-    raise NotImplementedError
-
-
 def assemble_tags(tags: list[str], **kwargs: Any) -> str:
     kwarg_thunk = ', '.join(
         f'{k}={v}' for k, v in kwargs.items()
@@ -776,7 +663,11 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
             val_ = eval_expr(expr, ctxt)
             if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
-                warnings.warn(f"Redundant expectation {pprint_expr(e)}, not marginalizing")
+                warnings.warn(f"""\
+Redundant expectation, not marginalizing...
+| {linecache.getline(e.loc.file, e.loc.line)[:-1] if e.loc is not None else ''}
+| {' ' * e.loc.offset if e.loc is not None else ''}^
+""")
                 if reduction == "expectation":
                     return val_
             idxs_to_marginalize = tuple(set(
@@ -858,7 +749,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
             deps = set()
             # print()
-            # ic(ctxt.frame.name, who, pprint_expr(e))
+            # ic(ctxt.frame.name, who, e)
             # ic(ctxt.frame.children[who].conditions)
             # ic(val_.deps)
             for who_, id in val_.deps:
@@ -869,7 +760,7 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                     # ic(who, who_, id, z_who, z_id)
                     deps.add((z_who, z_id))
                 else:
-                    ic(ctxt.frame.name, who, pprint_expr(e), who_, id)
+                    ic(ctxt.frame.name, who, e, who_, id)
                     assert False  # should never happen
             # ic(deps)
             try:
