@@ -11,6 +11,8 @@ N = 5
 @jax.jit
 def f(n):
     return n + 1
+
+Z = np.arange(1000)
 ''')
 
 @memo(install_module=mod.install)
@@ -223,3 +225,15 @@ def choose_min():
 def choose_err():
     alice: chooses(x in X, y in Y, to_eat=x + y)
     return Pr[alice.x == 0, alice.y == 0]
+
+@memo_test(mod)  # crashes without post optim
+def post_optim[z1: Z, z2: Z]():
+    alice: chooses(z1 in Z, wpp=1)
+    alice: chooses(z2 in Z, wpp=1)
+    return Pr[z1 == alice.z1, alice.z2 == z2]
+
+@memo_test(mod)
+def post_optim_distinctness[z: Z]():
+    alice: chooses(z1 in Z, wpp=1)
+    alice: chooses(z2 in Z, wpp=1)
+    return Pr[z == alice.z1, z == alice.z2]

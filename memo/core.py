@@ -741,25 +741,23 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
 
         case EExpect(expr, reduction):
             knw, var = [], []
+            def epost_eligible(lc: Id, rw: Name, rc: Id) -> bool:
+                if (Name("self"), lc) not in ctxt.frame.choices:
+                    return False
+                if (rw, rc) not in ctxt.frame.choices:
+                    return False
+
+                lcc = ctxt.frame.choices[Name("self"), lc]
+                rcc = ctxt.frame.choices[rw, rc]
+                return lcc.known and (not rcc.known) and lcc.domain == rcc.domain
+
             def check_eposterior(expr_: Expr) -> bool:
                 match expr_:
-                    case EOp(Op.EQ, [EChoice(id=lc), EWith(rw, EChoice(rc))]) if (
-                        (Name("self"), lc) in ctxt.frame.choices and
-                        ctxt.frame.choices[Name("self"), lc].known and
-                        (rw, rc) in ctxt.frame.choices and
-                        not ctxt.frame.choices[rw, rc].known and
-                        ctxt.frame.choices[Name("self"), lc].domain == ctxt.frame.choices[rw, rc].domain
-                    ):
+                    case EOp(Op.EQ, [EChoice(id=lc), EWith(rw, EChoice(rc))]) if epost_eligible(lc, rw, rc):
                         knw.append((Name("self"), lc))
                         var.append((rw, rc))
                         return True
-                    case EOp(Op.EQ, [EWith(rw, EChoice(rc)), EChoice(id=lc)]) if (
-                        (Name("self"), lc) in ctxt.frame.choices and
-                        ctxt.frame.choices[Name("self"), lc].known and
-                        (rw, rc) in ctxt.frame.choices and
-                        not ctxt.frame.choices[rw, rc].known and
-                        ctxt.frame.choices[Name("self"), lc].domain == ctxt.frame.choices[rw, rc].domain
-                    ):
+                    case EOp(Op.EQ, [EWith(rw, EChoice(rc)), EChoice(id=lc)]) if epost_eligible(lc, rw, rc):
                         knw.append((Name("self"), lc))
                         var.append((rw, rc))
                         return True
@@ -767,10 +765,9 @@ def eval_expr(e: Expr, ctxt: Context) -> Value:
                         return True
                 return False
             if check_eposterior(expr):
-                return eval_expr(
-                    EPosterior(knw, var, loc=e.loc, static=e.static),
-                    ctxt
-                )
+                axes_distinct = len({ctxt.frame.choices[c].idx for c in knw + var}) == len(knw) + len(var)
+                if axes_distinct:
+                    return eval_expr(EPosterior(knw, var, loc=e.loc, static=e.static), ctxt)
 
             val_ = eval_expr(expr, ctxt)
             if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
