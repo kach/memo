@@ -4,8 +4,6 @@ memo is a probabilistic programming language for expressing computational cognit
 
 memo stands for: mental modeling, memoized matrix operations, model-expressed-model-optimized, and metacognitive memos.
 
-For updates on memo's development, we strongly encourage you to subscribe to our low-traffic monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).
-
 ## Installing memo
 
 1. memo is based on Python. Before installing memo, make sure you have Python 3.12 or higher installed. You can check this by running `python --version`.
@@ -26,7 +24,13 @@ You may also be looking for general resources on the theory behind memo modeling
 2. For background on Bayesian models of theory of mind, we recommend consulting chapter 14 of _Bayesian Models of Cognition_ as a reference. You can read the published version [here](https://mitpress.ublish.com/ebook/bayesian-models-of-cognition-reverse-engineering-the-mind-preview/12799/341) and a PDF preprint [here](https://www.tomerullman.org/papers/BBB_chapter14.pdf).
 3. Dae Houlihan (Dartmouth University) is teaching a winter '25 [course](https://comosoco.daeh.info) on computational models of social cognition using memo.
 
-Finally, for live support, we host memOH (**memo office hours**) every Tuesday at 2pm ET. Email Kartik for the zoom link!
+## The memo community
+
+Here are some ways to engage with the memo community.
+
+1. For updates on memo's development, we _strongly_ encourage you to subscribe to our low-traffic monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).
+2. To ask questions about memo, and to get help from other memo users, use [Github Discussions](https://github.com/kach/memo/discussions). Note that you will need a Github account to participate.
+3. For live support, we host memOH (**memo office hours**) every Tuesday at 2pm ET. Email Kartik for the zoom link!
 
 ## The memo on memo
 
