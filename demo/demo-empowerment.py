@@ -73,19 +73,9 @@ def make_blahut_arimoto(X, Y, Z, p_Y_given_X):
 
 
 ## Setting up a gridworld...
-world = np.array([
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-])
+N = 13
+world = np.zeros((N, N))
+world = world.at[N // 2, N // 2].set(1)
 
 X = np.arange(world.shape[0])
 Y = np.arange(world.shape[1])
@@ -102,6 +92,7 @@ Ax = domain(
     a2=len(A),
     a3=len(A),
     a4=len(A),
+    a5=len(A),
 )
 
 @jax.jit
@@ -126,7 +117,7 @@ def Tr(s_, ax, s):
         s = Tr1(s, a)
     return s == s_
 
-# ...and computing 4-step empowerment in the gridworld!
+# ...and computing 5-step empowerment in the gridworld!
 m = make_blahut_arimoto(X=Ax, Y=S, Z=S, p_Y_given_X=Tr)
 m.Z = S
 @memo(install_module=m.install, debug_trace=True)
