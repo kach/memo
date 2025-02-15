@@ -212,8 +212,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         # expected value
         case ast.Subscript(value=ast.Name(id="E" | "Pr"), slice=rv_expr):
-            assert not isinstance(rv_expr, ast.Slice)
-            assert not isinstance(rv_expr, ast.Tuple)
+            if isinstance(rv_expr, ast.Slice) or isinstance(rv_expr, ast.Tuple):
+                raise MemoError(
+                    "Incorrect syntax in E[...] or Pr[...]",
+                    hint="Double-check that you don't have a stray comma or colon in your expressions.",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
             return EExpect(expr=parse_expr(rv_expr, ctxt), reduction="expectation", loc=loc, static=False)
 
         # entropy
