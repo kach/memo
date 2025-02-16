@@ -14,10 +14,10 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 
 There are many resources available for learning memo.
 1. The [Memonomicon](./demo/Memonomicon.ipynb) gives a brief tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent.
-2. You can also watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material.
+2. You can watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material. You can also check out a [talk given at LAFI '25](https://www.youtube.com/live/RLEFVgx2UWk?t=12500s) that offers a bigger-picture overview of memo.
 3. The [Handbook](./Handbook.pdf) is a complete reference for memo's syntactic constructs.
 4. This repository includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
-5. I am happy to give a short tutorial on memo in your lab. Just email me to ask!
+6. I am happy to give a short hands-on tutorial on memo in your lab. Just email me to ask!
 
 You may also be looking for general resources on the theory behind memo modeling.
 1. For background on the theory of decision making under uncertainty, e.g. MDPs and POMDPs, we recommending consulting _Decision Making Under Uncertainty_ as a reference. You can read the entire book for free online [here](https://algorithmsbook.com/decisionmaking/).
