@@ -20,6 +20,7 @@ class ParsingContext:
     loc_name: str
     loc_file: str
     qualname: str
+    doc: str | None = None
 
 
 def ast_increment_colno(tree: ast.AST, n: int) -> None:
@@ -686,6 +687,10 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
                         loc=loc
                     )
                 retval = parse_expr(expr, pctxt)
+            case ast.Expr(value=ast.Constant(value=docstr)) if (
+                isinstance(docstr, str) and pctxt.doc is None
+            ):
+                pctxt.doc = docstr
             case _:
                 raise MemoError(
                     f"Unknown statement syntax",
