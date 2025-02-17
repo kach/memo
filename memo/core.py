@@ -875,7 +875,14 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 ctxt.frame.choices[(Name("self"), id)] = Choice(
                     tag, idx, True, dom, set()
                 )
-            wpp_val = eval_expr(wpp, ctxt)
+
+            softmax = False
+            match wpp:
+                case EOp(Op.EXP, [logit]):
+                    wpp_val = eval_expr(logit, ctxt)
+                    softmax = True
+                case _:
+                    wpp_val = eval_expr(wpp, ctxt)
 
             for id, dom in choices:
                 if not wpp_val.known:
@@ -909,6 +916,9 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
             idx_tup = str(tuple(idx_list))
             shape_tup = ', '.join([f"{ctxt.frame.choices[who, id].tag}.shape" for id, dom in choices])
             ctxt.emit(f"{id_ll} = jnp.ones(jnp.broadcast_shapes({shape_tup}), dtype=jnp.float32) * {wpp_val.tag}")
+
+            if softmax:
+                ctxt.emit(f"{id_ll} = jnp.exp({id_ll} - maxx({id_ll}, {idx_tup}))")
             if s.reduction == "maximize":
                 ctxt.emit(f"{id_ll} = 1.0 * ({id_ll} == maxx({id_ll}, {idx_tup}))")
             ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, {idx_tup}))")
