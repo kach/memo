@@ -125,6 +125,13 @@ Yes! See this issue for details: https://github.com/kach/memo/issues/66
 If you write `# type: ignore` at the top of your file (even before the imports), then VS Code will suppress the red lines. If you use Ruff, additionally add `# ruff: noqa`.
 </details>
 
+<details><summary>Sometimes my model returns 0 in unexpected places, often at the edges/extreme values of distributions.</summary>
+
+This can be caused by numerical stability errors. For example, if a `wpp=` expression gets too big, then it might "overflow" to infinity, and wreak havoc downstream. Similarly, if a `wpp=` expression returns 0 for all possible choices, then normalizing that distribution causes a division-by-zero error that wreaks havoc downstream. This havoc usually comes in the form of calculations being unexpectedly clipped to 0.
+
+So, if you are seeing unexpected 0s, we recommend inspecting your `wpp=` expressions to see whether they could be returning very large or very small values. Often, you can fix the problem by adding a little epsilon value (e.g. `wpp=f(x) + 1e-5`).
+</details>
+
 <details><summary>Some of my output array's dimensions are unexpectedly of size 1.</summary>
 
 memo attempts to minimize redundant computation. If the output of your model doesn't depend on an input axis, then instead of repeating the computation along that axis, memo will set that axis to size 1. The idea is that [broadcasting](https://numpy.org/doc/stable/user/basics.broadcasting.html) will keep the array compatible with downstream computations.
