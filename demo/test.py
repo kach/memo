@@ -66,6 +66,11 @@ def inline_memo[x: X]():
     return test_[x]({N})
 
 @memo_test(mod)
+def memo_call_ellipsis(t=0):
+    alice: chooses(x in X, wpp=test_[x](...))
+    return E[alice.x]
+
+@memo_test(mod)
 def imagine_ok():
     return alice[
         imagine[
@@ -232,7 +237,7 @@ def post_optim[z1: Z, z2: Z]():
     alice: chooses(z2 in Z, wpp=1)
     return Pr[z1 == alice.z1, alice.z2 == z2]
 
-@memo_test(mod)
+@memo_test(mod)  # https://stackoverflow.com/a/22348885
 def post_optim_distinctness[z: Z]():
     alice: chooses(z1 in Z, wpp=1)
     alice: chooses(z2 in Z, wpp=1)
