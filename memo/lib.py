@@ -57,6 +57,9 @@ def check_domains(tgt, src):
 
 
 def pprint_table(f, z):
+    z = z.at[jnp.isclose(z, 1., atol=1e-5)].set(1)
+    z = z.at[jnp.isclose(z, 0., atol=1e-5)].set(0)
+
     def pprint(val):
         if isinstance(val, jnp.ndarray):
             return str(val.item())
@@ -66,7 +69,7 @@ def pprint_table(f, z):
         return str(val)
 
     rows = []
-    rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + (f"{f.__name__}[{', '.join(f._axes)}]",))  # header
+    rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + (f"{f.__name__}",))  # header
     import itertools
     for row in itertools.product(*[enumerate(v) for v in f._vals]):
         idx = tuple([r[0] for r in row])
