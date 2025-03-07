@@ -79,7 +79,6 @@ class Choice:
     idx: int
     known: bool
     domain: Dom
-    wpp_deps: set[tuple[Name, Id]]
 
 
 @dataclass
@@ -367,464 +366,481 @@ def assemble_tags(tags: list[str], **kwargs: Any) -> str:
         return posarg_thunk
     return f"{posarg_thunk}, {kwarg_thunk}"
 
+from functools import singledispatch
 
+@singledispatch
 def eval_expr(e: Expr, ctxt: Context) -> Value:
-    match e:
-        case ELit(val):
-            with ctxt.hoist():
-                out = ctxt.sym("lit")
-                ctxt.emit(f"{out} = {val}")
-            return Value(tag=out, known=True, deps=set())
+    raise NotImplementedError
 
-        case EChoice(id):
-            if (Name("self"), id) not in ctxt.frame.choices:
+@eval_expr.register
+def _(e: ELit, ctxt: Context) -> Value:
+    val = e.value
+    with ctxt.hoist():
+        out = ctxt.sym("lit")
+        ctxt.emit(f"{out} = {val}")
+    return Value(tag=out, known=True, deps=set())
+
+@eval_expr.register
+def _(e: EChoice, ctxt: Context) -> Value:
+    id = e.id
+    if (Name("self"), id) not in ctxt.frame.choices:
+        raise MemoError(
+            f"Unknown choice {ctxt.frame.name}.{id}",
+            hint=f"Did you perhaps misspell {id}?" + (
+                f" Or, did you forget to include {id} as an axis in the definition of this memo?"
+                if ctxt.frame.parent is None else
+                f" {ctxt.frame.name} is not yet aware of any choice called {id}. Or, did you forget to call {ctxt.frame.name}.chooses({id} ...) or {ctxt.frame.name}.knows({id}) earlier in the memo?"
+            ),
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+    ch = ctxt.frame.choices[(Name("self"), id)]
+    return Value(
+        tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)])
+    )
+
+@eval_expr.register
+def _(e: EFFI, ctxt: Context) -> Value:
+    name, args = e.name, e.args
+    args_out = []
+    for arg in args:
+        args_out.append(eval_expr(arg, ctxt))
+    known = all(arg.known for arg in args_out)
+    deps = set().union(*(arg.deps for arg in args_out))
+    with ctxt.hoist(e.static):
+        out = ctxt.sym(f"ffi_{name}")
+        ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
+        if e.static:
+            ctxt.emit(f'{out} = {out}.item()')
+    return Value(tag=out, known=known, deps=deps)
+
+@eval_expr.register
+def _(e: ECost, ctxt: Context) -> Value:
+    name, args = e.name, e.args
+    args_out = []
+    with ctxt.hoist():
+        for arg in args:
+            args_out.append(eval_expr(arg, ctxt))
+            if not arg.static:
                 raise MemoError(
-                    f"Unknown choice {ctxt.frame.name}.{id}",
-                    hint=f"Did you perhaps misspell {id}?" + (
-                        f" Or, did you forget to include {id} as an axis in the definition of this memo?"
-                        if ctxt.frame.parent is None else
-                        f" {ctxt.frame.name} is not yet aware of any choice called {id}. Or, did you forget to call {ctxt.frame.name}.chooses({id} ...) or {ctxt.frame.name}.knows({id}) earlier in the memo?"
-                    ),
+                    "parameter not statically known",
+                    hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
                     user=True,
                     ctxt=ctxt,
-                    loc=e.loc
+                    loc=arg.loc,
                 )
-            ch = ctxt.frame.choices[(Name("self"), id)]
-            # out = ctxt.sym("ch")
-            # ctxt.emit(f"{out} = {ch.tag}")
-            return Value(
-                tag=ch.tag, known=ch.known, deps=set([(Name("self"), id)])
+        res = ctxt.sym(f"result_cost_{name}")
+        ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
+        ctxt.indent()
+        ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], return_cost=True)})')
+        ctxt.emit(f'{res} = {res}.cost')
+        ctxt.dedent()
+        ctxt.emit('else:')
+        ctxt.indent()
+        ctxt.emit(f'{res} = 0')
+        ctxt.dedent()
+    return Value(tag=res, known=True, deps=set())
+
+@eval_expr.register
+def _(e: EMemo, ctxt: Context) -> Value:
+    name, args, ids = e.name, e.args, e.ids
+    args_out = []
+    with ctxt.hoist():
+        for arg in args:
+            args_out.append(eval_expr(arg, ctxt))
+            if not arg.static:
+                raise MemoError(
+                    "parameter not statically known",
+                    hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=arg.loc,
+                )
+
+    for _, source_name, source_id in ids:
+        if (source_name, source_id) not in ctxt.frame.choices:
+            raise MemoError(
+                "Unknown choice referenced in a memo call",
+                hint=f"{ctxt.frame.name} does not yet model {source_name}'s choice of {source_id}.",
+                user=True,
+                ctxt=ctxt,
+                loc=e.loc
             )
 
-        case EFFI(name, args):
-            args_out = []
-            for arg in args:
-                args_out.append(eval_expr(arg, ctxt))
-            known = all(arg.known for arg in args_out)
-            deps = set().union(*(arg.deps for arg in args_out))
-            with ctxt.hoist(e.static):
-                out = ctxt.sym(f"ffi_{name}")
-                ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
-                if e.static:
-                    ctxt.emit(f'{out} = {out}.item()')
-            return Value(tag=out, known=known, deps=deps)
+    with ctxt.hoist():
+        res = ctxt.sym(f"result_array_{name}")
+        doms = [ctxt.frame.choices[source_name, source_id].domain for _, source_name, source_id in ids]
+        ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
+        ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
+        ctxt.indent()
+        ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, return_cost='return_cost')})')
+        ctxt.emit(f"if return_cost: aux.cost += res_aux.cost")
+        ctxt.dedent()
+        ctxt.emit('else:')
+        ctxt.indent()
+        ctxt.emit(f'{res} = jnp.zeros({name}._shape)')
+        ctxt.dedent()
+        ctxt.emit(f"{res} = {res}.transpose()")
 
-        case ECost(name, args):
-            args_out = []
-            with ctxt.hoist():
-                for arg in args:
-                    args_out.append(eval_expr(arg, ctxt))
-                    if not arg.static:
-                        raise MemoError(
-                            "parameter not statically known",
-                            hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
-                            user=True,
-                            ctxt=ctxt,
-                            loc=arg.loc,
-                        )
-                res = ctxt.sym(f"result_cost_{name}")
-                ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
-                ctxt.indent()
-                ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], return_cost=True)})')
-                ctxt.emit(f'{res} = {res}.cost')
-                ctxt.dedent()
-                ctxt.emit('else:')
-                ctxt.indent()
-                ctxt.emit(f'{res} = 0')
-                ctxt.dedent()
-            return Value(tag=res, known=True, deps=set())
+    out_idxs = []
+    for target_id, source_name, source_id in reversed(ids):
+        out_idxs.append(ctxt.frame.choices[(source_name, source_id)].idx)
+        # TODO: assert domains match here, too
 
-        case EMemo(name, args, ids):
-            args_out = []
-            with ctxt.hoist():
-                for arg in args:
-                    args_out.append(eval_expr(arg, ctxt))
-                    if not arg.static:
-                        raise MemoError(
-                            "parameter not statically known",
-                            hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
-                            user=True,
-                            ctxt=ctxt,
-                            loc=arg.loc,
-                        )
+    ctxt.emit(
+        f'{res} = jnp.expand_dims({res}, ({",".join(str(-i - 1) for i in range(max(out_idxs) + 1 - len(out_idxs)))}))'
+    )
+    permuted_dims: list[None | int] = [None] * (max(out_idxs) + 1)
 
-            for _, source_name, source_id in ids:
-                if (source_name, source_id) not in ctxt.frame.choices:
-                    raise MemoError(
-                        "Unknown choice referenced in a memo call",
-                        hint=f"{ctxt.frame.name} does not yet model {source_name}'s choice of {source_id}.",
-                        user=True,
-                        ctxt=ctxt,
-                        loc=e.loc
-                    )
+    for permuted_idx, source_idx in enumerate(out_idxs):
+        permuted_dims[-1 - source_idx] = permuted_idx
 
-            with ctxt.hoist():
-                res = ctxt.sym(f"result_array_{name}")
-                doms = [ctxt.frame.choices[source_name, source_id].domain for _, source_name, source_id in ids]
-                ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
-                ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
-                ctxt.indent()
-                ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, return_cost='return_cost')})')
-                ctxt.emit(f"if return_cost: aux.cost += res_aux.cost")
-                ctxt.dedent()
-                ctxt.emit('else:')
-                ctxt.indent()
-                ctxt.emit(f'{res} = jnp.zeros({name}._shape)')
-                ctxt.dedent()
-                ctxt.emit(f"{res} = {res}.transpose()")
+    filler_count = len(out_idxs)
+    for idx in range(len(permuted_dims)):
+        if permuted_dims[idx] is None:
+            permuted_dims[idx] = filler_count
+            filler_count += 1
 
-            out_idxs = []
-            for target_id, source_name, source_id in reversed(ids):
-                out_idxs.append(ctxt.frame.choices[(source_name, source_id)].idx)
-                # TODO: assert domains match here, too
+    ctxt.emit(f"{res} = jnp.permute_dims({res}, {tuple(permuted_dims)})")
 
-            ctxt.emit(
-                f'{res} = jnp.expand_dims({res}, ({",".join(str(-i - 1) for i in range(max(out_idxs) + 1 - len(out_idxs)))}))'
-            )
-            permuted_dims: list[None | int] = [None] * (max(out_idxs) + 1)
+    return Value(
+        tag=res,
+        known=all(ctxt.frame.choices[sn, si].known for _, sn, si in ids),
+        deps=set((sn, si) for _, sn, si in ids)
+    )
 
-            for permuted_idx, source_idx in enumerate(out_idxs):
-                permuted_dims[-1 - source_idx] = permuted_idx
-
-            filler_count = len(out_idxs)
-            for idx in range(len(permuted_dims)):
-                if permuted_dims[idx] is None:
-                    permuted_dims[idx] = filler_count
-                    filler_count += 1
-
-            ctxt.emit(f"{res} = jnp.permute_dims({res}, {tuple(permuted_dims)})")
-            # ctxt.emit(f"print({tuple(permuted_dims)})")
-            # ctxt.emit(f"print({res}, {res}.shape)")
-
-            return Value(
-                tag=res,
-                known=all(ctxt.frame.choices[sn, si].known for _, sn, si in ids),
-                # deps=set.union(
-                #     *(ctxt.frame.choices[sn, si].wpp_deps for _, sn, si in ids)
-                # ),
-                deps=set((sn, si) for _, sn, si in ids)
-            )
-
-        case EOp(op, args):
-            if op in [
-                Op.ADD,
-                Op.SUB,
-                Op.MUL,
-                Op.DIV,
-                Op.POW,
-                Op.MOD,
-                Op.EQ,
-                Op.NEQ,
-                Op.LT,
-                Op.LTE,
-                Op.GT,
-                Op.GTE,
-                Op.AND,
-                Op.OR,
-                Op.XOR
-            ]:
-                assert len(args) == 2
-                l = eval_expr(args[0], ctxt)
-                r = eval_expr(args[1], ctxt)
-                with ctxt.hoist(e.static):
-                    out = ctxt.sym(f"op_{op.name.lower()}")
-                    match op:
-                        case Op.ADD:
-                            ctxt.emit(f"{out} = {l.tag} + {r.tag}")
-                        case Op.SUB:
-                            ctxt.emit(f"{out} = {l.tag} - {r.tag}")
-                        case Op.MUL:
-                            ctxt.emit(f"{out} = {l.tag} * {r.tag}")
-                        case Op.DIV:
-                            ctxt.emit(f"{out} = {l.tag} / {r.tag}")
-                        case Op.POW:
-                            ctxt.emit(f"{out} = {l.tag} ** {r.tag}")
-                        case Op.MOD:
-                            ctxt.emit(f"{out} = {l.tag} % {r.tag}")
-                        case Op.EQ:
-                            ctxt.emit(f"{out} = {l.tag} == {r.tag}")
-                        case Op.NEQ:
-                            ctxt.emit(f"{out} = {l.tag} != {r.tag}")
-                        case Op.LT:
-                            ctxt.emit(f"{out} = {l.tag} < {r.tag}")
-                        case Op.LTE:
-                            ctxt.emit(f"{out} = {l.tag} <= {r.tag}")
-                        case Op.GT:
-                            ctxt.emit(f"{out} = {l.tag} > {r.tag}")
-                        case Op.GTE:
-                            ctxt.emit(f"{out} = {l.tag} >= {r.tag}")
-                        case Op.AND:
-                            ctxt.emit(f"{out} = {l.tag} & {r.tag}")
-                        case Op.OR:
-                            ctxt.emit(f"{out} = {l.tag} | {r.tag}")
-                        case Op.XOR:
-                            ctxt.emit(f"{out} = {l.tag} ^ {r.tag}")
+@eval_expr.register
+def _(e: EOp, ctxt: Context) -> Value:
+    op, args = e.op, e.args
+    if op in [
+        Op.ADD,
+        Op.SUB,
+        Op.MUL,
+        Op.DIV,
+        Op.POW,
+        Op.MOD,
+        Op.EQ,
+        Op.NEQ,
+        Op.LT,
+        Op.LTE,
+        Op.GT,
+        Op.GTE,
+        Op.AND,
+        Op.OR,
+        Op.XOR
+    ]:
+        assert len(args) == 2
+        l = eval_expr(args[0], ctxt)
+        r = eval_expr(args[1], ctxt)
+        with ctxt.hoist(e.static):
+            out = ctxt.sym(f"op_{op.name.lower()}")
+            match op:
+                case Op.ADD:
+                    ctxt.emit(f"{out} = {l.tag} + {r.tag}")
+                case Op.SUB:
+                    ctxt.emit(f"{out} = {l.tag} - {r.tag}")
+                case Op.MUL:
+                    ctxt.emit(f"{out} = {l.tag} * {r.tag}")
+                case Op.DIV:
+                    ctxt.emit(f"{out} = {l.tag} / {r.tag}")
+                case Op.POW:
+                    ctxt.emit(f"{out} = {l.tag} ** {r.tag}")
+                case Op.MOD:
+                    ctxt.emit(f"{out} = {l.tag} % {r.tag}")
+                case Op.EQ:
+                    ctxt.emit(f"{out} = {l.tag} == {r.tag}")
+                case Op.NEQ:
+                    ctxt.emit(f"{out} = {l.tag} != {r.tag}")
+                case Op.LT:
+                    ctxt.emit(f"{out} = {l.tag} < {r.tag}")
+                case Op.LTE:
+                    ctxt.emit(f"{out} = {l.tag} <= {r.tag}")
+                case Op.GT:
+                    ctxt.emit(f"{out} = {l.tag} > {r.tag}")
+                case Op.GTE:
+                    ctxt.emit(f"{out} = {l.tag} >= {r.tag}")
+                case Op.AND:
+                    ctxt.emit(f"{out} = {l.tag} & {r.tag}")
+                case Op.OR:
+                    ctxt.emit(f"{out} = {l.tag} | {r.tag}")
+                case Op.XOR:
+                    ctxt.emit(f"{out} = {l.tag} ^ {r.tag}")
+        return Value(
+            tag=out,
+            known=l.known and r.known,
+            deps=l.deps | r.deps
+        )
+    elif op in [Op.EXP, Op.ABS, Op.LOG, Op.UADD, Op.NEG, Op.INV]:
+        assert len(args) == 1
+        l = eval_expr(args[0], ctxt)
+        with ctxt.hoist(e.static):
+            out = ctxt.sym(f"op_{op.name.lower()}")
+            match op:
+                case Op.EXP:
+                    ctxt.emit(f"{out} = jnp.exp({l.tag})")
+                case Op.ABS:
+                    ctxt.emit(f"{out} = jnp.abs({l.tag})")
+                case Op.LOG:
+                    ctxt.emit(f"{out} = jnp.log({l.tag})")
+                case Op.UADD:
+                    ctxt.emit(f"{out} = +({l.tag})")
+                case Op.NEG:
+                    ctxt.emit(f"{out} = -({l.tag})")
+                case Op.INV:
+                    ctxt.emit(f"{out} = True ^ {l.tag}")
+        return Value(tag=out, known=l.known, deps=l.deps)
+    elif op == Op.ITE:
+        assert len(args) == 3
+        with ctxt.hoist(e.static):
+            out = ctxt.sym(f"op_{op.name.lower()}")
+            c = eval_expr(args[0], ctxt)
+            if args[0].static:
+                with ctxt.path_depends(c.tag):
+                    t = eval_expr(args[1], ctxt)
+                inv_out = eval_expr(EOp(Op.INV, [ELit(c.tag, loc=None, static=True)], loc=None, static=True), ctxt)
+                with ctxt.path_depends(inv_out.tag):
+                    f = eval_expr(args[2], ctxt)
+                ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
                 return Value(
                     tag=out,
-                    known=l.known and r.known,
-                    deps=l.deps | r.deps
+                    known=c.known and t.known and f.known,
+                    deps=c.deps | t.deps | f.deps
                 )
-            elif op in [Op.EXP, Op.ABS, Op.LOG, Op.UADD, Op.NEG, Op.INV]:
-                assert len(args) == 1
-                l = eval_expr(args[0], ctxt)
-                with ctxt.hoist(e.static):
-                    out = ctxt.sym(f"op_{op.name.lower()}")
-                    match op:
-                        case Op.EXP:
-                            ctxt.emit(f"{out} = jnp.exp({l.tag})")
-                        case Op.ABS:
-                            ctxt.emit(f"{out} = jnp.abs({l.tag})")
-                        case Op.LOG:
-                            ctxt.emit(f"{out} = jnp.log({l.tag})")
-                        case Op.UADD:
-                            ctxt.emit(f"{out} = +({l.tag})")
-                        case Op.NEG:
-                            ctxt.emit(f"{out} = -({l.tag})")
-                        case Op.INV:
-                            ctxt.emit(f"{out} = True ^ {l.tag}")
-                return Value(tag=out, known=l.known, deps=l.deps)
-            elif op == Op.ITE:
-                assert len(args) == 3
-                with ctxt.hoist(e.static):
-                    out = ctxt.sym(f"op_{op.name.lower()}")
-                    c = eval_expr(args[0], ctxt)
-                    if args[0].static:
-                        with ctxt.path_depends(c.tag):
-                            t = eval_expr(args[1], ctxt)
-                        inv_out = eval_expr(EOp(Op.INV, [ELit(c.tag, loc=None, static=True)], loc=None, static=True), ctxt)
-                        with ctxt.path_depends(inv_out.tag):
-                            f = eval_expr(args[2], ctxt)
-                        ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
-                        return Value(
-                            tag=out,
-                            known=c.known and t.known and f.known,
-                            deps=c.deps | t.deps | f.deps
-                        )
-                    else:
-                        t = eval_expr(args[1], ctxt)
-                        f = eval_expr(args[2], ctxt)
-                        ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
-                        return Value(
-                            tag=out,
-                            known=c.known and t.known and f.known,
-                            deps=c.deps | t.deps | f.deps
-                        )
             else:
-                raise NotImplementedError
+                t = eval_expr(args[1], ctxt)
+                f = eval_expr(args[2], ctxt)
+                ctxt.emit(f"{out} = jnp.where({c.tag}, {t.tag}, {f.tag})")
+                return Value(
+                    tag=out,
+                    known=c.known and t.known and f.known,
+                    deps=c.deps | t.deps | f.deps
+                )
+    else:
+        raise NotImplementedError
 
-        case EPosterior(knw, var):
-            var_idxs = {ctxt.frame.choices[var_].idx for var_ in var}
-            idxs_to_marginalize = tuple(set(
-                c.idx for _, c in ctxt.frame.choices.items() if not (c.known or c.idx in var_idxs)
-            ))
-            out = ctxt.sym("posterior")
-            ctxt.emit(f"{out} = marg({ctxt.frame.ll}, {idxs_to_marginalize})")
-            ctxt.emit(f"{out} = pad({out}, {ctxt.next_idx})")
-            for knw_, var_ in zip(knw, var):
-                knw_c = ctxt.frame.choices[knw_]
-                var_c = ctxt.frame.choices[var_]
-                ctxt.emit(f"{out} = jnp.swapaxes({out}, -1 - {var_c.idx}, -1 - {knw_c.idx})")
-            return Value(tag=out, known=True, deps={c for c, cc in ctxt.frame.choices.items() if cc.known})
+@eval_expr.register
+def _(e: EPosterior, ctxt: Context) -> Value:
+    knw, var = e.query, e.var
+    var_idxs = {ctxt.frame.choices[var_].idx for var_ in var}
+    idxs_to_marginalize = tuple(set(
+        c.idx for _, c in ctxt.frame.choices.items() if not (c.known or c.idx in var_idxs)
+    ))
+    out = ctxt.sym("posterior")
+    ctxt.emit(f"{out} = marg({ctxt.frame.ll}, {idxs_to_marginalize})")
+    ctxt.emit(f"{out} = pad({out}, {ctxt.next_idx})")
+    for knw_, var_ in zip(knw, var):
+        knw_c = ctxt.frame.choices[knw_]
+        var_c = ctxt.frame.choices[var_]
+        ctxt.emit(f"{out} = jnp.swapaxes({out}, -1 - {var_c.idx}, -1 - {knw_c.idx})")
+    return Value(tag=out, known=True, deps={c for c, cc in ctxt.frame.choices.items() if cc.known})
 
-        case EExpect(expr, reduction):
-            knw, var = [], []
-            def epost_eligible(lc: Id, rw: Name, rc: Id) -> bool:
-                if (Name("self"), lc) not in ctxt.frame.choices:
-                    return False
-                if (rw, rc) not in ctxt.frame.choices:
-                    return False
+@eval_expr.register
+def _(e: EExpect, ctxt: Context) -> Value:
+    expr, reduction = e.expr, e.reduction
+    knw, var = [], []
+    def epost_eligible(lc: Id, rw: Name, rc: Id) -> bool:
+        if (Name("self"), lc) not in ctxt.frame.choices:
+            return False
+        if (rw, rc) not in ctxt.frame.choices:
+            return False
 
-                lcc = ctxt.frame.choices[Name("self"), lc]
-                rcc = ctxt.frame.choices[rw, rc]
-                return lcc.known and (not rcc.known) and lcc.domain == rcc.domain
+        lcc = ctxt.frame.choices[Name("self"), lc]
+        rcc = ctxt.frame.choices[rw, rc]
+        return lcc.known and (not rcc.known) and lcc.domain == rcc.domain
 
-            def check_eposterior(expr_: Expr) -> bool:
-                match expr_:
-                    case EOp(Op.EQ, (
-                        [EChoice(id=lc), EWith(rw, EChoice(rc))] |
-                        [EWith(rw, EChoice(rc)), EChoice(id=lc)]
-                    )) if epost_eligible(lc, rw, rc):
-                        knw.append((Name("self"), lc))
-                        var.append((rw, rc))
-                        return True
-                    case EOp(
-                        Op.AND, [fst, snd]
-                    ) if check_eposterior(fst) and check_eposterior(snd):
-                        return True
-                return False
-            if check_eposterior(expr):
-                axes_distinct = len(
-                    {ctxt.frame.choices[c].idx for c in knw + var}
-                ) == len(knw) + len(var)
-                if axes_distinct:
-                    return eval_expr(
-                        EPosterior(knw, var, loc=e.loc, static=e.static), ctxt
-                    )
+    def check_eposterior(expr_: Expr) -> bool:
+        match expr_:
+            case EOp(Op.EQ, (
+                [EChoice(id=lc), EWith(rw, EChoice(rc))] |
+                [EWith(rw, EChoice(rc)), EChoice(id=lc)]
+            )) if epost_eligible(lc, rw, rc):
+                knw.append((Name("self"), lc))
+                var.append((rw, rc))
+                return True
+            case EOp(
+                Op.AND, [fst, snd]
+            ) if check_eposterior(fst) and check_eposterior(snd):
+                return True
+        return False
+    if check_eposterior(expr):
+        axes_distinct = len(
+            {ctxt.frame.choices[c].idx for c in knw + var}
+        ) == len(knw) + len(var)
+        if axes_distinct:
+            return eval_expr(
+                EPosterior(knw, var, loc=e.loc, static=e.static), ctxt
+            )
 
-            val_ = eval_expr(expr, ctxt)
-            if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
-                warnings.warn(f"""\
+    val_ = eval_expr(expr, ctxt)
+    if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
+        warnings.warn(f"""\
 Redundant expectation, not marginalizing...
 | {linecache.getline(e.loc.file, e.loc.line)[:-1] if e.loc is not None else ''}
 | {' ' * e.loc.offset if e.loc is not None else ''}^
 """)
-                if reduction == "expectation":
-                    return val_
-            idxs_to_marginalize = tuple(set(
-                # TODO: ideally, dedup by looking at frame.conditions
-                c.idx for _, c in ctxt.frame.choices.items() if not c.known
-            ))
-            ctxt.emit(f"# {ctxt.frame.name} expectation")
-
-            out = ctxt.sym("exp")
-            if reduction == "expectation":
-                ctxt.emit(
-                    f"{out} = marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize})"
-                )
-            elif reduction == "variance":
-                ctxt.emit(
-                    f"{out} = marg({ctxt.frame.ll} * {val_.tag} ** 2, {idxs_to_marginalize}) - marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize}) ** 2"
-                )
-            deps = ({  # TODO: this lets in too many deps!!
-                c for c, _ in ctxt.frame.choices.items()
-                if ctxt.frame.choices[c].known
-            })
-            # deps = set.union(*[ctxt.frame.choices[c].wpp_deps for c in val_.deps]) | set.union(*[ctxt.frame.choices[c].wpp_deps for c in ctxt.frame.conditions.keys()])
-            return Value(
-                tag=out,
-                known=True,
-                # deps={(name, id) for (name, id) in val_.deps if ctxt.frame.choices[(name, id)].known}
-                deps=deps
-            )
-
-        case EEntropy(rvs):
-            for rv in rvs:
-                if ctxt.frame.choices[rv].known:
-                    raise MemoError(
-                        "Taking entropy of known variable",
-                        hint=f"{rv[0]}.{rv[1]} is already known to {ctxt.frame.name}, so its entropy is zero.",
-                        user=True,
-                        ctxt=ctxt,
-                        loc=e.loc
-                    )
-            idxs_a = tuple(
-                set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n not in rvs))
-            )
-            deps = {n for n, c in ctxt.frame.choices.items() if c.known}
-            ctxt.emit(f"# {ctxt.frame.name} entropy")
-
-            out = ctxt.sym("entropy")
-            marginal = ctxt.sym("marginal")
-            ctxt.emit(f"{marginal} = marg({ctxt.frame.ll}, {idxs_a})")
-
-            idxs_b = tuple(
-                set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n in rvs))
-            )
-            ctxt.emit(
-                f"{out} = -marg({marginal} * jnp.nan_to_num(jnp.log({marginal})), {idxs_b})"
-            )
-            return Value(
-                tag=out,
-                known=True,
-                deps=deps
-            )
-
-        case EWith(who, expr):
-            if who == Name("self"):
-                return eval_expr(expr, ctxt)
-            ctxt.frame.ensure_child(who)
-
-            old_frame = ctxt.frame
-            ctxt.frame = ctxt.frame.children[who]
-            val_ = eval_expr(expr, ctxt)
-            ctxt.frame = old_frame
-            if not val_.known:
-                raise MemoError(
-                    "Asking an agent for an unknown value",
-                    hint=f"{who} has uncertainty about the value of the expression that {ctxt.frame.name} is imagining {who} computing. Did you perhaps mean to take {who}'s *expected* value of that expression, using E[...]?",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=e.loc
-                )
-
-            deps = set()
-            # print()
-            # ic(ctxt.frame.name, who, e)
-            # ic(ctxt.frame.children[who].conditions)
-            # ic(val_.deps)
-            for who_, id in val_.deps:
-                if who_ == Name("self"):
-                    deps.add((who, id))
-                elif (who_, id) in ctxt.frame.children[who].conditions:
-                    z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
-                    # ic(who, who_, id, z_who, z_id)
-                    deps.add((z_who, z_id))
-                else:
-                    ic(ctxt.frame.name, who, e, who_, id)
-                    assert False  # should never happen
-            # ic(deps)
-            try:
-                # "all" short-circuits!!!
-                known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in reversed(sorted(deps)))
-            except Exception:
-                raise
-            return Value(tag=val_.tag, known=known, deps=deps)
-
-        case EImagine(do, then):
-            ctxt.emit(f"# {ctxt.frame.name} imagines")
-
-            who = ctxt.frame.name
-
-            if ctxt.frame.parent is not None:
-                ctxt.frame = ctxt.frame.parent
-                eval_stmt(SSnapshot(who, Name(f'future_{who}'), loc=e.loc), ctxt)
-                ctxt.frame = ctxt.frame.children[who]
-
-            old_frame = ctxt.frame
-            current_frame_copy = copy.deepcopy(ctxt.frame)
-            current_frame_copy.name = Name(f'imagined_{who}')
-            fresh_lls(ctxt, current_frame_copy)
-
-            ctxt.frame = current_frame_copy
-            for stmt in do:
-                eval_stmt(stmt, ctxt)
-            val_ = eval_expr(then, ctxt)
-            if not val_.known:
-                raise MemoError(
-                    'trying to imagine an unknown value',
-                    hint=f"In this hypothetical imagined world, {who} won't be able to compute the return value you requested. Perhaps you meant to wrap the return value in E[...]?",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=e.then.loc
-                )
-
-            new_deps = set()
-            for dep in val_.deps:
-                if dep in old_frame.choices:
-                    new_deps.add(dep)
-                    continue
-                if dep in current_frame_copy.conditions:
-                    # deal with env: knows(a) scenario
-                    if current_frame_copy.conditions[dep][0] == current_frame_copy.name:
-                        new_deps.add((Name('self'), current_frame_copy.conditions[dep][1]))
-                        continue
-                assert False  ## something bad has happened
-            val_ = dataclasses.replace(val_, deps=new_deps)
-
-            ctxt.frame = old_frame
+        if reduction == "expectation":
             return val_
+    idxs_to_marginalize = tuple(set(
+        # TODO: ideally, dedup by looking at frame.conditions
+        c.idx for _, c in ctxt.frame.choices.items() if not c.known
+    ))
+    ctxt.emit(f"# {ctxt.frame.name} expectation")
 
-        case EInline(val=val):
-            with ctxt.hoist():
-                tag = ctxt.sym("inline")
-                ctxt.emit(f'{tag} = {val}')
-            return Value(
-                tag=tag,
-                known=True,
-                deps=set()
+    out = ctxt.sym("exp")
+    if reduction == "expectation":
+        ctxt.emit(
+            f"{out} = marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize})"
+        )
+    elif reduction == "variance":
+        ctxt.emit(
+            f"{out} = marg({ctxt.frame.ll} * {val_.tag} ** 2, {idxs_to_marginalize}) - marg({ctxt.frame.ll} * {val_.tag}, {idxs_to_marginalize}) ** 2"
+        )
+    deps = ({  # TODO: this lets in too many deps!!
+        c for c, _ in ctxt.frame.choices.items()
+        if ctxt.frame.choices[c].known
+    })
+    return Value(
+        tag=out,
+        known=True,
+        # deps={(name, id) for (name, id) in val_.deps if ctxt.frame.choices[(name, id)].known}
+        deps=deps
+    )
+
+@eval_expr.register
+def _(e: EEntropy, ctxt: Context) -> Value:
+    rvs = e.rvs
+    for rv in rvs:
+        if ctxt.frame.choices[rv].known:
+            raise MemoError(
+                "Taking entropy of known variable",
+                hint=f"{rv[0]}.{rv[1]} is already known to {ctxt.frame.name}, so its entropy is zero.",
+                user=True,
+                ctxt=ctxt,
+                loc=e.loc
             )
-    raise NotImplementedError
+    idxs_a = tuple(
+        set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n not in rvs))
+    )
+    deps = {n for n, c in ctxt.frame.choices.items() if c.known}
+    ctxt.emit(f"# {ctxt.frame.name} entropy")
 
+    out = ctxt.sym("entropy")
+    marginal = ctxt.sym("marginal")
+    ctxt.emit(f"{marginal} = marg({ctxt.frame.ll}, {idxs_a})")
+
+    idxs_b = tuple(
+        set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (n in rvs))
+    )
+    ctxt.emit(
+        f"{out} = -marg({marginal} * jnp.nan_to_num(jnp.log({marginal})), {idxs_b})"
+    )
+    return Value(
+        tag=out,
+        known=True,
+        deps=deps
+    )
+
+@eval_expr.register
+def _(e: EWith, ctxt: Context) -> Value:
+    who, expr = e.who, e.expr
+    if who == Name("self"):
+        return eval_expr(expr, ctxt)
+    ctxt.frame.ensure_child(who)
+
+    old_frame = ctxt.frame
+    ctxt.frame = ctxt.frame.children[who]
+    val_ = eval_expr(expr, ctxt)
+    ctxt.frame = old_frame
+    if not val_.known:
+        raise MemoError(
+            "Asking an agent for an unknown value",
+            hint=f"{who} has uncertainty about the value of the expression that {ctxt.frame.name} is imagining {who} computing. Did you perhaps mean to take {who}'s *expected* value of that expression, using E[...]?",
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+
+    deps = set()
+    # print()
+    # ic(ctxt.frame.name, who, e)
+    # ic(ctxt.frame.children[who].conditions)
+    # ic(val_.deps)
+    for who_, id in val_.deps:
+        if who_ == Name("self"):
+            deps.add((who, id))
+        elif (who_, id) in ctxt.frame.children[who].conditions:
+            z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
+            # ic(who, who_, id, z_who, z_id)
+            deps.add((z_who, z_id))
+        else:
+            ic(ctxt.frame.name, who, e, who_, id)
+            assert False  # should never happen
+    # ic(deps)
+    try:
+        # "all" short-circuits!!!
+        known = all(ctxt.frame.choices[(who_, id_)].known for (who_, id_) in reversed(sorted(deps)))
+    except Exception:
+        raise
+    return Value(tag=val_.tag, known=known, deps=deps)
+
+@eval_expr.register
+def _(e: EImagine, ctxt: Context) -> Value:
+    do, then = e.do, e.then
+    ctxt.emit(f"# {ctxt.frame.name} imagines")
+
+    who = ctxt.frame.name
+
+    if ctxt.frame.parent is not None:
+        ctxt.frame = ctxt.frame.parent
+        eval_stmt(SSnapshot(who, Name(f'future_{who}'), loc=e.loc), ctxt)
+        ctxt.frame = ctxt.frame.children[who]
+
+    old_frame = ctxt.frame
+    current_frame_copy = copy.deepcopy(ctxt.frame)
+    current_frame_copy.name = Name(f'imagined_{who}')
+    fresh_lls(ctxt, current_frame_copy)
+
+    ctxt.frame = current_frame_copy
+    for stmt in do:
+        eval_stmt(stmt, ctxt)
+    val_ = eval_expr(then, ctxt)
+    if not val_.known:
+        raise MemoError(
+            'trying to imagine an unknown value',
+            hint=f"In this hypothetical imagined world, {who} won't be able to compute the return value you requested. Perhaps you meant to wrap the return value in E[...]?",
+            user=True,
+            ctxt=ctxt,
+            loc=e.then.loc
+        )
+
+    new_deps = set()
+    for dep in val_.deps:
+        if dep in old_frame.choices:
+            new_deps.add(dep)
+            continue
+        if dep in current_frame_copy.conditions:
+            # deal with env: knows(a) scenario
+            if current_frame_copy.conditions[dep][0] == current_frame_copy.name:
+                new_deps.add((Name('self'), current_frame_copy.conditions[dep][1]))
+                continue
+        assert False  ## something bad has happened
+    val_ = dataclasses.replace(val_, deps=new_deps)
+
+    ctxt.frame = old_frame
+    return val_
+
+@eval_expr.register
+def _(e: EInline, ctxt: Context) -> Value:
+    val = e.val
+    with ctxt.hoist():
+        tag = ctxt.sym("inline")
+        ctxt.emit(f'{tag} = {val}')
+    return Value(
+        tag=tag,
+        known=True,
+        deps=set()
+    )
 
 def fresh_lls(ctxt: Context, f: Frame) -> None:
     if f.ll is not None:
@@ -849,7 +865,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
             )
             ctxt.frame.choices[(Name("self"), id)] = Choice(
-                tag, idx, True, domain, set()
+                tag, idx, True, domain
             )
             ctxt.forall_idxs.append((idx, id, domain))
 
@@ -873,7 +889,7 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 )
 
                 ctxt.frame.choices[(Name("self"), id)] = Choice(
-                    tag, idx, True, dom, set()
+                    tag, idx, True, dom
                 )
 
             softmax = False
@@ -895,21 +911,11 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     )
                 if (Name("self"), id) not in wpp_val.deps and not isinstance(wpp, ELit):
                     warnings.warn(f"When {who} chooses {id}, the probability doesn't depend on the value of {id}. As a result, the choice will effectively be uniform over {id} after normalization. Are you sure this is what you want? (A uniform choice is more easily expressed with wpp=1.)")
-                ctxt.frame.choices[(Name("self"), id)].wpp_deps = wpp_val.deps
             ctxt.frame = old_frame
 
-            new_deps = set()
-            for who_, id_ in wpp_val.deps:
-                if who_ == Name("self"):
-                    new_deps.add((who, id_))
-                elif (who_, id_) in child_frame.conditions:
-                    new_deps.add(child_frame.conditions[(who_, id_)])
-                else:
-                    ic(child_frame.name, child_frame.conditions)
-                    assert False, f"Unexpected wpp_val.dep of {who_}.{id_} for choice {who}.{id}"
             for id, dom in choices:
                 child_choice = ctxt.frame.children[who].choices[Name("self"), id]
-                ctxt.frame.choices[who, id] = Choice(child_choice.tag, child_choice.idx, False, dom, new_deps)
+                ctxt.frame.choices[who, id] = Choice(child_choice.tag, child_choice.idx, False, dom)
 
             id_names_concat = '_'.join([id for id, dom in choices])
             id_ll = ctxt.sym(f"{id_names_concat}_ll")
@@ -948,10 +954,6 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                     loc=s.loc
                 )
             ch.known = True
-
-            for ch_addr, ch_val in ctxt.frame.choices.items():
-                if not ch_val.known:
-                    ch_val.wpp_deps.update(ctxt.frame.choices[(who, id)].wpp_deps)
 
             idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
             ctxt.emit(f"""# {ctxt.frame.name} observe {who}.{id}""")
