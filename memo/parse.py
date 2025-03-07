@@ -30,6 +30,12 @@ def ast_increment_colno(tree: ast.AST, n: int) -> None:
             if node.end_col_offset is not None:
                 node.end_col_offset += n
 
+def parse_args_list(args: list[ast.expr], ctxt: ParsingContext, loc: SourceLocation) -> list[Expr]:
+    match args:
+        case [ast.Constant(value=val)] if val is ...:
+            return [ELit(value=param, loc=loc, static=True) for param in ctxt.static_parameters]
+        case _:
+            return [parse_expr(arg, ctxt) for arg in args]
 
 def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
@@ -73,7 +79,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         ):
             return EMemo(
                 name=f_name,
-                args=[parse_expr(arg, ctxt) for arg in args],
+                args=parse_args_list(args, ctxt, loc),
                 ids=[(Id("..."), Name(source_name), Id(source_id))],
                 loc=loc,
                 static=False
@@ -88,7 +94,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         ):
             return EMemo(
                 name=f_name,
-                args=[parse_expr(arg, ctxt) for arg in args],
+                args=parse_args_list(args, ctxt, loc),
                 ids=[(Id("..."), Name("self"), Id(source_id))],
                 loc=loc,
                 static=False
@@ -110,7 +116,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                         raise Exception()
             return EMemo(
                 name=f_name,
-                args=[parse_expr(arg, ctxt) for arg in args],
+                args=parse_args_list(args, ctxt, loc),
                 ids=ids,
                 loc=loc,
                 static=False
@@ -323,7 +329,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
         case ast.Call(
-            func=ast.Name(id="chooses" | "given" | "draws" | "assigned"),
+            func=ast.Name(id="chooses" | "given" | "draws" | "assigned" | "guesses"),
             args=args,
             keywords=kw
         ):
