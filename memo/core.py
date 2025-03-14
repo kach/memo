@@ -177,6 +177,12 @@ class EExpect(ExprSyntaxNode):
 class EEntropy(ExprSyntaxNode):
     rvs: list[tuple[Name, Id]]
 
+@dataclass(frozen=True)
+class EKL(ExprSyntaxNode):
+    p_who: Name
+    p_id: Id
+    q_who: Name
+    q_id: Id
 
 @dataclass(frozen=True)
 class EWith(ExprSyntaxNode):
@@ -212,6 +218,7 @@ Expr = (
     | EChoice
     | EExpect
     | EEntropy
+    | EKL
     | EWith
     | EImagine
     | ECost
@@ -739,6 +746,72 @@ def _(e: EEntropy, ctxt: Context) -> Value:
         tag=out,
         known=True,
         deps=deps
+    )
+
+@eval_expr.register
+def _(e: EKL, ctxt: Context) -> Value:
+    p_who, p_id, q_who, q_id = e.p_who, e.p_id, e.q_who, e.q_id
+    if (p_who, p_id) not in ctxt.frame.choices:
+        raise MemoError(
+            f"Unknown choice {p_who}.{p_id}",
+            hint=f"Did you misspell something?",
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+    if (q_who, q_id) not in ctxt.frame.choices:
+        raise MemoError(
+            f"Unknown choice {q_who}.{q_id}",
+            hint=f"Did you misspell something?",
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+    p_c = ctxt.frame.choices[p_who, p_id]
+    q_c = ctxt.frame.choices[q_who, q_id]
+    if p_c.known:
+        raise MemoError(
+            f"Cannot take KL-divergence over known variable {p_who}.{p_id}",
+            hint=f"It only makes sense to take KL-divergence over uncertain variables.",
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+    if q_c.known:
+        raise MemoError(
+            f"Cannot take KL-divergence over known variable {q_who}.{q_id}",
+            hint=f"It only makes sense to take KL-divergence over uncertain variables.",
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+    if p_c.domain != q_c.domain:
+        raise MemoError(
+            f"KL-divergence mismatched support",
+            hint=f"Domains of {p_who}.{p_id} ({p_c.domain}) and {q_who}.{q_id} ({q_c.domain}) do not match.",
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+
+    idxs_p = tuple(set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (c != p_c)))
+    idxs_q = tuple(set(c.idx for n, c in ctxt.frame.choices.items() if (not c.known) and (c != q_c)))
+
+    ctxt.emit(f"# {ctxt.frame.name} KL-divergence")
+
+    out = ctxt.sym("out")
+    p_p = ctxt.sym("p_p")
+    ctxt.emit(f"{p_p} = marg({ctxt.frame.ll}, {idxs_p})")
+    q_p = ctxt.sym("q_p")
+    ctxt.emit(f"{q_p} = marg({ctxt.frame.ll}, {idxs_q})")
+
+    ctxt.emit(
+        f"{out} = marg({p_p} * jnp.nan_to_num(jnp.log({p_p}) - jnp.log(jnp.swapaxes({q_p}, {p_c.idx}, {q_c.idx}))), [{p_c.idx}])"
+    )
+    return Value(
+        tag=out,
+        known=True,
+        deps={n for n, c in ctxt.frame.choices.items() if c.known}
     )
 
 @eval_expr.register

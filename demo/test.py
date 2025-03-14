@@ -13,6 +13,11 @@ def f(n):
     return n + 1
 
 Z = np.arange(1000)
+R = np.linspace(-10, 10, 1000)
+
+@jax.jit
+def normpdf(x, mu, sigma):
+    return jax.scipy.stats.norm.pdf(x, mu, sigma)
 ''')
 
 @memo(install_module=mod.install)
@@ -242,3 +247,28 @@ def post_optim_distinctness[z: Z]():
     alice: chooses(z1 in Z, wpp=1)
     alice: chooses(z2 in Z, wpp=1)
     return Pr[z == alice.z1, z == alice.z2]
+
+from math import log
+@memo_test(mod, item=log(2/1) + 1/8 - 1/2)
+def kl():
+    alice: chooses(p in R, wpp=normpdf(p, 0, 1))
+    alice: chooses(q in R, wpp=normpdf(q, 0, 2))
+    return KL[alice.p | alice.q]
+
+@memo_test(mod, expect='ce')
+def kl_fail_unknown():
+    alice: chooses(p in R, wpp=normpdf(p, 0, 1))
+    alice: chooses(q in R, wpp=normpdf(q, 0, 2))
+    return KL[alice.r | alice.q]
+
+@memo_test(mod, expect='ce')
+def kl_fail_known[r: R]():
+    alice: knows(r)
+    alice: chooses(q in R, wpp=normpdf(q, 0, 2))
+    return KL[alice.r | alice.q]
+
+@memo_test(mod, expect='ce')
+def kl_fail_dom():
+    alice: chooses(p in Z, wpp=normpdf(p, 0, 1))
+    alice: chooses(q in R, wpp=normpdf(q, 0, 2))
+    return KL[alice.p | alice.q]

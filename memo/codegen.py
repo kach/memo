@@ -278,7 +278,7 @@ def memo(f: None | Callable[..., Any] = None, **kwargs: Any) -> Callable[[Callab
         return lambda f: memo_(f, **kwargs)
     return memo_(f, **kwargs)
 
-def memo_test(mod, expect='pass', *args, **kwargs):  # type: ignore
+def memo_test(mod, expect='pass', item=None, *args, **kwargs):  # type: ignore
     def helper(f):  # type: ignore
         name = f.__name__
         outcome = None
@@ -286,7 +286,7 @@ def memo_test(mod, expect='pass', *args, **kwargs):  # type: ignore
         try:
             memo(f, install_module=mod.install, **kwargs)
             f = mod.__getattribute__(name)
-            f(*args)
+            out = f(*args)
         except MemoError as e:
             outcome = 'ce'
             err = e
@@ -295,7 +295,10 @@ def memo_test(mod, expect='pass', *args, **kwargs):  # type: ignore
             err = e
         else:
             outcome = 'pass'
-        if expect == outcome:
+
+        if outcome == 'pass' and item is not None and abs(out.item() - item) > 1e-6:
+            print(f'[fail {name}, {out} != {item}]')
+        elif expect == outcome:
             print(f'[ pass {name} ]')
             return f
         else:

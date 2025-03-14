@@ -265,6 +265,17 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             assert not isinstance(rv_expr, ast.Tuple)
             return EExpect(expr=parse_expr(rv_expr, ctxt), reduction="variance", loc=loc, static=False)
 
+        # KL divergence
+        case ast.Subscript(
+            value=ast.Name(id='KL'),
+            slice=ast.BinOp(
+                left=ast.Attribute(value=ast.Name(id=p_who), attr=p_id),
+                op=ast.BitOr(),
+                right=ast.Attribute(value=ast.Name(id=q_who), attr=q_id)
+            )
+        ):
+            return EKL(Name(p_who), Id(p_id), Name(q_who), Id(q_id), loc=loc, static=False)
+
         # imagine
         case ast.Subscript(value=ast.Name("imagine"), slice=ast.Tuple(elts=elts)):
             stmts = []
