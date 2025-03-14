@@ -806,7 +806,7 @@ def _(e: EKL, ctxt: Context) -> Value:
     ctxt.emit(f"{q_p} = marg({ctxt.frame.ll}, {idxs_q})")
 
     ctxt.emit(
-        f"{out} = marg({p_p} * jnp.nan_to_num(jnp.log({p_p}) - jnp.log(jnp.swapaxes({q_p}, {p_c.idx}, {q_c.idx}))), [{p_c.idx}])"
+        f"{out} = marg({p_p} * jnp.nan_to_num(jnp.log({p_p}) - jnp.log(jnp.swapaxes({q_p}, {-1 - p_c.idx}, {-1 - q_c.idx}))), [{p_c.idx}])"
     )
     return Value(
         tag=out,
@@ -952,6 +952,14 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
 
             idx_list = []
             for id, dom in choices:
+                if (Name("self"), id) in ctxt.frame.choices:
+                    raise MemoError(
+                        "Repeated choice",
+                        hint=f"{who} has already chosen {id} earlier in this model! Pick a new name?",
+                        user=True,
+                        ctxt=ctxt,
+                        loc=s.loc
+                    )
                 idx = ctxt.next_idx
                 ctxt.next_idx += 1
                 idx_list.append(idx)

@@ -24,6 +24,12 @@ def normpdf(x, mu, sigma):
 def test_[x: X](t):
     return x
 
+@memo_test(mod, expect='ce')
+def chooses_multiple():
+    bob: chooses(x in X, wpp=1)
+    bob: chooses(x in X, wpp=1)
+    return 1
+
 @memo_test(mod)
 def observes_call[x: X]():
     a: thinks[ b: chooses(x in X, wpp=1) ]
@@ -272,3 +278,11 @@ def kl_fail_dom():
     alice: chooses(p in Z, wpp=normpdf(p, 0, 1))
     alice: chooses(q in R, wpp=normpdf(q, 0, 2))
     return KL[alice.p | alice.q]
+
+@memo_test(mod)
+def kl_victor[x: X]():
+    bob: thinks[
+        alice: given(x in X, wpp=1),
+        env: chooses(x in X, wpp=1)
+    ]
+    return bob[KL[alice.x | env.x]]
