@@ -42,7 +42,7 @@ def make_blahut_arimoto(X, Y, Z, p_Y_given_X):
     def Q[x: X, y: Y, z: Z](t):
         alice: knows(x, y, z)
         alice: thinks[
-            bob: knows(x, z),
+            bob: knows(z),
             bob: chooses(x in X, wpp=q[x, z](t)),
             bob: chooses(y in Y, wpp=p_Y_given_X(y, x, z))
         ]
