@@ -283,6 +283,10 @@ class SSnapshot(SyntaxNode):
     who: Name
     alias: Name
 
+@dataclass(frozen=True)
+class STrace(SyntaxNode):
+    who: Name
+
 Stmt = (
     SPass
     | SChoose
@@ -293,6 +297,7 @@ Stmt = (
     | SForAll
     | SKnows
     | SSnapshot
+    | STrace
 )
 
 
@@ -1156,6 +1161,39 @@ def eval_stmt(s: Stmt, ctxt: Context) -> None:
                 else:
                     # map everything else back to alice's own version of that
                     future_frame.conditions[name, id] = (name, id)
+
+        case STrace(who):
+            import os, sys
+            if s.loc is not None:
+                loc_str = f"from {os.path.basename(s.loc.file)}, line {s.loc.line}, in @memo {s.loc.name}"
+            else:
+                loc_str = ""
+            print(f"** Tracing {who} {loc_str}")
+            if who not in ctxt.frame.children:
+                print(f"-> From {ctxt.frame.name}'s perspective, there is not yet any model of {who}. The current agents currently modeled by {ctxt.frame.name} are: {', '.join(ctxt.frame.children.keys())}.")
+                print()
+                return
+
+            f = ctxt.frame.children[who]
+            print(f"-> {who} is tracking the following choices:")
+            for key, val in f.choices.items():
+                if key[0] == Name("self"):
+                    print(f"   - {key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
+                else:
+                    print(f"   - {key[0]}.{key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
+            if key in f.conditions:
+                assert f.parent is not None
+                print(f"     | (observed to be {f.parent.name}'s {f.conditions[key][0]}.{f.conditions[key][1]})")
+            if len(f.children) == 0:
+                print(f"-> {who} is not yet tracking any agents.")
+            else:
+                print(f"-> {who} is currently tracking the following agents:")
+                for c in f.children:
+                    print(f"   + {c}")
+            while f.parent is not None:
+                print(f"-> {f.name} is being modeled by {f.parent.name}.")
+                f = f.parent
+            print()
 
         case _:
             raise NotImplementedError

@@ -339,6 +339,9 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
+        case ast.Call(func=ast.Name(id='INSPECT'), args=[]):
+            return [STrace(who=Name(who), loc=loc)]
+
         case ast.Call(
             func=ast.Name(id="chooses" | "given" | "draws" | "assigned" | "guesses"),
             args=args,
