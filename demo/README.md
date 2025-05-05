@@ -28,6 +28,7 @@
 - [I-POMDP (investment game)](./demo-i-pomdp.ipynb)
   (agents reason about their uncertainty about each other)
 - [Sally-Anne (false belief test)](./demo-sally-anne.ipynb)
+- [Integrating intuitive psychology and intuitive physics](./demo-physics.ipynb)
 
 ## Information theoretic calculations
 
