@@ -8,6 +8,7 @@ from enum import Enum
 import dataclasses
 from dataclasses import dataclass, field
 import copy
+from functools import singledispatch
 
 import textwrap
 from io import StringIO
@@ -287,6 +288,11 @@ class SSnapshot(SyntaxNode):
 class STrace(SyntaxNode):
     who: Name
 
+@dataclass(frozen=True)
+class SWants(SyntaxNode):
+    who: Name
+    what: Expr
+
 Stmt = (
     SPass
     | SChoose
@@ -298,6 +304,7 @@ Stmt = (
     | SKnows
     | SSnapshot
     | STrace
+    | SWants
 )
 
 
@@ -377,8 +384,6 @@ def assemble_tags(tags: list[str], **kwargs: Any) -> str:
     if len(kwargs) == 0:
         return posarg_thunk
     return f"{posarg_thunk}, {kwarg_thunk}"
-
-from functools import singledispatch
 
 @singledispatch
 def eval_expr(e: Expr, ctxt: Context) -> Value:
@@ -928,272 +933,291 @@ def fresh_lls(ctxt: Context, f: Frame) -> None:
     for c in f.children.keys():
         fresh_lls(ctxt, f.children[c])
 
-
+@singledispatch
 def eval_stmt(s: Stmt, ctxt: Context) -> None:
-    match s:
-        case SPass():
-            pass
+    raise NotImplementedError
 
-        case SForAll(id, domain):
-            assert ctxt.frame.name == ROOT_FRAME_NAME
-            idx = ctxt.next_idx
-            ctxt.next_idx += 1
-            tag = ctxt.sym(f"forall_{id}")
-            ctxt.emit(
-                f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
+@eval_stmt.register
+def _(s: SPass, ctxt: Context) -> None:
+    pass
+
+@eval_stmt.register
+def _(s: SForAll, ctxt: Context) -> None:
+    id, domain = s.id, s.domain
+    assert ctxt.frame.name == ROOT_FRAME_NAME
+    idx = ctxt.next_idx
+    ctxt.next_idx += 1
+    tag = ctxt.sym(f"forall_{id}")
+    ctxt.emit(
+        f"{tag} = jnp.array({domain}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
+    )
+    ctxt.frame.choices[(Name("self"), id)] = Choice(
+        tag, idx, True, domain
+    )
+    ctxt.forall_idxs.append((idx, id, domain))
+
+@eval_stmt.register
+def _(s: SChoose, ctxt: Context) -> None:
+    who, choices, wpp = s.who, s.choices, s.wpp
+    ctxt.frame.ensure_child(who)
+
+    # briefly enter child's frame
+    child_frame = ctxt.frame.children[who]
+    old_frame = ctxt.frame
+    ctxt.frame = child_frame
+
+    idx_list = []
+    for id, dom in choices:
+        if (Name("self"), id) in ctxt.frame.choices:
+            raise MemoError(
+                "Repeated choice",
+                hint=f"{who} has already chosen {id} earlier in this model! Pick a new name?",
+                user=True,
+                ctxt=ctxt,
+                loc=s.loc
             )
-            ctxt.frame.choices[(Name("self"), id)] = Choice(
-                tag, idx, True, domain
-            )
-            ctxt.forall_idxs.append((idx, id, domain))
+        idx = ctxt.next_idx
+        ctxt.next_idx += 1
+        idx_list.append(idx)
+        tag = ctxt.sym(f"{who}_{id}")
+        ctxt.emit(f"""# {who} choose {id}""")
+        ctxt.emit(
+            f"{tag} = jnp.array({dom}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
+        )
 
-        case SChoose(who, choices, wpp):
-            ctxt.frame.ensure_child(who)
+        ctxt.frame.choices[(Name("self"), id)] = Choice(
+            tag, idx, True, dom
+        )
 
-            # briefly enter child's frame
-            child_frame = ctxt.frame.children[who]
-            old_frame = ctxt.frame
-            ctxt.frame = child_frame
-
-            idx_list = []
-            for id, dom in choices:
-                if (Name("self"), id) in ctxt.frame.choices:
-                    raise MemoError(
-                        "Repeated choice",
-                        hint=f"{who} has already chosen {id} earlier in this model! Pick a new name?",
-                        user=True,
-                        ctxt=ctxt,
-                        loc=s.loc
-                    )
-                idx = ctxt.next_idx
-                ctxt.next_idx += 1
-                idx_list.append(idx)
-                tag = ctxt.sym(f"{who}_{id}")
-                ctxt.emit(f"""# {who} choose {id}""")
-                ctxt.emit(
-                    f"{tag} = jnp.array({dom}).reshape(*{(-1,) + tuple(1 for _ in range(idx))})"
-                )
-
-                ctxt.frame.choices[(Name("self"), id)] = Choice(
-                    tag, idx, True, dom
-                )
-
-            softmax = False
-            match wpp:
-                case EOp(Op.EXP, [logit]):
-                    wpp_val = eval_expr(logit, ctxt)
-                    softmax = True
-                case _:
-                    wpp_val = eval_expr(wpp, ctxt)
-
-            for id, dom in choices:
-                if not wpp_val.known:
-                    raise MemoError(
-                        "Choice based on uncertain expression",
-                        hint=f"{who} is uncertain about the value of the expression (wpp/to_maximize) that {who} is using to choose {id}. Hence, {who} cannot compute the probabilities needed to make the choice. Perhaps you meant to take an expected value somewhere, using E[...]?",
-                        user=True,
-                        ctxt=ctxt,
-                        loc=s.loc
-                    )
-                if (Name("self"), id) not in wpp_val.deps and not isinstance(wpp, ELit):
-                    warnings.warn(f"When {who} chooses {id}, the probability doesn't depend on the value of {id}. As a result, the choice will effectively be uniform over {id} after normalization. Are you sure this is what you want? (A uniform choice is more easily expressed with wpp=1.)")
-            ctxt.frame = old_frame
-
-            for id, dom in choices:
-                child_choice = ctxt.frame.children[who].choices[Name("self"), id]
-                ctxt.frame.choices[who, id] = Choice(child_choice.tag, child_choice.idx, False, dom)
-
-            id_names_concat = '_'.join([id for id, dom in choices])
-            id_ll = ctxt.sym(f"{id_names_concat}_ll")
-            idx_tup = str(tuple(idx_list))
-            shape_tup = ', '.join([f"{ctxt.frame.choices[who, id].tag}.shape" for id, dom in choices])
-            ctxt.emit(f"{id_ll} = jnp.ones(jnp.broadcast_shapes({shape_tup}), dtype=jnp.float32) * {wpp_val.tag}")
-
-            if softmax:
-                ctxt.emit(f"{id_ll} = jnp.exp({id_ll} - maxx({id_ll}, {idx_tup}))")
-            if s.reduction == "maximize":
-                ctxt.emit(f"{id_ll} = 1.0 * ({id_ll} == maxx({id_ll}, {idx_tup}))")
-            ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, {idx_tup}))")
-
-            if ctxt.frame.ll is None:
-                ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
-                ctxt.emit(f"{ctxt.frame.ll} = 1.0")
-            ctxt.emit(f"{ctxt.frame.ll} = {id_ll} * {ctxt.frame.ll}")
-
-
-        case SObserve(who, id):
-            if (who, id) not in ctxt.frame.choices:
-                raise MemoError(
-                    "Observation of unmodeled choice",
-                    hint=f"{ctxt.frame.name} does not have {who}'s choice of {id} in their mental model. Perhaps you meant to write `{ctxt.frame.name}: thinks[ {who}: chooses({id} ...) ]` somewhere earlier in this memo?",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=s.loc
-                )
-            ch = ctxt.frame.choices[(who, id)]
-            if ch.known:
-                raise MemoError(
-                    "Observation of already-known choice",
-                    hint=f"{ctxt.frame.name} already knows {who}'s choice of {id}. It doesn't make sense for {ctxt.frame.name} to re-observe that same choice again.",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=s.loc
-                )
-            ch.known = True
-
-            idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
-            ctxt.emit(f"""# {ctxt.frame.name} observe {who}.{id}""")
-            ctxt.emit(
-                f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
-            )
-
-        case SObserves(who, what, how):
-            ctxt.frame.ensure_child(who)
-            old_frame = ctxt.frame
-            ctxt.frame = ctxt.frame.children[who]
-            if ctxt.frame.ll is None:
-                ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
-                ctxt.emit(f"{ctxt.frame.ll} = 1.0")
-            what_val = eval_expr(what, ctxt)
-            ctxt.emit(f"""# {ctxt.frame.name} factors""")
-            if how == "boolean":
-                ctxt.emit(f"""{what_val.tag} = jnp.bool({what_val.tag}) * 1.0""")
-            ctxt.emit(f"""{ctxt.frame.ll} = {ctxt.frame.ll} * {what_val.tag}""")
-            idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
-            ctxt.emit(
-                f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
-            )
-            ctxt.frame = old_frame
-
-        case SWith(who, stmt):  # TODO: this could take many "who"s as input
-            ctxt.frame.ensure_child(who)
-            f_old = ctxt.frame
-            ctxt.frame = ctxt.frame.children[who]
-            eval_stmt(stmt, ctxt)
-            ctxt.frame = f_old
-
-        case SShow(who, target_who, target_id, source_who, source_id):
-            ctxt.emit(f"# telling {who} about {target_who}.{target_id}")
-            ctxt.frame.ensure_child(who)
-            if (target_who, target_id) not in ctxt.frame.children[who].choices:
-                raise MemoError(
-                    "Observation of unmodeled choice",
-                    hint=f"{ctxt.frame.name} does not yet think that {who} is modeling {target_who}'s choice of {target_id}, so it doesn't make sense for {who} to observe that choice. Perhaps you meant to write `{who}: thinks[ {target_who}: chooses({target_id} ...) ]` somewhere earlier in {ctxt.frame.name}'s memo?",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=s.loc
-                )
-            if (source_who, source_id) not in ctxt.frame.choices:
-                raise MemoError(
-                    "Observation of unknown choice",
-                    hint=f"{ctxt.frame.name} does not yet think that {source_who} has chosen {source_id}, so cannot model {who} observing that value. Perhaps you misspelled {source_id}?",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=s.loc
-                )
-
-            eval_stmt(
-                SWith(who, SObserve(target_who, target_id, loc=None), loc=None), ctxt
-            )
-            target_addr = (target_who, target_id)
-            source_addr = (source_who, source_id)
-            target_dom = ctxt.frame.children[who].choices[target_addr].domain
-            source_dom = ctxt.frame.choices[source_addr].domain
-            if target_dom != source_dom:
-                raise MemoError(
-                    "Domain mismatch",
-                    hint=f"{target_who}.{target_id} is from domain {target_dom}, while {source_who}.{source_id} is from domain {source_dom}.",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=s.loc
-                )
-            ctxt.frame.children[who].conditions[target_addr] = source_addr
-            tidx = ctxt.frame.children[who].choices[target_addr].idx
-            sidx = ctxt.frame.choices[source_addr].idx
-            ctxt.emit(
-                f"{ctxt.frame.children[who].ll} = jnp.swapaxes(pad({ctxt.frame.children[who].ll}, {ctxt.next_idx}), -1-{sidx}, -1-{tidx})"
-            )
-            ctxt.frame.children[who].choices[target_addr].idx = sidx
-            ctxt.frame.children[who].children[target_who].choices[(Name('self'), target_id)].idx = sidx
-            ctxt.emit(
-                f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
-            )
-
-        case SKnows(who, source_who, source_id):
-            source_addr = (source_who, source_id)
-            # out_addr = (ctxt.frame.name if source_who == "self" else source_who, source_id)
-            ctxt.frame.ensure_child(who)
-            if source_addr not in ctxt.frame.choices:
-                raise MemoError(
-                    "Knowing unknown choice",
-                    hint=f"{ctxt.frame.name} does not yet model {source_who}'s choice of {source_id}. So, it doesn't make sense for {ctxt.frame.name} to model {who} as knowing that choice.",
-                    user=True,
-                    ctxt=ctxt,
-                    loc=s.loc
-                )
-            ctxt.frame.children[who].choices[source_addr] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
-            ctxt.frame.children[who].conditions[source_addr] = source_addr
-
-            if source_who == "self":
-                ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
-                ctxt.frame.conditions[(who, source_id)] = (ctxt.frame.name, source_id)
-            else:
-                ctxt.frame.children[who].ensure_child(source_who)
-                ctxt.frame.children[who].children[source_who].choices[(Name("self"), source_id)] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
-                ctxt.frame.children[who].children[source_who].conditions[(Name("self"), source_id)] = (source_who, source_id)
-            ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
-
-        case SSnapshot(who, alias):
-            current_frame = ctxt.frame.children[who]
-            future_frame = copy.deepcopy(current_frame)
-            fresh_lls(ctxt, future_frame)
-            future_frame.name = alias
-            future_frame.parent = current_frame
-            current_frame.children[alias] = future_frame
-
-            # alice should be able to deal with all of the choices in future_alice's frame
-            for name, id in list(future_frame.choices.keys()):
-                if name == 'self':
-                    # alice should know about future_alice's own choices
-                    current_frame.choices[alias, id] = copy.deepcopy(future_frame.choices[name, id])
-                    # alice[future_alice.x]  -->  alice.x
-                    current_frame.conditions[alias, id] = (who, id)
-                else:
-                    # map everything else back to alice's own version of that
-                    future_frame.conditions[name, id] = (name, id)
-
-        case STrace(who):
-            import os, sys
-            if s.loc is not None:
-                loc_str = f"from {os.path.basename(s.loc.file)}, line {s.loc.line}, in @memo {s.loc.name}"
-            else:
-                loc_str = ""
-            print(f"** Tracing {who} {loc_str}")
-            if who not in ctxt.frame.children:
-                print(f"-> From {ctxt.frame.name}'s perspective, there is not yet any model of {who}. The current agents currently modeled by {ctxt.frame.name} are: {', '.join(ctxt.frame.children.keys())}.")
-                print()
-                return
-
-            f = ctxt.frame.children[who]
-            print(f"-> {who} is tracking the following choices:")
-            for key, val in f.choices.items():
-                if key[0] == Name("self"):
-                    print(f"   - {key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
-                else:
-                    print(f"   - {key[0]}.{key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
-            if key in f.conditions:
-                assert f.parent is not None
-                print(f"     | (observed to be {f.parent.name}'s {f.conditions[key][0]}.{f.conditions[key][1]})")
-            if len(f.children) == 0:
-                print(f"-> {who} is not yet tracking any agents.")
-            else:
-                print(f"-> {who} is currently tracking the following agents:")
-                for c in f.children:
-                    print(f"   + {c}")
-            while f.parent is not None:
-                print(f"-> {f.name} is being modeled by {f.parent.name}.")
-                f = f.parent
-            print()
-
+    softmax = False
+    match wpp:
+        case EOp(Op.EXP, [logit]):
+            wpp_val = eval_expr(logit, ctxt)
+            softmax = True
         case _:
-            raise NotImplementedError
+            wpp_val = eval_expr(wpp, ctxt)
+
+    for id, dom in choices:
+        if not wpp_val.known:
+            raise MemoError(
+                "Choice based on uncertain expression",
+                hint=f"{who} is uncertain about the value of the expression (wpp/to_maximize) that {who} is using to choose {id}. Hence, {who} cannot compute the probabilities needed to make the choice. Perhaps you meant to take an expected value somewhere, using E[...]?",
+                user=True,
+                ctxt=ctxt,
+                loc=s.loc
+            )
+        if (Name("self"), id) not in wpp_val.deps and not isinstance(wpp, ELit):
+            warnings.warn(f"When {who} chooses {id}, the probability doesn't depend on the value of {id}. As a result, the choice will effectively be uniform over {id} after normalization. Are you sure this is what you want? (A uniform choice is more easily expressed with wpp=1.)")
+    ctxt.frame = old_frame
+
+    for id, dom in choices:
+        child_choice = ctxt.frame.children[who].choices[Name("self"), id]
+        ctxt.frame.choices[who, id] = Choice(child_choice.tag, child_choice.idx, False, dom)
+
+    id_names_concat = '_'.join([id for id, dom in choices])
+    id_ll = ctxt.sym(f"{id_names_concat}_ll")
+    idx_tup = str(tuple(idx_list))
+    shape_tup = ', '.join([f"{ctxt.frame.choices[who, id].tag}.shape" for id, dom in choices])
+    ctxt.emit(f"{id_ll} = jnp.ones(jnp.broadcast_shapes({shape_tup}), dtype=jnp.float32) * {wpp_val.tag}")
+
+    if softmax:
+        ctxt.emit(f"{id_ll} = jnp.exp({id_ll} - maxx({id_ll}, {idx_tup}))")
+    if s.reduction == "maximize":
+        ctxt.emit(f"{id_ll} = 1.0 * ({id_ll} == maxx({id_ll}, {idx_tup}))")
+    ctxt.emit(f"{id_ll} = jnp.nan_to_num({id_ll} / marg({id_ll}, {idx_tup}))")
+
+    if ctxt.frame.ll is None:
+        ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
+        ctxt.emit(f"{ctxt.frame.ll} = 1.0")
+    ctxt.emit(f"{ctxt.frame.ll} = {id_ll} * {ctxt.frame.ll}")
+
+@eval_stmt.register
+def _(s: SObserve, ctxt: Context) -> None:
+    who, id = s.who, s.id
+    if (who, id) not in ctxt.frame.choices:
+        raise MemoError(
+            "Observation of unmodeled choice",
+            hint=f"{ctxt.frame.name} does not have {who}'s choice of {id} in their mental model. Perhaps you meant to write `{ctxt.frame.name}: thinks[ {who}: chooses({id} ...) ]` somewhere earlier in this memo?",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
+    ch = ctxt.frame.choices[(who, id)]
+    if ch.known:
+        raise MemoError(
+            "Observation of already-known choice",
+            hint=f"{ctxt.frame.name} already knows {who}'s choice of {id}. It doesn't make sense for {ctxt.frame.name} to re-observe that same choice again.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
+    ch.known = True
+
+    idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
+    ctxt.emit(f"""# {ctxt.frame.name} observe {who}.{id}""")
+    ctxt.emit(
+        f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
+    )
+
+@eval_stmt.register
+def _(s: SObserves, ctxt: Context) -> None:
+    who, what, how = s.who, s.what, s.how
+    ctxt.frame.ensure_child(who)
+    old_frame = ctxt.frame
+    ctxt.frame = ctxt.frame.children[who]
+    if ctxt.frame.ll is None:
+        ctxt.frame.ll = ctxt.sym(f"{ctxt.frame.name}_ll")
+        ctxt.emit(f"{ctxt.frame.ll} = 1.0")
+    what_val = eval_expr(what, ctxt)
+    ctxt.emit(f"""# {ctxt.frame.name} factors""")
+    if how == "boolean":
+        ctxt.emit(f"""{what_val.tag} = jnp.bool({what_val.tag}) * 1.0""")
+    ctxt.emit(f"""{ctxt.frame.ll} = {ctxt.frame.ll} * {what_val.tag}""")
+    idxs = tuple([c.idx for _, c in ctxt.frame.choices.items() if not c.known])
+    ctxt.emit(
+        f"""{ctxt.frame.ll} = jnp.nan_to_num({ctxt.frame.ll} / marg({ctxt.frame.ll}, {idxs}))"""
+    )
+    ctxt.frame = old_frame
+
+@eval_stmt.register
+def _(s: SWith, ctxt: Context) -> None:
+    who = s.who
+    ctxt.frame.ensure_child(who)
+    who, stmt = s.who, s.stmt
+    f_old = ctxt.frame
+    ctxt.frame = ctxt.frame.children[who]
+    eval_stmt(stmt, ctxt)
+    ctxt.frame = f_old
+
+@eval_stmt.register
+def _(s: SShow, ctxt: Context) -> None:
+    who, target_who, target_id, source_who, source_id = (
+        s.who, s.target_who, s.target_id, s.source_who, s.source_id
+    )
+    ctxt.emit(f"# telling {who} about {target_who}.{target_id}")
+    ctxt.frame.ensure_child(who)
+    if (target_who, target_id) not in ctxt.frame.children[who].choices:
+        raise MemoError(
+            "Observation of unmodeled choice",
+            hint=f"{ctxt.frame.name} does not yet think that {who} is modeling {target_who}'s choice of {target_id}, so it doesn't make sense for {who} to observe that choice. Perhaps you meant to write `{who}: thinks[ {target_who}: chooses({target_id} ...) ]` somewhere earlier in {ctxt.frame.name}'s memo?",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
+    if (source_who, source_id) not in ctxt.frame.choices:
+        raise MemoError(
+            "Observation of unknown choice",
+            hint=f"{ctxt.frame.name} does not yet think that {source_who} has chosen {source_id}, so cannot model {who} observing that value. Perhaps you misspelled {source_id}?",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
+
+    eval_stmt(
+        SWith(who, SObserve(target_who, target_id, loc=None), loc=None), ctxt
+    )
+    target_addr = (target_who, target_id)
+    source_addr = (source_who, source_id)
+    target_dom = ctxt.frame.children[who].choices[target_addr].domain
+    source_dom = ctxt.frame.choices[source_addr].domain
+    if target_dom != source_dom:
+        raise MemoError(
+            "Domain mismatch",
+            hint=f"{target_who}.{target_id} is from domain {target_dom}, while {source_who}.{source_id} is from domain {source_dom}.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
+    ctxt.frame.children[who].conditions[target_addr] = source_addr
+    tidx = ctxt.frame.children[who].choices[target_addr].idx
+    sidx = ctxt.frame.choices[source_addr].idx
+    ctxt.emit(
+        f"{ctxt.frame.children[who].ll} = jnp.swapaxes(pad({ctxt.frame.children[who].ll}, {ctxt.next_idx}), -1-{sidx}, -1-{tidx})"
+    )
+    ctxt.frame.children[who].choices[target_addr].idx = sidx
+    ctxt.frame.children[who].children[target_who].choices[(Name('self'), target_id)].idx = sidx
+    ctxt.emit(
+        f"{ctxt.frame.children[who].choices[target_addr].tag} = {ctxt.frame.choices[source_addr].tag}"
+    )
+
+@eval_stmt.register
+def _(s: SKnows, ctxt: Context) -> None:
+    who, source_who, source_id = s.who, s.source_who, s.source_id
+    source_addr = (source_who, source_id)
+    # out_addr = (ctxt.frame.name if source_who == "self" else source_who, source_id)
+    ctxt.frame.ensure_child(who)
+    if source_addr not in ctxt.frame.choices:
+        raise MemoError(
+            "Knowing unknown choice",
+            hint=f"{ctxt.frame.name} does not yet model {source_who}'s choice of {source_id}. So, it doesn't make sense for {ctxt.frame.name} to model {who} as knowing that choice.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
+    ctxt.frame.children[who].choices[source_addr] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
+    ctxt.frame.children[who].conditions[source_addr] = source_addr
+
+    if source_who == "self":
+        ctxt.frame.choices[(who, source_id)] = ctxt.frame.choices[source_addr]
+        ctxt.frame.conditions[(who, source_id)] = (ctxt.frame.name, source_id)
+    else:
+        ctxt.frame.children[who].ensure_child(source_who)
+        ctxt.frame.children[who].children[source_who].choices[(Name("self"), source_id)] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
+        ctxt.frame.children[who].children[source_who].conditions[(Name("self"), source_id)] = (source_who, source_id)
+    ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
+
+@eval_stmt.register
+def _(s: SSnapshot, ctxt: Context) -> None:
+    who, alias = s.who, s.alias
+    current_frame = ctxt.frame.children[who]
+    future_frame = copy.deepcopy(current_frame)
+    fresh_lls(ctxt, future_frame)
+    future_frame.name = alias
+    future_frame.parent = current_frame
+    current_frame.children[alias] = future_frame
+
+    # alice should be able to deal with all of the choices in future_alice's frame
+    for name, id in list(future_frame.choices.keys()):
+        if name == 'self':
+            # alice should know about future_alice's own choices
+            current_frame.choices[alias, id] = copy.deepcopy(future_frame.choices[name, id])
+            # alice[future_alice.x]  -->  alice.x
+            current_frame.conditions[alias, id] = (who, id)
+        else:
+            # map everything else back to alice's own version of that
+            future_frame.conditions[name, id] = (name, id)
+
+@eval_stmt.register
+def _(s: STrace, ctxt: Context) -> None:
+    who = s.who
+    import os, sys
+    if s.loc is not None:
+        loc_str = f"from {os.path.basename(s.loc.file)}, line {s.loc.line}, in @memo {s.loc.name}"
+    else:
+        loc_str = ""
+    print(f"** Tracing {who} {loc_str}")
+    if who not in ctxt.frame.children:
+        print(f"-> From {ctxt.frame.name}'s perspective, there is not yet any model of {who}. The current agents currently modeled by {ctxt.frame.name} are: {', '.join(ctxt.frame.children.keys())}.")
+        print()
+        return
+
+    f = ctxt.frame.children[who]
+    print(f"-> {who} is tracking the following choices:")
+    for key, val in f.choices.items():
+        if key[0] == Name("self"):
+            print(f"   - {key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
+        else:
+            print(f"   - {key[0]}.{key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
+    if key in f.conditions:
+        assert f.parent is not None
+        print(f"     | (observed to be {f.parent.name}'s {f.conditions[key][0]}.{f.conditions[key][1]})")
+    if len(f.children) == 0:
+        print(f"-> {who} is not yet tracking any agents.")
+    else:
+        print(f"-> {who} is currently tracking the following agents:")
+        for c in f.children:
+            print(f"   + {c}")
+    while f.parent is not None:
+        print(f"-> {f.name} is being modeled by {f.parent.name}.")
+        f = f.parent
+    print()
