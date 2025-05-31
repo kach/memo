@@ -87,11 +87,10 @@ class Frame:
     name: Name
     choices: dict[tuple[Name, Id], Choice] = field(default_factory=dict)
     children: dict[Name, Frame] = field(default_factory=dict)
-    conditions: dict[tuple[Name, Id], tuple[Name, Id]] = field(
-        default_factory=dict
-    )
+    conditions: dict[tuple[Name, Id], tuple[Name, Id]] = field(default_factory=dict)
     # key is a choice in this frame, val is a choice in the parent frame
     # used to create "aliases" in child's choices, e.g. in observe/knows
+    goals: dict[tuple[Name, Id], Expr] = field(default_factory=dict)
     ll: str | None = None
     parent: Frame | None = None
 
@@ -211,6 +210,10 @@ class EPosterior(ExprSyntaxNode):
     query: list[tuple[Name, Id]]
     var: list[tuple[Name, Id]]
 
+@dataclass(frozen=True)
+class EFuture(ExprSyntaxNode):
+    expr: Expr
+
 Expr = (
     ELit
     | EOp
@@ -225,6 +228,7 @@ Expr = (
     | ECost
     | EInline
     | EPosterior
+    | EFuture
 )
 
 
@@ -291,7 +295,15 @@ class STrace(SyntaxNode):
 @dataclass(frozen=True)
 class SWants(SyntaxNode):
     who: Name
-    what: Expr
+    what: Id
+    how: Expr
+
+@dataclass(frozen=True)
+class SGuess(SyntaxNode):
+    who: Name
+    id: Id
+    target_who: Name
+    target_id: Id
 
 Stmt = (
     SPass
@@ -305,6 +317,7 @@ Stmt = (
     | SSnapshot
     | STrace
     | SWants
+    | SGuess
 )
 
 
@@ -328,6 +341,7 @@ class Buffer:
 @dataclass
 class Context:
     frame: Frame
+    continuation: list[Stmt] = field(default_factory=list)
 
     hoisted_buf: Buffer = field(default_factory=Buffer)
     regular_buf: Buffer = field(default_factory=Buffer)
@@ -874,10 +888,10 @@ def _(e: EImagine, ctxt: Context) -> Value:
 
     who = ctxt.frame.name
 
-    if ctxt.frame.parent is not None:
-        ctxt.frame = ctxt.frame.parent
-        eval_stmt(SSnapshot(who, Name(f'future_{who}'), loc=e.loc), ctxt)
-        ctxt.frame = ctxt.frame.children[who]
+    # if ctxt.frame.parent is not None:
+        # ctxt.frame = ctxt.frame.parent
+        # eval_stmt(SSnapshot(who, Name(f'future_{who}'), loc=e.loc), ctxt)
+        # ctxt.frame = ctxt.frame.children[who]
 
     old_frame = ctxt.frame
     current_frame_copy = copy.deepcopy(ctxt.frame)
@@ -885,9 +899,12 @@ def _(e: EImagine, ctxt: Context) -> Value:
     fresh_lls(ctxt, current_frame_copy)
 
     ctxt.frame = current_frame_copy
-    for stmt in do:
+    cont_saved = ctxt.continuation
+    for i, stmt in enumerate(do):
+        ctxt.continuation = do[i + 1:]
         eval_stmt(stmt, ctxt)
     val_ = eval_expr(then, ctxt)
+    ctxt.continuation = cont_saved
     if not val_.known:
         raise MemoError(
             'trying to imagine an unknown value',
@@ -924,6 +941,56 @@ def _(e: EInline, ctxt: Context) -> Value:
         known=True,
         deps=set()
     )
+
+@eval_expr.register
+def _(e: EFuture, ctxt: Context) -> Value:
+    assert ctxt.frame.parent is not None
+    expr = e.expr
+
+    prefix: list[Name] = []
+    f = ctxt.frame
+    while f.parent is not None and not f.name.startswith('imagined_'):
+        prefix.insert(0, f.name)
+        f = f.parent
+
+    name = Name(ctxt.sym(f'future_{ctxt.frame.name}'))
+    frame_saved = ctxt.frame
+    ctxt.frame = ctxt.frame.parent
+    eval_stmt(SSnapshot(frame_saved.name, name, loc=e.loc), ctxt)
+    ctxt.frame = frame_saved
+
+    to_imagine: list[Stmt] = []
+    for stmt in ctxt.continuation:
+        for who in prefix[:-1]:
+            if isinstance(stmt, SWith) and stmt.who == who:
+                stmt = stmt.stmt
+            else:
+                break
+        else:  # if no break
+            if isinstance(stmt, SForAll):
+                raise NotImplementedError
+            elif isinstance(stmt, SPass):
+                to_imagine.append(stmt)
+                continue
+            elif stmt.who == prefix[-1]:
+                if isinstance(stmt, SShow):
+                    ch_id = Id(ctxt.sym(stmt.target_id))
+                    to_imagine.append(SGuess(name, ch_id, stmt.target_who, stmt.target_id, loc=stmt.loc))
+                    stmt = dataclasses.replace(stmt, source_who=name, source_id=ch_id)
+                to_imagine.append(dataclasses.replace(stmt, who=name))
+
+    then_expr = EExpect(
+        EWith(who=name, expr=expr, loc=expr.loc, static=False),
+        reduction="expectation", loc=expr.loc, static=False
+    )
+    eimagine_expr = EImagine(
+        do=to_imagine,
+        then=then_expr,
+        loc=e.loc,
+        static=then_expr.static
+    )
+    val = eval_expr(eimagine_expr, ctxt)
+    return val
 
 def fresh_lls(ctxt: Context, f: Frame) -> None:
     if f.ll is not None:
@@ -1183,6 +1250,7 @@ def _(s: SSnapshot, ctxt: Context) -> None:
             current_frame.choices[alias, id] = copy.deepcopy(future_frame.choices[name, id])
             # alice[future_alice.x]  -->  alice.x
             current_frame.conditions[alias, id] = (who, id)
+            # future_frame.conditions[name, id] = (alias, id)
         else:
             # map everything else back to alice's own version of that
             future_frame.conditions[name, id] = (name, id)
@@ -1208,9 +1276,9 @@ def _(s: STrace, ctxt: Context) -> None:
             print(f"   - {key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
         else:
             print(f"   - {key[0]}.{key[1]}: {val.domain} ({'known' if val.known else 'uncertain'})")
-    if key in f.conditions:
-        assert f.parent is not None
-        print(f"     | (observed to be {f.parent.name}'s {f.conditions[key][0]}.{f.conditions[key][1]})")
+        if key in f.conditions:
+            assert f.parent is not None
+            print(f"     | (observed to be {f.parent.name}'s {f.conditions[key][0]}.{f.conditions[key][1]})")
     if len(f.children) == 0:
         print(f"-> {who} is not yet tracking any agents.")
     else:
@@ -1221,3 +1289,49 @@ def _(s: STrace, ctxt: Context) -> None:
         print(f"-> {f.name} is being modeled by {f.parent.name}.")
         f = f.parent
     print()
+
+@eval_stmt.register
+def _(s: SWants, ctxt: Context) -> None:
+    who, what, how = s.who, s.what, s.how
+    assert (who, what) not in ctxt.frame.goals
+    ctxt.frame.goals[who, what] = how
+
+@eval_stmt.register
+def _(s: SGuess, ctxt: Context) -> None:
+    who, id, target_id, target_who = s.who, s.id, s.target_id, s.target_who
+    dom = ctxt.frame.children[who].choices[target_who, target_id].domain
+    eval_stmt(
+        SChoose(
+            who,
+            [(id, dom)],
+            EExpect(
+                expr=EOp(
+                    Op.EQ,
+                    [
+                        EChoice(
+                            id,
+                            loc=s.loc,
+                            static=False
+                        ),
+                        EWith(
+                            s.target_who,
+                            EChoice(
+                                s.target_id,
+                                loc=s.loc,
+                                static=False
+                            ),
+                            loc=s.loc,
+                            static=False
+                        )
+                    ],
+                    loc=s.loc,
+                    static=False
+                ),
+                reduction='expectation',
+                loc=s.loc,
+                static=False),
+            reduction='normalize',
+            loc=s.loc
+        ),
+        ctxt
+    )

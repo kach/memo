@@ -204,6 +204,11 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 return ELit(id, loc=loc, static=True)
             return EChoice(id=Id(id), loc=loc, static=False)
 
+        case ast.Subscript(value=ast.Name(id="Future"), slice=f_expr):
+            if isinstance(f_expr, ast.Slice) or isinstance(f_expr, ast.Tuple):
+                raise Exception()
+            return EFuture(expr=parse_expr(f_expr, ctxt), loc=loc, static=False)
+
         # joint probability
         case ast.Subscript(value=ast.Name(id="Pr"), slice=ast.Tuple(elts=elts)):
             rv_expr = parse_expr(elts[0], ctxt)
@@ -449,6 +454,14 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                             )
                         )
             return stmts
+
+        case ast.Call(
+            func=ast.Name(id="wants"),
+            args=[],
+            keywords=[ast.keyword(arg=what, value=how)]
+        ):
+            assert what is not None
+            return [SWants(who=Name(who), what=Id(what), how=parse_expr(how, ctxt), loc=loc)]
 
         case ast.Call(
             func=ast.Name(id="snapshots_self_as"),
