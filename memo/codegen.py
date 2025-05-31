@@ -85,7 +85,8 @@ def codegen(
         if debug_trace:
             ctxt.emit(f"""_time_ = time.time()""")
             ctxt.emit(f"""print(f' --> {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }})')""")
-    for stmt_ in stmts:
+    for i, stmt_ in enumerate(stmts):
+        ctxt.continuation = stmts[i + 1:]
         eval_stmt(stmt_, ctxt)
 
     val = eval_expr(retval, ctxt)

@@ -143,6 +143,7 @@ def imagine_knows_other[z: X]():
 def imagine_future_stress():
     alice: chooses(x in X, wpp=1)
     alice: thinks[ bob: chooses(z in X, wpp=1) ]
+    alice: snapshots_self_as(future_alice)
     return E[alice[
         imagine[
             world: knows(x, bob.z),
@@ -286,3 +287,18 @@ def kl_victor[x: X]():
         env: chooses(x in X, wpp=1)
     ]
     return bob[KL[alice.x | env.x]]
+
+@memo_test(mod)
+def wants():
+    bob: chooses(z in X, wpp=1)
+    bob: thinks[
+        alice: chooses(x in X, to_maximize=Future[z]),
+        alice: chooses(y in X, to_maximize=Future[z]),
+        alice: thinks[
+            world: knows(x, y),
+            world: chooses(z in X, wpp=z+x+y),
+        ],
+        alice: observes [world.z] is z,
+        alice: chooses(z in X, wpp=world.z + z)
+    ]
+    return E[bob[E[alice.x]]]
