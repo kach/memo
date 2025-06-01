@@ -204,10 +204,10 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 return ELit(id, loc=loc, static=True)
             return EChoice(id=Id(id), loc=loc, static=False)
 
-        case ast.Subscript(value=ast.Name(id="Future"), slice=f_expr):
+        case ast.Subscript(value=ast.Name(id="Predict"), slice=f_expr):
             if isinstance(f_expr, ast.Slice) or isinstance(f_expr, ast.Tuple):
                 raise Exception()
-            return EFuture(expr=parse_expr(f_expr, ctxt), loc=loc, static=False)
+            return EPredict(expr=parse_expr(f_expr, ctxt), loc=loc, static=False)
 
         # joint probability
         case ast.Subscript(value=ast.Name(id="Pr"), slice=ast.Tuple(elts=elts)):

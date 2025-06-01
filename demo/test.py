@@ -289,11 +289,11 @@ def kl_victor[x: X]():
     return bob[KL[alice.x | env.x]]
 
 @memo_test(mod)
-def wants():
+def predict():
     bob: chooses(z in X, wpp=1)
     bob: thinks[
-        alice: chooses(x in X, to_maximize=Future[z]),
-        alice: chooses(y in X, to_maximize=Future[z]),
+        alice: chooses(x in X, to_maximize=Predict[z]),
+        alice: chooses(y in X, to_maximize=Predict[z]),
         alice: thinks[
             world: knows(x, y),
             world: chooses(z in X, wpp=z+x+y),
@@ -302,3 +302,14 @@ def wants():
         alice: chooses(z in X, wpp=world.z + z)
     ]
     return E[bob[E[alice.x]]]
+
+@memo_test(mod)
+def wants[x: X, y: X]():
+    bob: thinks[
+        alice: wants(u=x + y),
+        alice: wants(v=x - y),
+        alice: chooses(x in X, to_maximize=u),
+        alice: chooses(y in X, to_maximize=v)
+    ]
+    bob: knows(x, y)
+    return bob[Pr[alice.x == x, alice.y == y]]

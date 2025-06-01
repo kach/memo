@@ -90,7 +90,7 @@ class Frame:
     conditions: dict[tuple[Name, Id], tuple[Name, Id]] = field(default_factory=dict)
     # key is a choice in this frame, val is a choice in the parent frame
     # used to create "aliases" in child's choices, e.g. in observe/knows
-    goals: dict[tuple[Name, Id], Expr] = field(default_factory=dict)
+    goals: dict[Id, Expr] = field(default_factory=dict)
     ll: str | None = None
     parent: Frame | None = None
 
@@ -211,7 +211,7 @@ class EPosterior(ExprSyntaxNode):
     var: list[tuple[Name, Id]]
 
 @dataclass(frozen=True)
-class EFuture(ExprSyntaxNode):
+class EPredict(ExprSyntaxNode):
     expr: Expr
 
 Expr = (
@@ -228,7 +228,7 @@ Expr = (
     | ECost
     | EInline
     | EPosterior
-    | EFuture
+    | EPredict
 )
 
 
@@ -415,6 +415,8 @@ def _(e: ELit, ctxt: Context) -> Value:
 def _(e: EChoice, ctxt: Context) -> Value:
     id = e.id
     if (Name("self"), id) not in ctxt.frame.choices:
+        if id in ctxt.frame.goals:
+            return eval_expr(EPredict(ctxt.frame.goals[id], loc=e.loc, static=False), ctxt)
         raise MemoError(
             f"Unknown choice {ctxt.frame.name}.{id}",
             hint=f"Did you perhaps misspell {id}?" + (
@@ -943,7 +945,7 @@ def _(e: EInline, ctxt: Context) -> Value:
     )
 
 @eval_expr.register
-def _(e: EFuture, ctxt: Context) -> Value:
+def _(e: EPredict, ctxt: Context) -> Value:
     assert ctxt.frame.parent is not None
     expr = e.expr
 
@@ -1294,7 +1296,8 @@ def _(s: STrace, ctxt: Context) -> None:
 def _(s: SWants, ctxt: Context) -> None:
     who, what, how = s.who, s.what, s.how
     assert (who, what) not in ctxt.frame.goals
-    ctxt.frame.goals[who, what] = how
+    ctxt.frame.ensure_child(who)
+    ctxt.frame.children[who].goals[what] = how
 
 @eval_stmt.register
 def _(s: SGuess, ctxt: Context) -> None:
