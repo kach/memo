@@ -303,6 +303,15 @@ def predict():
     ]
     return E[bob[E[alice.x]]]
 
+@memo_test(mod, expect='ce')
+def predict_fail_knows():
+    bob: chooses(z in X, wpp=1)
+    bob: thinks[
+        alice: chooses(x in X, to_maximize=Predict[x]),
+        alice: knows(z)
+    ]
+    return E[bob[E[alice.x]]]
+
 @memo_test(mod)
 def wants[x: X, y: X]():
     bob: thinks[

@@ -975,6 +975,14 @@ def _(e: EPredict, ctxt: Context) -> Value:
                 to_imagine.append(stmt)
                 continue
             elif stmt.who == prefix[-1]:
+                if isinstance(stmt, SKnows):
+                    raise MemoError(
+                        message="A 'knows' statement cannot appear after a 'wants' statement or a 'Predict' expression.",
+                        hint=f"This is because {ctxt.frame.name} cannot evaluate utilities without knowing all of the relevant variables. Can you move the 'knows' statement before the 'wants' statement?",
+                        user=True,
+                        ctxt=ctxt,
+                        loc=e.loc
+                    )
                 if isinstance(stmt, SShow):
                     ch_id = Id(ctxt.sym(stmt.target_id))
                     to_imagine.append(SGuess(name, ch_id, stmt.target_who, stmt.target_id, loc=stmt.loc))
@@ -1295,7 +1303,8 @@ def _(s: STrace, ctxt: Context) -> None:
 @eval_stmt.register
 def _(s: SWants, ctxt: Context) -> None:
     who, what, how = s.who, s.what, s.how
-    assert (who, what) not in ctxt.frame.goals
+    assert what not in ctxt.frame.goals
+    assert (Name("self"), what) not in ctxt.frame.choices
     ctxt.frame.ensure_child(who)
     ctxt.frame.children[who].goals[what] = how
 
