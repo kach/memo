@@ -11,3 +11,4 @@ demo/*-aux
 demo/*.dot
 demo/*.png
 Handbook.key
+venv12/
