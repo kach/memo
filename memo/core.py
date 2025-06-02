@@ -171,6 +171,7 @@ class EChoice(ExprSyntaxNode):
 class EExpect(ExprSyntaxNode):
     expr: Expr
     reduction: Literal["expectation", "variance"]
+    warn: bool = True
 
 
 @dataclass(frozen=True)
@@ -710,11 +711,12 @@ def _(e: EExpect, ctxt: Context) -> Value:
 
     val_ = eval_expr(expr, ctxt)
     if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
-        warnings.warn(f"""\
+        if e.warn:
+            warnings.warn(f"""\
 Redundant expectation, not marginalizing...
 | {linecache.getline(e.loc.file, e.loc.line)[:-1] if e.loc is not None else ''}
 | {' ' * e.loc.offset if e.loc is not None else ''}^
-""")
+    """)
         if reduction == "expectation":
             return val_
     idxs_to_marginalize = tuple(set(
@@ -869,12 +871,12 @@ def _(e: EWith, ctxt: Context) -> Value:
     # ic(ctxt.frame.children[who].conditions)
     # ic(val_.deps)
     for who_, id in val_.deps:
-        if who_ == Name("self"):
-            deps.add((who, id))
-        elif (who_, id) in ctxt.frame.children[who].conditions:
+        if (who_, id) in ctxt.frame.children[who].conditions:
             z_who, z_id = ctxt.frame.children[who].conditions[(who_, id)]
             # ic(who, who_, id, z_who, z_id)
             deps.add((z_who, z_id))
+        elif who_ == Name("self"):
+            deps.add((who, id))
         else:
             ic(ctxt.frame.name, who, e, who_, id)
             assert False  # should never happen
@@ -994,7 +996,7 @@ def _(e: EPredict, ctxt: Context) -> Value:
 
     then_expr = EExpect(
         EWith(who=name, expr=expr, loc=expr.loc, static=False),
-        reduction="expectation", loc=expr.loc, static=False
+        reduction="expectation", warn=False, loc=expr.loc, static=False
     )
     eimagine_expr = EImagine(
         do=to_imagine,
@@ -1006,7 +1008,7 @@ def _(e: EPredict, ctxt: Context) -> Value:
     return val
 
 @eval_expr.register
-def _(e: EUtil, ctxt: Context):
+def _(e: EUtil, ctxt: Context) -> Value:
     id = e.goal
     if id not in ctxt.frame.goals:
         raise MemoError(
@@ -1274,9 +1276,10 @@ def _(s: SSnapshot, ctxt: Context) -> None:
         if name == 'self':
             # alice should know about future_alice's own choices
             current_frame.choices[alias, id] = copy.deepcopy(future_frame.choices[name, id])
-            # alice[future_alice.x]  -->  alice.x
+            # observer{ alice[future_alice.x]  -->  alice.x }
             current_frame.conditions[alias, id] = (who, id)
-            # future_frame.conditions[name, id] = (alias, id)
+            # alice{ future_alice.x --> x }
+            future_frame.conditions[name, id] = (Name("self"), id)
         else:
             # map everything else back to alice's own version of that
             future_frame.conditions[name, id] = (name, id)
@@ -1322,7 +1325,7 @@ def _(s: SWants, ctxt: Context) -> None:
     assert what not in ctxt.frame.goals
     assert (Name("self"), what) not in ctxt.frame.choices
     ctxt.frame.ensure_child(who)
-    ctxt.frame.children[who].goals[what] = how
+    ctxt.frame.children[who].goals[what] = EExpect(how, reduction='expectation', warn=False, loc=s.loc, static=False)
 
 @eval_stmt.register
 def _(s: SGuess, ctxt: Context) -> None:
@@ -1356,6 +1359,7 @@ def _(s: SGuess, ctxt: Context) -> None:
                     static=False
                 ),
                 reduction='expectation',
+                warn=False,
                 loc=s.loc,
                 static=False),
             reduction='normalize',

@@ -289,6 +289,11 @@ def kl_victor[x: X]():
     return bob[KL[alice.x | env.x]]
 
 @memo_test(mod)
+def predict_no_deps_warning():
+    alice: chooses(x in X, to_maximize=Predict[x])
+    return 1.0
+
+@memo_test(mod)
 def predict():
     bob: chooses(z in X, wpp=1)
     bob: thinks[
