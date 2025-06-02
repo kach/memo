@@ -214,6 +214,10 @@ class EPosterior(ExprSyntaxNode):
 class EPredict(ExprSyntaxNode):
     expr: Expr
 
+@dataclass(frozen=True)
+class EUtil(ExprSyntaxNode):
+    goal: Id
+
 Expr = (
     ELit
     | EOp
@@ -229,6 +233,7 @@ Expr = (
     | EInline
     | EPosterior
     | EPredict
+    | EUtil
 )
 
 
@@ -415,8 +420,6 @@ def _(e: ELit, ctxt: Context) -> Value:
 def _(e: EChoice, ctxt: Context) -> Value:
     id = e.id
     if (Name("self"), id) not in ctxt.frame.choices:
-        if id in ctxt.frame.goals:
-            return eval_expr(EPredict(ctxt.frame.goals[id], loc=e.loc, static=False), ctxt)
         raise MemoError(
             f"Unknown choice {ctxt.frame.name}.{id}",
             hint=f"Did you perhaps misspell {id}?" + (
@@ -1001,6 +1004,19 @@ def _(e: EPredict, ctxt: Context) -> Value:
     )
     val = eval_expr(eimagine_expr, ctxt)
     return val
+
+@eval_expr.register
+def _(e: EUtil, ctxt: Context):
+    id = e.goal
+    if id not in ctxt.frame.goals:
+        raise MemoError(
+            message=f"Unknown goal {id}",
+            hint=f"Did you misspell {id}?",
+            user=True,
+            ctxt=ctxt,
+            loc=e.loc
+        )
+    return eval_expr(EPredict(ctxt.frame.goals[id], loc=e.loc, static=False), ctxt)
 
 def fresh_lls(ctxt: Context, f: Frame) -> None:
     if f.ll is not None:

@@ -208,6 +208,9 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             if isinstance(f_expr, ast.Slice) or isinstance(f_expr, ast.Tuple):
                 raise Exception()
             return EPredict(expr=parse_expr(f_expr, ctxt), loc=loc, static=False)
+        
+        case ast.Subscript(value=ast.Name(id="EU"), slice=ast.Name(id=gid)):
+            return EUtil(goal=Id(gid), loc=loc, static=False)
 
         # joint probability
         case ast.Subscript(value=ast.Name(id="Pr"), slice=ast.Tuple(elts=elts)):

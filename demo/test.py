@@ -317,8 +317,8 @@ def wants[x: X, y: X]():
     bob: thinks[
         alice: wants(u=x + y),
         alice: wants(v=x - y),
-        alice: chooses(x in X, to_maximize=u),
-        alice: chooses(y in X, to_maximize=v)
+        alice: chooses(x in X, to_maximize=EU[u]),
+        alice: chooses(y in X, to_maximize=EU[v])
     ]
     bob: knows(x, y)
     return bob[Pr[alice.x == x, alice.y == y]]
