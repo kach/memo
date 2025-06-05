@@ -1322,7 +1322,7 @@ def _(s: STrace, ctxt: Context) -> None:
 @eval_stmt.register
 def _(s: SWants, ctxt: Context) -> None:
     who, what, how = s.who, s.what, s.how
-    assert what not in ctxt.frame.goals
+    assert what not in ctxt.frame.children[who].goals
     assert (Name("self"), what) not in ctxt.frame.choices
     ctxt.frame.ensure_child(who)
     ctxt.frame.children[who].goals[what] = EExpect(how, reduction='expectation', warn=False, loc=s.loc, static=False)
