@@ -143,6 +143,7 @@ def imagine_knows_other[z: X]():
 def imagine_future_stress():
     alice: chooses(x in X, wpp=1)
     alice: thinks[ bob: chooses(z in X, wpp=1) ]
+    alice: snapshots_self_as(future_alice)
     return E[alice[
         imagine[
             world: knows(x, bob.z),
@@ -254,6 +255,25 @@ def post_optim_distinctness[z: Z]():
     alice: chooses(z2 in Z, wpp=1)
     return Pr[z == alice.z1, z == alice.z2]
 
+@memo_test(mod)
+def post_diag_1[x: X]():
+    bob: knows(x)
+    bob: chooses(y in X, wpp=(x + y))
+    return Pr[bob.y == x]
+
+@memo_test(mod)
+def post_diag_2[x: X]():
+    bob: thinks[alice: chooses(x in X, wpp=1)]
+    bob: observes [alice.x] is x
+    bob: chooses(y in X, wpp=(alice.x + y))
+    return Pr[bob.y == x]
+
+@memo_test(mod)
+def post_diag_3[x: X]():
+    bob: chooses(x in X, wpp=1)
+    bob: chooses(y in X, wpp=(x + y))
+    return Pr[bob.y == x]
+
 from math import log
 @memo_test(mod, item=log(2/1) + 1/8 - 1/2)
 def kl():
@@ -286,3 +306,43 @@ def kl_victor[x: X]():
         env: chooses(x in X, wpp=1)
     ]
     return bob[KL[alice.x | env.x]]
+
+@memo_test(mod)
+def predict_no_deps_warning():
+    alice: chooses(x in X, to_maximize=Predict[x])
+    return 1.0
+
+@memo_test(mod)
+def predict():
+    bob: chooses(z in X, wpp=1)
+    bob: thinks[
+        alice: chooses(x in X, to_maximize=Predict[z]),
+        alice: chooses(y in X, to_maximize=Predict[z]),
+        alice: thinks[
+            world: knows(x, y),
+            world: chooses(z in X, wpp=z+x+y),
+        ],
+        alice: observes [world.z] is z,
+        alice: chooses(z in X, wpp=world.z + z)
+    ]
+    return E[bob[E[alice.x]]]
+
+@memo_test(mod, expect='ce')
+def predict_fail_knows():
+    bob: chooses(z in X, wpp=1)
+    bob: thinks[
+        alice: chooses(x in X, to_maximize=Predict[x]),
+        alice: knows(z)
+    ]
+    return E[bob[E[alice.x]]]
+
+@memo_test(mod)
+def wants[x: X, y: X]():
+    bob: thinks[
+        alice: wants(u=x + y),
+        alice: wants(v=x - y),
+        alice: chooses(x in X, to_maximize=EU[u]),
+        alice: chooses(y in X, to_maximize=EU[v])
+    ]
+    bob: knows(x, y)
+    return bob[Pr[alice.x == x, alice.y == y]]
