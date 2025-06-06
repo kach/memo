@@ -667,9 +667,20 @@ def _(e: EPosterior, ctxt: Context) -> Value:
     ctxt.emit(f"{out} = marg({ctxt.frame.ll}, {idxs_to_marginalize})")
     ctxt.emit(f"{out} = pad({out}, {ctxt.next_idx})")
     for knw_, var_ in zip(knw, var):
+        # in theory, knw_c is a unitary dimension (known choice ll)
+        # in theory, var_c is a non-unitary dimension (unknown choice ll)
+        # if we transpose their indices, then all is well
+        # however, sometimes knw_c is non-unitary, so we have to instead extract the diag
         knw_c = ctxt.frame.choices[knw_]
         var_c = ctxt.frame.choices[var_]
+        ctxt.emit(f"if {out}.shape[-1 - {knw_c.idx}] == 1:")
+        ctxt.indent()
         ctxt.emit(f"{out} = jnp.swapaxes({out}, -1 - {var_c.idx}, -1 - {knw_c.idx})")
+        ctxt.dedent()
+        ctxt.emit("else:")
+        ctxt.indent()
+        ctxt.emit(f"{out} = collapse_diagonal({out}, -1 - {knw_c.idx}, -1 - {var_c.idx})")
+        ctxt.dedent()
     return Value(tag=out, known=True, deps={c for c, cc in ctxt.frame.choices.items() if cc.known})
 
 @eval_expr.register

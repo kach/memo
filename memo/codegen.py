@@ -181,7 +181,7 @@ def _make_{f_name}():
 
     if debug_print_compiled:
         for i, line in enumerate(out.splitlines()):
-            print(f"{i + 1: 5d}  {line}")
+            print(f"{line}  # {i + 1: 5d}")
 
     if save_comic is not None:
         from .comic import comic

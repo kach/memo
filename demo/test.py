@@ -255,6 +255,25 @@ def post_optim_distinctness[z: Z]():
     alice: chooses(z2 in Z, wpp=1)
     return Pr[z == alice.z1, z == alice.z2]
 
+@memo_test(mod)
+def post_diag_1[x: X]():
+    bob: knows(x)
+    bob: chooses(y in X, wpp=(x + y))
+    return Pr[bob.y == x]
+
+@memo_test(mod)
+def post_diag_2[x: X]():
+    bob: thinks[alice: chooses(x in X, wpp=1)]
+    bob: observes [alice.x] is x
+    bob: chooses(y in X, wpp=(alice.x + y))
+    return Pr[bob.y == x]
+
+@memo_test(mod)
+def post_diag_3[x: X]():
+    bob: chooses(x in X, wpp=1)
+    bob: chooses(y in X, wpp=(x + y))
+    return Pr[bob.y == x]
+
 from math import log
 @memo_test(mod, item=log(2/1) + 1/8 - 1/2)
 def kl():
