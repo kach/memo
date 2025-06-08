@@ -140,3 +140,17 @@ def make_xarray_data(f, z):
 
     import xarray as xr
     return xr.DataArray(name=f"{f.__name__[5:]}", data=z, coords=coords)
+
+def collapse_diagonal(A, i, j):
+    # Check that the specified axes have the same size
+    if A.shape[i] != A.shape[j]:
+        raise ValueError(f"Axes {i} and {j} must have the same size (got {A.shape[i]} and {A.shape[j]})")
+    # Move the axes of interest to the end for easier manipulation
+    A_swapped = jnp.moveaxis(A, [i, j], [-2, -1])
+    # Extract the diagonal
+    diag = jnp.diagonal(A_swapped, axis1=-2, axis2=-1)
+    # Add a new axis at the end (which will become axis j)
+    diag_expanded = jnp.expand_dims(diag, axis=-1)
+    # Now move the axes to the correct order
+    result = jnp.moveaxis(diag_expanded, [-2, -1], [i, j])
+    return result

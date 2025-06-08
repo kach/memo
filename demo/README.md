@@ -17,6 +17,8 @@
 - [Bayesian Persuasion](./demo-persuasion.ipynb)  
   (we use memo to recover a result presented in a classic paper on persuasion)
 - [Risk aversion](./demo-risk-aversion.ipynb)
+- [The Battle of Wits](./demo-vizzini.py)  
+  (from "The Princess Bride")
 
 ## Planning and inverse planning
 
