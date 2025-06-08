@@ -2,6 +2,8 @@
 from memo import memo
 from enum import IntEnum
 
+# See: https://www.youtube.com/watch?v=rMz7JBRbmNo
+
 class Cups(IntEnum):
     Near_Vizzini = 0
     Near_Westley = 1
