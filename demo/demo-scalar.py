@@ -1,15 +1,21 @@
 from memo import memo
 import jax
 import jax.numpy as np
+from enum import IntEnum
 
 ## Scalar implicature
 
-N = [0, 1, 2, 3]  # number of nice people
-U = [0, 1, 2]     # utterance: {none, some, all} of the people are nice
+NN = 10_000
+
+N = np.arange(NN + 1)  # number of nice people
+class U(IntEnum):
+    NONE = 0
+    SOME = 1
+    ALL = 2
 
 @jax.jit
 def meaning(n, u):  # (none)  (some)  (all)
-    return np.array([ n == 0, n > 0, n == 3 ])[u]
+    return np.array([ n == 0, n > 0, n == NN ])[u]
 
 @memo
 def scalar[n: N, u: U]():
@@ -25,4 +31,9 @@ def scalar[n: N, u: U]():
     listener: chooses(n in N, wpp=E[speaker.n == n])
     return Pr[listener.n == n]
 
-print(scalar())
+scalar()  # warm up JIT
+
+import time
+t_s = time.time()
+scalar()
+print(time.time() - t_s)
