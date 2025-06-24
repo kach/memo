@@ -346,3 +346,10 @@ def wants[x: X, y: X]():
     ]
     bob: knows(x, y)
     return bob[Pr[alice.x == x, alice.y == y]]
+
+@memo_test(mod)
+def jianlin[x: X]():
+    a: thinks [b : chooses(u in X, wpp=1.0)]
+    a : observes [b.u] is x
+    a : chooses(v in X, wpp=Pr[b.u == v])
+    return Pr[a.v == x]
