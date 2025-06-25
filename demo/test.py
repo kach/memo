@@ -349,7 +349,7 @@ def wants[x: X, y: X]():
 
 @memo_test(mod)
 def jianlin[x: X]():
-    a: thinks [b : chooses(u in X, wpp=1.0)]
-    a : observes [b.u] is x
-    a : chooses(v in X, wpp=Pr[b.u == v])
+    a: thinks [b: chooses(u in X, wpp=1.0)]
+    a: observes [b.u] is x
+    a: chooses(v in X, wpp=b.u == v)
     return Pr[a.v == x]
