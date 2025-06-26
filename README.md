@@ -41,7 +41,6 @@ An early draft of a paper on memo's design and implementation is available [here
   title={A Domain-Specific Probabilistic Programming Language for Reasoning About Reasoning (or: a memo on memo)},
   year={2025},
   author={Kartik Chandra and Tony Chen and Joshua B. Tenenbaum and Jonathan Ragan-Kelley},
-  journal={psyarxiv preprint},
   url={https://doi.org/10.31234/osf.io/pt863}
 }
 ```
