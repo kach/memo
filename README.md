@@ -7,8 +7,9 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 ## Installing memo
 
 1. memo is based on Python. Before installing memo, make sure you have Python 3.12 or higher installed. You can check this by running `python --version`.
-2. Next, install [JAX](https://github.com/google/jax), a Python module that memo uses to produce fast, differentiable, GPU-enabled code. If you don't have a GPU, then running `pip install jax` should be enough. Otherwise, please consult the JAX website for installation instructions. You can check if JAX is installed by running `import jax` in Python.
-3. Finally, install memo by running `pip install memo-lang`. You can check if memo is installed by running `from memo import memo` in Python. (Make sure to install `memo-lang`, not `memo`! The latter is a different package, unrelated to this project.)
+2. Create a [virtual environment](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments) by running `python -m venv venv`, and then `. venv/bin/activate`. (Your command prompt should change to be prefixed by "venv", indicating that you have successfully created the virtual environment.)
+3. Next, install [JAX](https://github.com/google/jax), a Python module that memo uses to produce fast, differentiable, GPU-enabled code. If you don't have a GPU, then running `pip install jax` should be enough. Otherwise, please consult the JAX website for GPU-specific installation instructions. You can check if JAX is installed by running `import jax` in Python.
+4. Finally, install memo by running `pip install memo-lang`. You can check if memo is installed by running `from memo import memo` in Python. (Important: Make sure to install `memo-lang`, not `memo`! The latter is a different package, unrelated to this project.)
 
 ## Learning memo
 
