@@ -37,6 +37,9 @@ class domain(list):
     def __call__(self, *args, **kwargs):
         return self.pack(*args, **kwargs)
 
+    def __str__(self):
+        return f'<domain with {len(self.place_values)} fields ({", ".join(self.keys)}) and {self.n} total members>'
+
     def pack(self, *args, **kwargs):
         z = 0
         if len(args) > 0:
