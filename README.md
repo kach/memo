@@ -23,7 +23,8 @@ There are many resources available for learning memo.
 You may also be looking for general resources on the theory behind memo modeling.
 1. For background on the theory of decision making under uncertainty, e.g. MDPs and POMDPs, we recommending consulting _Decision Making Under Uncertainty_ as a reference. You can read the entire book for free online [here](https://algorithmsbook.com/decisionmaking/).
 2. For background on Bayesian models of theory of mind, we recommend consulting chapter 14 of _Bayesian Models of Cognition_ as a reference. You can read the published version [here](https://mitpress.ublish.com/ebook/bayesian-models-of-cognition-reverse-engineering-the-mind-preview/12799/341) and a PDF preprint [here](https://www.tomerullman.org/papers/BBB_chapter14.pdf).
-3. Dae Houlihan (Dartmouth University) is teaching a winter '25 [course](https://comosoco.daeh.info) on computational models of social cognition using memo.
+3. Dae Houlihan (Dartmouth University) taught a winter '25 [course](https://comosoco.daeh.info) on computational models of social cognition using memo.
+4. Robert Hawkins (Stanford University) is teaching a summer '25 seminar on pragmatics using memo. Here is the work-in-progress [textbook](https://hawkrobe.github.io/probLang-memo/), a version of problang that has been adapted to use memo.
 
 ## The memo community
 
@@ -47,6 +48,30 @@ An early draft of a paper on memo's design and implementation is available [here
 ```
 
 I would love to hear about any research using memo. Please don't hesitate to share your work with me!
+
+## As seen on…
+
+**Papers/projects using memo**  
+- People use theory of mind to craft lies exploiting audience desires (Sterling, Berke, Chandra, & Jara-Ettinger, CogSci '25, SPP '25)
+- Solving strategic social coordination via Bayesian learning (Lamba, Houlihan, & Saxe, CogSci '25)
+- Empathy in Explanation (Collins, Chandra, Weller, Ragan-Kelley, & Tenenbaum, CogSci '25, SPP '25)
+- Minding the Politeness Gap in Cross-cultural Communication (Machino, Siegel, & Hawkins, CogSci '25)
+- Preparing a learner for an independent future (Sundar, Chandra, & Kleiman-Weiner, CogSci '25)
+- A Computational Theory of Dignity (Chandra, Tenenbaum, & Saxe, SPP '25)
+- Theories of Mind as Languages of Thought for Thought about Thought (Chandra, Ragan-Kelley & Tenenbaum, CogSci '25)
+
+_(Email me to have your work listed here!)_
+
+**Talks on memo**  
+- New England PL/Systems Summit (NEPLS) (2024)
+- Languages For Inference (LAFI @ POPL) (2025)
+
+**Courses using memo**  
+- Semester-long course at Dartmouth College (2025)
+- Summer seminar at Stanford University (2025)
+- Tutorial at CogSci conference (2025, upcoming)
+- Tutorial at COSMOS summer School (2025, upcoming)
+
 
 ## FAQ
 
@@ -85,7 +110,7 @@ One way to think about memo is that it simulates _all_ possible traces at the sa
 
 <details><summary>Is memo a research prototype, or a mature software product? Should I invest in learning memo?</summary>
 
-While memo originated as a research project, it is now stable software that is being used by many labs around the world. memo will be supported for a long time to come, and you should feel confident in using memo for your own projects.
+While memo originated as a research project, it is now stable software that is being used by many labs around the world, and has led to several published papers. memo will be supported for a long time to come, and you should feel confident in using memo for your own projects.
 </details>
 
 ---
@@ -115,7 +140,7 @@ Assuming you have [installed JAX with GPU support](https://jax.readthedocs.io/en
 
 <details><summary>Can I run memo on Apple's "metal" platform?</summary>
 
-Yes! See this issue for details: https://github.com/kach/memo/issues/66
+Yes! However, JAX on Metal is not very well-supported by Apple, so we cannot guarantee that everything will work perfectly. See this issue for details: https://github.com/kach/memo/issues/66
 </details>
 
 ---
