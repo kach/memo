@@ -11,8 +11,8 @@ authors = [
   {name = "Tony Chen"}
 ]
 license = {file = "LICENSE"}
-description = "A language for mental models"
-readme = "README.md"
+description = "A probabilistic programming language for reasoning about reasoning"
+readme = "README-pypi.md"
 requires-python = ">=3.12"
 dependencies = [ "jax" ]
 classifiers = [
