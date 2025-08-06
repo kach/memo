@@ -4,4 +4,4 @@
 
 memo stands for: mental modeling, memoized matrix operations, model-expressed-model-optimized, and metacognitive memos.
 
-For more information, please visit memo's [GitHub repository](https://githun.com/kach/memo).
+For more information, please visit memo's [GitHub repository](https://github.com/kach/memo).
