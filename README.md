@@ -69,8 +69,8 @@ _(Email me to have your work listed here!)_
 **Courses using memo**  
 - Semester-long course at Dartmouth College (2025)
 - Summer seminar at Stanford University (2025)
-- Tutorial at CogSci conference (2025, upcoming)
-- Tutorial at COSMOS summer School (2025, upcoming)
+- Tutorial at CogSci conference in San Francisco (2025)
+- Tutorial at COSMOS summer school in Tokyo (2025)
 
 
 ## FAQ
