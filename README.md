@@ -36,7 +36,7 @@ Here are some ways to engage with the memo community.
 
 ## The memo on memo
 
-The authoritative paper on memo's design and implementation is available [here]([https://osf.io/preprints/psyarxiv/pt863](https://dl.acm.org/doi/10.1145/3763078)). If you use memo in your work, you are invited to cite this paper via this BibTeX citation:
+The authoritative paper on memo's design and implementation is available [here](https://dl.acm.org/doi/10.1145/3763078). If you use memo in your work, you are invited to cite this paper via this BibTeX citation:
 
 ```bibtex
 @article{chandra2025memo,
