@@ -40,10 +40,22 @@ An early draft of a paper on memo's design and implementation is available [here
 
 ```bibtex
 @article{chandra2025memo,
-  title={A Domain-Specific Probabilistic Programming Language for Reasoning About Reasoning (or: a memo on memo)},
-  year={2025},
-  author={Kartik Chandra and Tony Chen and Joshua B. Tenenbaum and Jonathan Ragan-Kelley},
-  url={https://doi.org/10.31234/osf.io/pt863}
+author = {Chandra, Kartik and Chen, Tony and Tenenbaum, Joshua B. and Ragan-Kelley, Jonathan},
+title = {A Domain-Specific Probabilistic Programming Language for Reasoning about Reasoning (Or: A Memo on memo)},
+year = {2025},
+issue_date = {October 2025},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {9},
+number = {OOPSLA2},
+url = {https://doi.org/10.1145/3763078},
+doi = {10.1145/3763078},
+abstract = {The human ability to think about thinking ("theory of mind") is a fundamental object of study in many disciplines. In recent decades, researchers across these disciplines have converged on a rich computational paradigm for modeling theory of mind, grounded in recursive probabilistic reasoning. However, practitioners often find programming in this paradigm challenging: first, because thinking-about-thinking is confusing for programmers, and second, because models are slow to run. This paper presents memo, a new domain-specific probabilistic programming language that overcomes these challenges: first, by providing specialized syntax and semantics for theory of mind, and second, by taking a unique approach to inference that scales well on modern hardware via array programming. memo enables practitioners to write dramatically faster models with much less code, and has already been adopted by several research groups.},
+journal = {Proc. ACM Program. Lang.},
+month = oct,
+articleno = {300},
+numpages = {31},
+keywords = {probabilistic programming}
 }
 ```
 
