@@ -36,7 +36,7 @@ Here are some ways to engage with the memo community.
 
 ## The memo on memo
 
-An early draft of a paper on memo's design and implementation is available [here](https://osf.io/preprints/psyarxiv/pt863). If you use memo in your work, you are invited to cite this paper:
+The authoritative paper on memo's design and implementation is available [here]([https://osf.io/preprints/psyarxiv/pt863](https://dl.acm.org/doi/10.1145/3763078)). If you use memo in your work, you are invited to cite this paper via this BibTeX citation:
 
 ```bibtex
 @article{chandra2025memo,
@@ -58,6 +58,10 @@ numpages = {31},
 keywords = {probabilistic programming}
 }
 ```
+
+or this reference:
+
+> Kartik Chandra, Tony Chen, Joshua B. Tenenbaum, and Jonathan Ragan-Kelley. 2025. A Domain-Specific Probabilistic Programming Language for Reasoning about Reasoning (Or: A Memo on memo). Proc. ACM Program. Lang. 9, OOPSLA2, Article 300 (October 2025), 31 pages. https://doi.org/10.1145/3763078
 
 I would love to hear about any research using memo. Please don't hesitate to share your work with me!
 
