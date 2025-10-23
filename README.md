@@ -213,3 +213,12 @@ Use `@memo(save_comic="filename")` instead of just `@memo`. memo will produce a 
 <details><summary>How can I get model outputs in pandas/xarray format?</summary>
 Pass in the <code>return_pandas=True</code> or <code>return_xarray=True</code> keyword arguments to your model. Your model will then return a tuple: the first argument will be the raw array, and the second argument will have a <code>.pandas</code> or <code>.xarray</code> property, respectively.
 </details>
+
+<details><summary>How can I sample from common distributions, e.g. normal or Beta?</summary>
+You can import and call the pdfs and pmfs defined in `jax.scipy.stats` ([documentation](https://docs.jax.dev/en/latest/jax.scipy.html)). For example, to choose from a Bernoulli distribution with p=0.9, you can write:
+```
+from jax.scipy.stats.bernoulli import pmf as ber_pmf
+...
+alice: chooses(x in Bool, wpp=ber_pmf(x, 0.9))
+```
+</details>
