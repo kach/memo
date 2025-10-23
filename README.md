@@ -215,11 +215,13 @@ Pass in the <code>return_pandas=True</code> or <code>return_xarray=True</code> k
 </details>
 
 <details><summary>How can I sample from common distributions, e.g. normal or Beta?</summary>
-You can import and call the pdfs and pmfs defined in <code>jax.scipy.stats</code> ([documentation](https://docs.jax.dev/en/latest/jax.scipy.html)). For example, to choose from a Bernoulli distribution with p=0.9, you can write:
+You can import and call the pdfs and pmfs defined in <code>jax.scipy.stats</code> (see https://docs.jax.dev/en/latest/jax.scipy.html). For example, to choose from a Bernoulli distribution with p=0.9, you can write:
 
 ```python
 from jax.scipy.stats.bernoulli import pmf as ber_pmf
+
 ...
+
 alice: chooses(x in Bool, wpp=ber_pmf(x, 0.9))
 ```
 </details>
