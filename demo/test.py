@@ -353,3 +353,14 @@ def jianlin[x: X]():
     a: observes [b.u] is x
     a: chooses(v in X, wpp=b.u == v)
     return Pr[a.v == x]
+
+mod.install('''
+@jax.jit
+def takes_nonstatic_arg(x, Z, y):
+    return Z[x] * y
+''')
+
+@memo_test(mod)
+def ffi_static():
+    alice: chooses(x in X, wpp=takes_nonstatic_arg(x, {np.array([0, 1, 2, 3, 4])}, 3.0))
+    return E[alice.x]

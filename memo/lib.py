@@ -21,8 +21,11 @@ def pad(t, total):
         t = jnp.expand_dims(t, 0)
     return t
 
-def ffi(f, *args):
-    if jax.eval_shape(f, *[jax.ShapeDtypeStruct((), jnp.int32) for z in args]).shape != ():
+def ffi(f, statics, *args):
+    if jax.eval_shape(
+        f,
+        *[(z if static else jax.ShapeDtypeStruct((), jnp.int32)) for z, static in zip(args, statics)]
+    ).shape != ():
         raise MemoError(
             f"The function {f.__name__}(...) is not scalar-in-scalar-out. memo can only handle external (@jax.jit) functions that take scalars as input and return a single scalar as output.",
             hint=None,
@@ -30,20 +33,20 @@ def ffi(f, *args):
             ctxt=None,
             loc=None
         )
-    if not isinstance(f, jax.lib.xla_extension.PjitFunction):
-        raise MemoError(
-            f"Tried to call non-JAX function `{f.__name__}`. Use @jax.jit to mark as JAX.",
-            hint=None,
-            user=True,
-            ctxt=None,
-            loc=None
-        )
-    if len(args) == 0:
-        return f()
-    args = jax.numpy.broadcast_arrays(*args)
-    target_shape = args[0].shape
-    args = [arg.reshape(-1) for arg in args]
-    return jax.vmap(f)(*args).reshape(target_shape)
+    # if not isinstance(f, jax.lib.xla_extension.PjitFunction):
+    #     raise MemoError(
+    #         f"Tried to call non-JAX function `{f.__name__}`. Use @jax.jit to mark as JAX.",
+    #         hint=None,
+    #         user=True,
+    #         ctxt=None,
+    #         loc=None
+    #     )
+    nonstatic_args = [arg for arg, static in zip(args, statics) if not static]
+    if len(nonstatic_args) == 0:
+        return f(*args)
+    target_shape = jax.numpy.broadcast_shapes(*[arg.shape for arg in nonstatic_args])
+    args = [arg if static else jax.numpy.broadcast_to(arg, target_shape).reshape(-1) for arg, static in zip(args, statics)]
+    return jax.vmap(f, in_axes=[None if static else 0 for arg, static in zip(args, statics)])(*args).reshape(target_shape)
 
 def check_domains(tgt, src):
     if len(tgt) > len(src):

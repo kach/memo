@@ -447,7 +447,9 @@ def _(e: EFFI, ctxt: Context) -> Value:
     deps = set().union(*(arg.deps for arg in args_out))
     with ctxt.hoist(e.static):
         out = ctxt.sym(f"ffi_{name}")
-        ctxt.emit(f'{out} = ffi({name}, {", ".join(arg.tag for arg in args_out)})')
+        arg_statics = ", ".join([repr(arg.static) for arg in args])
+        arg_tags = ", ".join(arg.tag for arg in args_out)
+        ctxt.emit(f'{out} = ffi({name}, [{arg_statics}], {arg_tags})')
         if e.static:
             ctxt.emit(f'{out} = {out}.item()')
     return Value(tag=out, known=known, deps=deps)
