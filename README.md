@@ -126,7 +126,7 @@ One way to think about memo is that it simulates _all_ possible traces at the sa
 
 <details><summary>Is memo a research prototype, or a mature software product? Should I invest in learning memo?</summary>
 
-While memo originated as a research project, it is now stable software that is being used by many labs around the world, and has led to several published papers. memo will be supported for a long time to come, and you should feel confident in using memo for your own projects.
+memo is stable software that is being used by many labs around the world, and has led to several published papers. memo will be supported for a long time to come, and you should feel confident in using memo for your own projects.
 </details>
 
 ---

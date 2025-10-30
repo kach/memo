@@ -349,6 +349,7 @@ class Buffer:
 class ParsingContext:
     cast: None | list[str]
     static_parameters: list[str]
+    exotic_parameters: set[str]
     static_defaults: list[None | str]
     axes: list[tuple[str, str]]
     loc_name: str
@@ -465,7 +466,7 @@ def _(e: EFFI, ctxt: Context) -> Value:
         arg_tags = ", ".join(arg.tag for arg in args_out)
         ctxt.emit(f'{out} = ffi({name}, [{arg_statics}], {arg_tags})')
         if e.static:
-            ctxt.emit(f'{out} = {out}.item()')
+            ctxt.emit(f'{out} = jnp.array({out}).item()')
     return Value(tag=out, known=known, deps=deps)
 
 @eval_expr.register

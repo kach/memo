@@ -1,6 +1,6 @@
 from .core import *
 
-import ast, inspect, textwrap, re
+import ast, inspect, textwrap, re, builtins
 from typing import Any, Callable, Literal
 from dataclasses import dataclass
 
@@ -23,7 +23,15 @@ def parse_args_list(args: list[ast.expr], ctxt: ParsingContext, loc: SourceLocat
         case [ast.Constant(value=val)] if val is ...:
             return [ELit(value=param, loc=loc, static=True) for param in ctxt.static_parameters]
         case _:
-            return [parse_expr(arg, ctxt) for arg in args]
+            out: list[Expr] = []
+            for arg in args:
+                match arg:
+                    case ast.Name(id=id) if id in ctxt.exotic_parameters:
+                        loc_ = SourceLocation(ctxt.loc_file, arg.lineno, arg.col_offset, ctxt.loc_name)
+                        out.append(ELit(value=id, loc=loc_, static=True))
+                    case _:
+                        out.append(parse_expr(arg, ctxt))
+            return out
 
 def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
@@ -52,7 +60,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             )
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
-            ffi_args_parsed = [parse_expr(arg, ctxt) for arg in ffi_args]
+            ffi_args_parsed = parse_args_list(ffi_args, ctxt, loc)
             return EFFI(
                 name=ffi_name, args=ffi_args_parsed, loc=loc, static=all(arg.static for arg in ffi_args_parsed)
             )
@@ -189,6 +197,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         # literals
         case ast.Name(id=id):
             if id in ctxt.static_parameters:
+                if id in ctxt.exotic_parameters:
+                    raise MemoError(
+                        "Unexpected use of non-numeric parameter",
+                        hint=f"{id} is labeled as a special (non-numeric / ...) parameter. Such parameters can only be used as direct arguments to function calls.",
+                        user=True,
+                        ctxt=None,
+                        loc=loc
+                    )
                 return ELit(id, loc=loc, static=True)
             return EChoice(id=Id(id), loc=loc, static=False)
 
@@ -196,7 +212,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             if isinstance(f_expr, ast.Slice) or isinstance(f_expr, ast.Tuple):
                 raise Exception()
             return EPredict(expr=parse_expr(f_expr, ctxt), loc=loc, static=False)
-        
+
         case ast.Subscript(value=ast.Name(id="EU"), slice=ast.Name(id=gid)):
             return EUtil(goal=Id(gid), loc=loc, static=False)
 
@@ -463,7 +479,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             for arg in args:
                 if not isinstance(arg, ast.Name):
                     raise MemoError(
-                        "Inputs to snaps() must be names of agents",
+                        "Inputs to snapshots_self_as() must be names of agents",
                         hint=f"`{ast.unparse(arg)}` is not a name",
                         user=True,
                         ctxt=None,
@@ -523,13 +539,6 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 )
             ]
 
-        # case ast.Call(
-        #     func=ast.Name("observes_event"),
-        #     args=[e_],
-        #     keywords=[]
-        # ):
-        #     return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), how="boolean", loc=loc)]
-
         case ast.Call(
             func=ast.Name("observes_event"),
             args=[],
@@ -541,11 +550,6 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             value=ast.Name("observes_that"),
             slice=e_
         ): return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), how="boolean", loc=loc)]
-
-        # case ast.Subscript(
-        #     value=ast.Name("observes_event_wp"),
-        #     slice=e_
-        # ): return [SObserves(who=Name(who), what=parse_expr(e_, ctxt), how="probability", loc=loc)]
 
         case ast.Subscript(
             value=ast.Name("thinks"), slice=ast.Slice(lower=ast.Name(who_), upper=expr_)
@@ -601,6 +605,7 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
 
     cast = None
     static_parameters: list[str] = []
+    exotic_parameters: set[str] = set()
     static_defaults: list[None | str] = []
 
     match tree:
@@ -610,6 +615,19 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
             for arg_i, arg in enumerate(f.args.args):
                 # assert isinstance(arg.annotation, ast.Name) and arg.annotation.id in ['float']
                 # should always be true, see https://docs.python.org/3.8/library/ast.html#ast.parse
+                match arg.annotation:
+                    case ast.Constant(builtins.Ellipsis):
+                        exotic_parameters.add(arg.arg)
+                    case None:
+                        pass
+                    case _:
+                        raise MemoError(
+                            "Unexpected annotation on parameter",
+                            hint=f"The parameter {arg.arg} was annotated with an unnexpected annotation. Currently, memo only supports the annotation `...`, which signals a non-numeric parameter.",
+                            user=True,
+                            ctxt=None,
+                            loc=None
+                        )
                 assert arg.type_comment is None
                 static_parameters.append(arg.arg)
                 if arg_i < num_required_args:
@@ -642,6 +660,7 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
     pctxt = ParsingContext(
         cast=cast,
         static_parameters=static_parameters,
+        exotic_parameters=exotic_parameters,
         static_defaults=static_defaults,
         axes=[],
         loc_name=f_name,

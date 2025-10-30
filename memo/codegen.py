@@ -81,6 +81,11 @@ def codegen(
     ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME), pctxt=pctxt)
     ctxt.hoisted_syms.extend(pctxt.static_parameters)
     with ctxt.hoist():
+        for param in pctxt.static_parameters:
+            if param not in pctxt.exotic_parameters:
+                ctxt.emit(f'check_scalar_param({param}, "{param}")')
+            else:
+                ctxt.emit(f'check_exotic_param({param}, "{param}")')
         ctxt.emit(f"cost_ = 0")
         if debug_trace:
             ctxt.emit(f"""_time_ = time.time()""")

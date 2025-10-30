@@ -21,6 +21,26 @@ def pad(t, total):
         t = jnp.expand_dims(t, 0)
     return t
 
+def check_scalar_param(x, name):
+    if not jnp.isscalar(x):
+        raise MemoError(
+            f"Parameter {name} was not a numeric scalar, but rather an array. By default, all memo parameters must be scalars. Annotate this parameter as `{name}: ...` if you really did intend to pass in a non-scalar.",
+            hint=None,
+            user=True,
+            ctxt=None,
+            loc=None
+        )
+
+def check_exotic_param(x, name):
+    if not isinstance(x, jax.numpy.ndarray):
+        raise MemoError(
+            f"Parameter {name} was not a JAX array, despite being annotated as `{name}: ...`.",
+            hint=None,
+            user=True,
+            ctxt=None,
+            loc=None
+        )
+
 def ffi(f, statics, *args):
     if jax.eval_shape(
         f,
@@ -157,3 +177,9 @@ def collapse_diagonal(A, i, j):
     # Now move the axes to the correct order
     result = jnp.moveaxis(diag_expanded, [-2, -1], [i, j])
     return result
+
+
+def array_index(arr, *idxs):
+    if len(idxs) == 1:
+        return arr[idxs[0]]
+    return arr[idxs]
