@@ -1,4 +1,6 @@
 from memo import memo, memo_test, make_module
+import jax.numpy as np
+X = np.arange(3)
 
 mod = make_module('test_suite')
 mod.install('''
@@ -11,6 +13,10 @@ N = 5
 @jax.jit
 def f(n):
     return n + 1
+
+@jax.jit
+def g(n):
+    return n.sum()
 
 Z = np.arange(1000)
 R = np.linspace(-10, 10, 1000)
@@ -369,3 +375,23 @@ def ffi_static():
 def param_name_conflict(x):
     alice: chooses(x in X, wpp=1)
     return 1.0
+
+@memo_test(mod, expect='ce')
+def exotic_param_1(x: ... = X):
+    return x
+
+@memo_test(mod, expect='ce')
+def exotic_param_2(x: ... = X):
+    return f(x)
+
+@memo_test(mod, expect='ce')
+def exotic_param_3(x: ... = "not_an_array"):
+    return f(x)
+
+@memo_test(mod, expect='ce')
+def exotic_param_4(x = X):
+    return x
+
+@memo_test(mod)
+def exotic_param_5(x: ... = X):
+    return g(x) + array_index(x, 0)
