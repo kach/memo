@@ -364,3 +364,8 @@ def takes_nonstatic_arg(x, Z, y):
 def ffi_static():
     alice: chooses(x in X, wpp=takes_nonstatic_arg(x, {np.array([0, 1, 2, 3, 4])}, 3.0))
     return E[alice.x]
+
+@memo_test(mod, expect='ce')
+def param_name_conflict(x):
+    alice: chooses(x in X, wpp=1)
+    return 1.0

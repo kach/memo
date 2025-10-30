@@ -78,7 +78,7 @@ def codegen(
     cache: bool = False
 ) -> MemoCompiled:
     f_name = pctxt.loc_name
-    ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME))
+    ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME), pctxt=pctxt)
     ctxt.hoisted_syms.extend(pctxt.static_parameters)
     with ctxt.hoist():
         ctxt.emit(f"cost_ = 0")

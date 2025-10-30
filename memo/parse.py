@@ -11,18 +11,6 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
-@dataclass
-class ParsingContext:
-    cast: None | list[str]
-    static_parameters: list[str]
-    static_defaults: list[None | str]
-    axes: list[tuple[str, str]]
-    loc_name: str
-    loc_file: str
-    qualname: str
-    doc: str | None = None
-
-
 def ast_increment_colno(tree: ast.AST, n: int) -> None:
     for node in ast.walk(tree):
         if isinstance(node, ast.expr) or isinstance(node, ast.stmt):

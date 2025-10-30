@@ -344,9 +344,23 @@ class Buffer:
     def getvalue(self: Buffer) -> str:
         return self.io.getvalue()
 
+
+@dataclass
+class ParsingContext:
+    cast: None | list[str]
+    static_parameters: list[str]
+    static_defaults: list[None | str]
+    axes: list[tuple[str, str]]
+    loc_name: str
+    loc_file: str
+    qualname: str
+    doc: str | None = None
+
+
 @dataclass
 class Context:
     frame: Frame
+    pctxt: ParsingContext
     continuation: list[Stmt] = field(default_factory=list)
 
     hoisted_buf: Buffer = field(default_factory=Buffer)
@@ -1080,6 +1094,14 @@ def _(s: SChoose, ctxt: Context) -> None:
             raise MemoError(
                 "Repeated choice",
                 hint=f"{who} has already chosen {id} earlier in this model! Pick a new name?",
+                user=True,
+                ctxt=ctxt,
+                loc=s.loc
+            )
+        if id in ctxt.pctxt.static_parameters:
+            raise MemoError(
+                "Name conflict",
+                hint=f"The name {id} is already being used as a parameter to the model.",
                 user=True,
                 ctxt=ctxt,
                 loc=s.loc
