@@ -180,6 +180,4 @@ def collapse_diagonal(A, i, j):
 
 
 def array_index(arr, *idxs):
-    if len(idxs) == 1:
-        return arr[idxs[0]]
     return arr[idxs]
