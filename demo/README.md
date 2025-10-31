@@ -32,6 +32,7 @@
   (agents reason about their uncertainty about each other)
 - [Sally-Anne (false belief test)](./demo-sally-anne.ipynb)
 - [Integrating intuitive psychology and intuitive physics](./demo-physics.ipynb)
+- [Ratioanl belief revision in chimpanzees](./demo-chimp-belief-revision.ipynb)
 
 ## Information theoretic calculations
 
