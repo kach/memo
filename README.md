@@ -162,8 +162,32 @@ Yes! However, JAX on Metal is not very well-supported by Apple, so we cannot gua
 ---
 
 <details><summary>VS Code underlines all my memo code in red. It's a bloodbath out there!</summary>
+This is because your editor is trying to interpret your memo code as regular python
+code while checking it for problems. To disable this behavior, you can annotate your 
+memo models with `@no_type_check` and (if you are using `ruff`) `# ruff: noqa`.
+For example, if you have memo code that looks like:
 
-If you write `# type: ignore` at the top of your file (even before the imports), then VS Code will suppress the red lines. If you use Ruff, additionally add `# ruff: noqa`.
+```python
+@memo
+def model[u: U, r: R]():
+   # ...
+```
+
+You can disable the checks by adding the following to the top of your file:
+
+```python
+from typing import no_type_check
+```
+
+Then, annotate your model function like so:
+
+```python
+# ruff: noqa
+@no_type_check
+@memo
+def model[u: U, r: R]():
+   # ...
+```
 </details>
 
 <details><summary>Sometimes my model returns 0 in unexpected places, often at the edges/extreme values of distributions.</summary>
