@@ -20,19 +20,20 @@
 - [Belief Polarization](./demo-polarization.ipynb)
 - [The Battle of Wits](./demo-vizzini.py)  
   (from "The Princess Bride")
+- [I-POMDP (investment game)](./demo-i-pomdp.ipynb)  
+  (agents reason about their uncertainty about each other)
 
 ## Planning and inverse planning
 
 - [MDP (gridworld)](./demo-mdp.ipynb) (discussed in paper)
 - [POMDP (crying baby)](./demo-pomdp.ipynb) (discussed in paper)
+- [Food trucks](./demo-trucks.ipynb)
 - [Takeaway](./demo-takeaway.ipynb) (discussed in paper)  
   (we use memo to reflect on cost of computation and make inferences about _whether_ someone is thinking)
 - [Perturbation confusion](./demo-pc.ipynb) (discussed in paper)
-- [I-POMDP (investment game)](./demo-i-pomdp.ipynb)
-  (agents reason about their uncertainty about each other)
 - [Sally-Anne (false belief test)](./demo-sally-anne.ipynb)
 - [Integrating intuitive psychology and intuitive physics](./demo-physics.ipynb)
-- [Ratioanl belief revision in chimpanzees](./demo-chimp-belief-revision.ipynb)
+- [Rational belief revision in chimpanzees](./demo-chimp-belief-revision.ipynb)
 
 ## Information theoretic calculations
 
