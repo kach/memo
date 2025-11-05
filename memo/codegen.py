@@ -70,7 +70,7 @@ def make_static_parameter_list(pctxt: ParsingContext) -> str:
 def codegen(
     pctxt: ParsingContext,
     stmts: list[Stmt],
-    retval: Expr,
+    retvals: list[Expr],
     debug_print_compiled: bool=False,
     debug_trace: bool=False,
     save_comic: Optional[str]=None,
@@ -94,28 +94,31 @@ def codegen(
         ctxt.continuation = stmts[i + 1:]
         eval_stmt(stmt_, ctxt)
 
-    val = eval_expr(retval, ctxt)
-    # for ax_name, ax_dom in pctxt.axes:
-    #     if (Name('self'), ax_name) not in val.deps:
-    #         warnings.warn(f"memo {pctxt.loc_name}'s return value does not depend on axis {ax_name} (of type {ax_dom}). Are you sure this is what you want? Please note that memo will avoid redundant work by returning an array where the dimension along that axis is of length 1.")
+    vals = []
+    for retval in retvals:
+        val = eval_expr(retval, ctxt)
+        # for ax_name, ax_dom in pctxt.axes:
+        #     if (Name('self'), ax_name) not in val.deps:
+        #         warnings.warn(f"memo {pctxt.loc_name}'s return value does not depend on axis {ax_name} (of type {ax_dom}). Are you sure this is what you want? Please note that memo will avoid redundant work by returning an array where the dimension along that axis is of length 1.")
 
-    if not val.known:
-        raise MemoError(
-            "Returning a value that the observer has uncertainty over",
-            hint="Did you mean to use E[...] after your return statement?",
-            ctxt=ctxt,
-            user=True,
-            loc=retval.loc
-        )
-    squeeze_axes = [
-        -1 - i
-        for i in range(ctxt.next_idx)
-        if i not in [z[0] for z in ctxt.forall_idxs]
-    ]
-    ctxt.emit(f"# prepare output")
-    ctxt.emit(f"{val.tag} = jnp.array({val.tag})  # ensure output is an array")
-    ctxt.emit(f"{val.tag} = pad({val.tag}, {ctxt.next_idx})")
-    ctxt.emit(f"{val.tag} = {val.tag}.squeeze(axis={tuple(squeeze_axes)}).transpose()")
+        if not val.known:
+            raise MemoError(
+                "Returning a value that the observer has uncertainty over",
+                hint="Did you mean to use E[...] after your return statement?",
+                ctxt=ctxt,
+                user=True,
+                loc=retval.loc
+            )
+        squeeze_axes = [
+            -1 - i
+            for i in range(ctxt.next_idx)
+            if i not in [z[0] for z in ctxt.forall_idxs]
+        ]
+        ctxt.emit(f"# prepare output")
+        ctxt.emit(f"{val.tag} = jnp.array({val.tag})  # ensure output is an array")
+        ctxt.emit(f"{val.tag} = pad({val.tag}, {ctxt.next_idx})")
+        ctxt.emit(f"{val.tag} = {val.tag}.squeeze(axis={tuple(squeeze_axes)}).transpose()")
+        vals.append(val.tag)
 
     with ctxt.hoist():
         ctxt.emit(f"""\
@@ -145,7 +148,10 @@ if return_cost:
         ctxt.emit(f"if return_pandas: aux.pandas = make_pandas_data(_out_{f_name}, _out_)")
         ctxt.emit(f"if return_xarray: aux.xarray = make_xarray_data(_out_{f_name}, _out_)")
         ctxt.emit(f"""return memo_result(data=_out_, aux=aux) if return_aux else _out_""")
-    ctxt.emit(f"return {val.tag}")
+    if len(retvals) == 1:
+        ctxt.emit(f"return {vals[0]}")
+    else:
+        ctxt.emit(f"return jnp.stack(jnp.broadcast_arrays({', '.join(vals)}), axis=0)")
 
     out = f"""\
 def _make_{f_name}():
@@ -176,6 +182,7 @@ def _make_{f_name}():
     _out_{f_name}._axes = tuple([{", ".join(f"{repr(p[0])}" for p in pctxt.axes)}])
     _out_{f_name}._doms = tuple([{", ".join(f"{repr(p[1])}" for p in pctxt.axes)}])
     _out_{f_name}._vals = tuple([{", ".join(f"{p[1]}" for p in pctxt.axes)}])
+    _out_{f_name}._num_retvals = {len(retvals)}
     return _out_{f_name}
 
 {f_name} = _make_{f_name}()
@@ -200,15 +207,15 @@ def _make_{f_name}():
         ret = install_module(out)[f"{f_name}"]
         return cast(MemoCompiled, lambda _: print("Call me from inside the module!"))
 
-    retvals: dict[Any, Any] = {}
+    scope_retvals: dict[Any, Any] = {}
 
-    exec(out, globals_of_caller, retvals)
-    return cast(MemoCompiled, retvals[f"{f_name}"])
+    exec(out, globals_of_caller, scope_retvals)
+    return cast(MemoCompiled, scope_retvals[f"{f_name}"])
 
 def memo_(f: Callable[..., Any], **kwargs: Any) -> MemoCompiled:
     try:
-        pctxt, stmts, retval = parse_memo(f)
-        return codegen(pctxt, stmts, retval, **kwargs)
+        pctxt, stmts, retvals = parse_memo(f)
+        return codegen(pctxt, stmts, retvals, **kwargs)
     except MemoError as e:
         if e.loc:
             e.add_note(f"  file: \"{os.path.basename(e.loc.file)}\", line {e.loc.line}, in @memo {e.loc.name}")
