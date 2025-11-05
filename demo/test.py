@@ -395,3 +395,24 @@ def exotic_param_4(x = X):
 @memo_test(mod)
 def exotic_param_5(x: ... = X):
     return g(x) + array_index(x, 0)
+
+@memo_test(mod)
+def multi_return_1[x: X]():
+    return 1
+    return 2
+
+@memo_test(mod)
+def multi_return_2[x: X]():
+    return multi_return_1[0][x]()
+
+@memo_test(mod, expect='re')
+def multi_return_3[x: X]():
+    return multi_return_1[x]()
+
+@memo_test(mod, expect='re')
+def multi_return_4[x: X]():
+    return multi_return_1[3][x]()
+
+@memo_test(mod, expect='re')
+def multi_return_5[x: X]():
+    return test_[0][x]()

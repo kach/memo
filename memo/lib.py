@@ -32,7 +32,7 @@ def check_scalar_param(x, name):
         )
 
 def check_exotic_param(x, name):
-    if not isinstance(x, jax.numpy.ndarray):
+    if not isinstance(x, jnp.ndarray):
         raise MemoError(
             f"Parameter {name} was not a JAX array, despite being annotated as `{name}: ...`.",
             hint=None,
@@ -68,6 +68,14 @@ def ffi(f, statics, *args):
     args = [arg if static else jax.numpy.broadcast_to(arg, target_shape).reshape(-1) for arg, static in zip(args, statics)]
     return jax.vmap(f, in_axes=[None if static else 0 for arg, static in zip(args, statics)])(*args).reshape(target_shape)
 
+def check_which_retval(num_retvals, which_retval):
+    if num_retvals == 1:
+        assert which_retval is None, "You are calling a memo model with only one return value, so you do not have to specify specify which return value you want."
+    else:
+        assert which_retval is not None, "You are calling a memo model that has multiple return values, but you have not specified which return value you want. Try writing model[0][...](...) to get the first return value."
+        assert 0 <= which_retval
+        assert which_retval < num_retvals, "Your memo model does not have enough return values."
+
 def check_domains(tgt, src):
     if len(tgt) > len(src):
         raise Exception("Not enough arguments to memo call!")
@@ -76,8 +84,6 @@ def check_domains(tgt, src):
     for i, (t, s) in enumerate(zip(tgt, src)):
         if t != s:
             raise Exception(f"Domain mismatch in memo call argument {i + 1}: {t} != {s}.")
-
-
 
 def pprint_table(f, z):
     z = z.at[jnp.isclose(z, 1., atol=1e-5)].set(1)
@@ -92,12 +98,18 @@ def pprint_table(f, z):
         return str(val)
 
     rows = []
-    rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + (f"{f.__name__}",))  # header
+    if f._num_retvals == 1:
+        rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + (f"{f.__name__}",))
+    else:
+        rows.append(tuple([f'{ax}: {dom}' for ax, dom in zip(f._axes, f._doms)]) + tuple(f"{f.__name__}[{i}]" for i in range(f._num_retvals)))
     import itertools
     for row in itertools.product(*[enumerate(v) for v in f._vals]):
         idx = tuple([r[0] for r in row])
         lead = tuple([pprint(r[1]) for r in row])
-        rows.append(lead + (pprint(z[idx]),))
+        if f._num_retvals == 1:
+            rows.append(lead + (pprint(z[idx]),))
+        else:
+            rows.append(lead + tuple([pprint(z[(k,) + idx]) for k in range(f._num_retvals)]))
 
     widths = []
     for col in range(len(rows[0])):
@@ -181,3 +193,8 @@ def collapse_diagonal(A, i, j):
 
 def array_index(arr, *idxs):
     return arr[idxs]
+
+from enum import IntEnum
+class Bool(IntEnum):
+    NO = 0
+    YES = 1

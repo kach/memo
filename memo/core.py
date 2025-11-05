@@ -158,6 +158,7 @@ class EFFI(ExprSyntaxNode):
 @dataclass(frozen=True)
 class EMemo(ExprSyntaxNode):
     name: str
+    which_retval: int | None
     args: list[Expr]
     ids: list[Tuple[Id, Name, Id]]
 
@@ -498,7 +499,7 @@ def _(e: ECost, ctxt: Context) -> Value:
 
 @eval_expr.register
 def _(e: EMemo, ctxt: Context) -> Value:
-    name, args, ids = e.name, e.args, e.ids
+    name, args, ids, which_retval = e.name, e.args, e.ids, e.which_retval
     args_out = []
     with ctxt.hoist():
         for arg in args:
@@ -525,10 +526,13 @@ def _(e: EMemo, ctxt: Context) -> Value:
     with ctxt.hoist():
         res = ctxt.sym(f"result_array_{name}")
         doms = [ctxt.frame.choices[source_name, source_id].domain for _, source_name, source_id in ids]
+        ctxt.emit(f"""check_which_retval({name}._num_retvals, {which_retval})""")
         ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
         ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
         ctxt.indent()
         ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, return_cost='return_cost')})')
+        if which_retval is not None:
+            ctxt.emit(f'{res} = {res}[{which_retval}]')
         ctxt.emit(f"if return_cost: aux.cost += res_aux.cost")
         ctxt.dedent()
         ctxt.emit('else:')

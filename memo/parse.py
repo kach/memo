@@ -33,6 +33,52 @@ def parse_args_list(args: list[ast.expr], ctxt: ParsingContext, loc: SourceLocat
                         out.append(parse_expr(arg, ctxt))
             return out
 
+def parse_ememo(expr: ast.expr, ctxt: ParsingContext, loc: SourceLocation) -> Expr | None:
+    match expr:
+        case ast.Call(
+            func=ast.Subscript(
+                value=f,
+                slice=axes
+            ),
+            args=args
+        ):
+            pass
+        case _:
+            return None
+
+    match f:
+        case ast.Name(id=f_name):
+            which_retval = None
+        case ast.Subscript(ast.Name(id=f_name), slice=ast.Constant(value=which_retval)) if isinstance(which_retval, int):
+            pass
+        case _:
+            return None
+
+    match axes:
+        case ast.Tuple(elts=elts):
+            pass
+        case _:
+            elts = [axes]
+
+    ids = []
+    for elt in elts:
+        match elt:
+            case ast.Attribute(value=ast.Name(id=source_name), attr=source_id):
+                ids.append((Id("..."), Name(source_name), Id(source_id)))
+            case ast.Name(id=source_id):
+                ids.append((Id("..."), Name("self"), Id(source_id)))
+            case _:
+                raise Exception()
+
+    return EMemo(
+        name=f_name,
+        which_retval=which_retval,
+        args=parse_args_list(args, ctxt, loc),
+        ids=ids,
+        loc=loc,
+        static=False
+    )
+
 def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
@@ -66,57 +112,8 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             )
 
         # memo call single arg
-        case ast.Call(
-            func=ast.Subscript(
-                value=ast.Name(id=f_name),
-                slice=ast.Attribute(value=ast.Name(id=source_name), attr=source_id)
-            ),
-            args=args,
-        ):
-            return EMemo(
-                name=f_name,
-                args=parse_args_list(args, ctxt, loc),
-                ids=[(Id("..."), Name(source_name), Id(source_id))],
-                loc=loc,
-                static=False
-            )
-
-        case ast.Call(
-            func=ast.Subscript(
-                value=ast.Name(id=f_name),
-                slice=ast.Name(id=source_id)
-            ),
-            args=args,
-        ):
-            return EMemo(
-                name=f_name,
-                args=parse_args_list(args, ctxt, loc),
-                ids=[(Id("..."), Name("self"), Id(source_id))],
-                loc=loc,
-                static=False
-            )
-
-        # memo call multi arg
-        case ast.Call(
-            func=ast.Subscript(value=ast.Name(id=f_name), slice=ast.Tuple(elts=elts)),
-            args=args,
-        ):
-            ids = []
-            for elt in elts:
-                match elt:
-                    case ast.Attribute(value=ast.Name(id=source_name), attr=source_id):
-                        ids.append((Id("..."), Name(source_name), Id(source_id)))
-                    case ast.Name(id=source_id):
-                        ids.append((Id("..."), Name("self"), Id(source_id)))
-                    case _:
-                        raise Exception()
-            return EMemo(
-                name=f_name,
-                args=parse_args_list(args, ctxt, loc),
-                ids=ids,
-                loc=loc,
-                static=False
-            )
+        case _ if ememo := parse_ememo(expr, ctxt, loc):
+            return ememo
 
         # operators
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
@@ -579,7 +576,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             )
 
 
-def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr]:
+def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], list[Expr]]:
     try:
         rawsrc = inspect.getsource(ff)
     except OSError:
@@ -668,7 +665,7 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
         qualname=ff.__qualname__
     )
     stmts: list[Stmt] = []
-    retval = None
+    retvals = []
 
     for tp in f.type_params:
         assert isinstance(tp, ast.TypeVar)
@@ -721,15 +718,7 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
                     )
                 stmts.extend(parse_stmt(expr, who, pctxt))
             case ast.Return(value=expr) if expr is not None:
-                if retval is not None:
-                    raise MemoError(
-                        f"multiple return statements",
-                        hint=f"A memo should only have one return statement, at the end",
-                        user=True,
-                        ctxt=None,
-                        loc=loc
-                    )
-                retval = parse_expr(expr, pctxt)
+                retvals.append(parse_expr(expr, pctxt))
             case ast.Expr(value=ast.Constant(value=docstr)) if (
                 isinstance(docstr, str) and pctxt.doc is None
             ):
@@ -743,7 +732,7 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
                     loc=loc
                 )
 
-    if retval is None:
+    if len(retvals) == 0:
         raise MemoError(
             f"No return statement",
             hint=f"All memos should end with a return statement",
@@ -752,4 +741,4 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], Expr
             loc=SourceLocation(pctxt.loc_file, f.lineno, f.col_offset, pctxt.loc_name),
         )
 
-    return pctxt, stmts, retval
+    return pctxt, stmts, retvals
