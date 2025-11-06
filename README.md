@@ -24,7 +24,7 @@ You may also be looking for general resources on the theory behind memo modeling
 1. For background on the theory of decision making under uncertainty, e.g. MDPs and POMDPs, we recommending consulting _Decision Making Under Uncertainty_ as a reference. You can read the entire book for free online [here](https://algorithmsbook.com/decisionmaking/).
 2. For background on Bayesian models of theory of mind, we recommend consulting chapter 14 of _Bayesian Models of Cognition_ as a reference. You can read the published version [here](https://mitpress.ublish.com/ebook/bayesian-models-of-cognition-reverse-engineering-the-mind-preview/12799/341) and a PDF preprint [here](https://www.tomerullman.org/papers/BBB_chapter14.pdf).
 3. Dae Houlihan (Dartmouth University) taught a winter '25 [course](https://comosoco.daeh.info) on computational models of social cognition using memo.
-4. Robert Hawkins (Stanford University) is teaching a summer '25 seminar on pragmatics using memo. Here is the work-in-progress [textbook](https://hawkrobe.github.io/probLang-memo/), a version of problang that has been adapted to use memo.
+4. Robert Hawkins (Stanford University) is teaching a summer '25 seminar on pragmatics using memo. Here is the work-in-progress [textbook](https://social-interaction-lab.org/problang-v2/), a version of problang that has been adapted to use memo.
 
 ## The memo community
 
