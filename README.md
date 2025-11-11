@@ -1,8 +1,10 @@
 ![memo's logo](https://github.com/kach/memo/raw/main/assets/logo.png)
 
-memo is a probabilistic programming language for expressing computational cognitive models involving **recursive reasoning about reasoning**. memo inherits from the tradition of WebPPL-based Bayesian modeling (see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities (including GPUs!). As a result, models are often significantly simpler to express (we've seen codebases shrink by a **factor of 3x or more**), and dramatically faster to execute and fit to data (we've seen **speedups of 3,000x or more**). In idiomatic memo, a POMDP solver is 15 lines of code, and is just as fast as a hand-optimized solver written in 200 lines of code.
+memo is a probabilistic programming language for expressing computational cognitive models involving **recursive reasoning about reasoning**. memo inherits from the tradition of Bayesian modeling with probabilistic programming languages (PPLs; see [probmods](http://probmods.org/), [agentmodels](https://agentmodels.org/), and [problang](https://www.problang.org/)), but memo aims to make models **easier to write and run** by taking advantage of modern programming language techniques and hardware capabilities (including GPUs!). memo models are often significantly simpler to express (we've seen codebases shrink by a **factor of 3x or more**), and dramatically faster to execute and fit to data (we've seen **speedups of 3,000x or more**). In idiomatic memo, a POMDP solver is 15 lines of memo code, and is just as fast as a hand-optimized solver written in 200 lines of ordinary code.
 
 memo stands for: mental modeling, memoized matrix operations, model-expressed-model-optimized, and metacognitive memos.
+
+**For updates on memo's development, we _strongly_ encourage you to subscribe to our low-traffic at-most-monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).**
 
 ## Installing memo
 
@@ -14,11 +16,10 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 ## Learning memo
 
 There are many resources available for learning memo.
-1. The [Memonomicon](./demo/Memonomicon.ipynb) gives a brief tour of the language, and an example of how to build a model and fit it to data by parallel grid search and/or gradient descent.
-2. You can watch a [video tutorial](https://www.dropbox.com/scl/fi/c3jjup1lheowfppbz41zr/memo-live-tutorial.mp4?rlkey=ce7reeadff2nh2ktqh3tubbik&st=lai8yx1h&dl=0) that covers similar material. You can also check out a [talk given at LAFI '25](https://www.youtube.com/live/RLEFVgx2UWk?t=12500s) that offers a bigger-picture overview of memo.
-3. The [Handbook](./Handbook.pdf) is a complete reference for memo's syntactic constructs.
-4. This repository includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
-6. I am happy to give a short hands-on tutorial on memo in your lab. Just email me to ask!
+1. You can watch a [live tutorial given at COSMOS 2025](https://www.youtube.com/watch?v=6nZ60Luy7Ac). You can also check out a [talk given at LAFI 2025](https://www.youtube.com/live/RLEFVgx2UWk?t=12500s) that offers a bigger-picture overview of memo.
+2. The [Handbook](./Handbook.pdf) is a complete reference for memo's syntax.
+3. This repository includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
+4. I am happy to give a short hands-on tutorial on memo in your lab. Just email me to ask!
 
 You may also be looking for general resources on the theory behind memo modeling.
 1. For background on the theory of decision making under uncertainty, e.g. MDPs and POMDPs, we recommending consulting _Decision Making Under Uncertainty_ as a reference. You can read the entire book for free online [here](https://algorithmsbook.com/decisionmaking/).
@@ -26,13 +27,7 @@ You may also be looking for general resources on the theory behind memo modeling
 3. Dae Houlihan (Dartmouth University) taught a winter '25 [course](https://comosoco.daeh.info) on computational models of social cognition using memo.
 4. Robert Hawkins (Stanford University) is teaching a summer '25 seminar on pragmatics using memo. Here is the work-in-progress [textbook](https://social-interaction-lab.org/problang-v2/), a version of problang that has been adapted to use memo.
 
-## The memo community
-
-Here are some ways to engage with the memo community.
-
-1. For updates on memo's development, we _strongly_ encourage you to subscribe to our low-traffic monthly announcements mailing list [here](https://lists.csail.mit.edu/mailman/listinfo/memo-lang).
-2. To ask questions about memo, and to get help from other memo users, use [Github Discussions](https://github.com/kach/memo/discussions). Note that you will need a Github account to participate.
-3. For live support, we host memOH (**memo office hours**) every Tuesday at 2pm ET. Email Kartik for the zoom link!
+Finally, to ask questions about memo, and to get help from other memo users, we encourage you to use [Github Discussions](https://github.com/kach/memo/discussions). Note that you will need a Github account to participate.
 
 ## The memo on memo
 
