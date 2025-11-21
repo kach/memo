@@ -31,9 +31,12 @@
 - [Takeaway](./demo-takeaway.ipynb) (discussed in paper)  
   (we use memo to reflect on cost of computation and make inferences about _whether_ someone is thinking)
 - [Perturbation confusion](./demo-pc.ipynb) (discussed in paper)
+
+## Developmental and comparative psychology
 - [Sally-Anne (false belief test)](./demo-sally-anne.ipynb)
 - [Integrating intuitive psychology and intuitive physics](./demo-physics.ipynb)
 - [Rational belief revision in chimpanzees](./demo-chimp-belief-revision.ipynb)
+- [Toddlers favor utterances in common ground](./demo-mouths-of-babes.ipynb)
 
 ## Information theoretic calculations
 
