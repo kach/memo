@@ -457,6 +457,15 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                                 loc=loc,
                             )
                         )
+
+                    case _:
+                        raise MemoError(
+                            "Invalid input to knows(...)",
+                            hint="You can only supply names of choices (e.g. x or alice.y) to knows(...).",
+                            user=True,
+                            ctxt=None,
+                            loc=loc
+                        )
             return stmts
 
         case ast.Call(
