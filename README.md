@@ -63,13 +63,14 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 ## As seen on…
 
 **Papers/projects using memo**  
-- People use theory of mind to craft lies exploiting audience desires (Sterling, Berke, Chandra, & Jara-Ettinger, CogSci '25, SPP '25)
-- Solving strategic social coordination via Bayesian learning (Lamba, Houlihan, & Saxe, CogSci '25)
+- People use theory of mind to craft lies exploiting audience desires (Sterling, Berke, Chandra & Jara-Ettinger, CogSci '25, SPP '25)
+- Solving strategic social coordination via Bayesian learning (Lamba, Houlihan & Saxe, CogSci '25)
 - Empathy in Explanation (Collins, Chandra, Weller, Ragan-Kelley, & Tenenbaum, CogSci '25, SPP '25)
-- Minding the Politeness Gap in Cross-cultural Communication (Machino, Siegel, & Hawkins, CogSci '25)
-- Preparing a learner for an independent future (Sundar, Chandra, & Kleiman-Weiner, CogSci '25)
-- A Computational Theory of Dignity (Chandra, Tenenbaum, & Saxe, SPP '25)
+- Minding the Politeness Gap in Cross-cultural Communication (Machino, Siegel & Hawkins, CogSci '25)
+- Preparing a learner for an independent future (Sundar, Chandra & Kleiman-Weiner, CogSci '25)
+- A Computational Theory of Dignity (Chandra, Tenenbaum & Saxe, SPP '25)
 - Theories of Mind as Languages of Thought for Thought about Thought (Chandra, Ragan-Kelley & Tenenbaum, CogSci '25)
+- Signaling social identity in referential communication (Chen, Hawkins & Saxe, CogSci '25)
 
 _(Email me to have your work listed here!)_
 
