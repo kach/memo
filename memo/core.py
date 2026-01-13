@@ -153,6 +153,7 @@ class EOp(ExprSyntaxNode):
 class EFFI(ExprSyntaxNode):
     name: str
     args: list[Expr]
+    kwargs: dict[str, Expr] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -455,17 +456,30 @@ def _(e: EChoice, ctxt: Context) -> Value:
 
 @eval_expr.register
 def _(e: EFFI, ctxt: Context) -> Value:
-    name, args = e.name, e.args
+    name, args, kwargs = e.name, e.args, e.kwargs
     args_out = []
     for arg in args:
         args_out.append(eval_expr(arg, ctxt))
-    known = all(arg.known for arg in args_out)
-    deps = set().union(*(arg.deps for arg in args_out))
+    kwargs_out: dict[str, Value] = {}
+    for key, arg in kwargs.items():
+        kwargs_out[key] = eval_expr(arg, ctxt)
+    all_values = list(args_out) + list(kwargs_out.values())
+    known = all(val.known for val in all_values) if all_values else True
+    deps = set().union(*(val.deps for val in all_values)) if all_values else set()
     with ctxt.hoist(e.static):
         out = ctxt.sym(f"ffi_{name}")
         arg_statics = ", ".join([repr(arg.static) for arg in args])
         arg_tags = ", ".join(arg.tag for arg in args_out)
-        ctxt.emit(f'{out} = ffi({name}, [{arg_statics}], {arg_tags})')
+        kwarg_statics_dict = ", ".join(f"{repr(k)}: {kwargs[k].static}" for k in kwargs_out.keys())
+        kwarg_tags = ", ".join(f"{k}={v.tag}" for k, v in kwargs_out.items())
+        if arg_tags and kwarg_tags:
+            ctxt.emit(f'{out} = ffi({name}, [{arg_statics}], {{{kwarg_statics_dict}}}, {arg_tags}, {kwarg_tags})')
+        elif arg_tags:
+            ctxt.emit(f'{out} = ffi({name}, [{arg_statics}], {{}}, {arg_tags})')
+        elif kwarg_tags:
+            ctxt.emit(f'{out} = ffi({name}, [], {{{kwarg_statics_dict}}}, {kwarg_tags})')
+        else:
+            ctxt.emit(f'{out} = ffi({name}, [], {{}})')
         if e.static:
             ctxt.emit(f'{out} = jnp.array({out}).item()')
     return Value(tag=out, known=known, deps=deps)
