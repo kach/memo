@@ -105,10 +105,30 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 static=False
             )
 
-        case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args):
+        case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args, keywords=ffi_keywords):
             ffi_args_parsed = parse_args_list(ffi_args, ctxt, loc)
+            ffi_kwargs_parsed: dict[str, Expr] = {}
+            for kw in ffi_keywords:
+                if kw.arg is None:
+                    raise MemoError(
+                        "FFI calls do not support **kwargs expansion",
+                        hint="Pass keyword arguments explicitly: f(x=1, y=2)",
+                        user=True,
+                        ctxt=None,
+                        loc=SourceLocation(ctxt.loc_file, kw.value.lineno,
+                                           kw.value.col_offset, ctxt.loc_name)
+                    )
+                ffi_kwargs_parsed[kw.arg] = parse_expr(kw.value, ctxt)
+            all_static = (
+                all(arg.static for arg in ffi_args_parsed) and
+                all(kwarg.static for kwarg in ffi_kwargs_parsed.values())
+            )
             return EFFI(
-                name=ffi_name, args=ffi_args_parsed, loc=loc, static=all(arg.static for arg in ffi_args_parsed)
+                name=ffi_name,
+                args=ffi_args_parsed,
+                kwargs=ffi_kwargs_parsed,
+                loc=loc,
+                static=all_static
             )
 
         # memo call single arg
