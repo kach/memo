@@ -371,6 +371,22 @@ def ffi_static():
     alice: chooses(x in X, wpp=takes_nonstatic_arg(x, {np.array([0, 1, 2, 3, 4])}, 3.0))
     return E[alice.x]
 
+mod.install('''
+from jax.scipy.stats.norm import pdf as norm_pdf
+N = np.arange(11)
+norm_pdf_kwargs = dict(scale=1, loc=5)
+''')
+
+@memo_test(mod, item=5.0)
+def ffi_kwargs():
+    agent: chooses(n in N, wpp=norm_pdf(n, scale=1, loc=5))
+    return E[agent.n]
+
+@memo_test(mod, expect='ce')
+def ffi_kwargs_expansion():
+    agent: chooses(n in N, wpp=norm_pdf(n, **norm_pdf_kwargs))
+    return E[agent.n]
+
 @memo_test(mod, expect='ce')
 def param_name_conflict(x):
     alice: chooses(x in X, wpp=1)
