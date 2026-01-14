@@ -464,8 +464,8 @@ def _(e: EFFI, ctxt: Context) -> Value:
     for key, arg in kwargs.items():
         kwargs_out[key] = eval_expr(arg, ctxt)
     all_values = list(args_out) + list(kwargs_out.values())
-    known = all(val.known for val in all_values) if all_values else True
-    deps = set().union(*(val.deps for val in all_values)) if all_values else set()
+    known = all(val.known for val in all_values)
+    deps = set().union(*(val.deps for val in all_values))
     with ctxt.hoist(e.static):
         out = ctxt.sym(f"ffi_{name}")
         arg_statics = ", ".join([repr(arg.static) for arg in args])
