@@ -118,7 +118,13 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                         loc=SourceLocation(ctxt.loc_file, kw.value.lineno,
                                            kw.value.col_offset, ctxt.loc_name)
                     )
-                ffi_kwargs_parsed[kw.arg] = parse_expr(kw.value, ctxt)
+                match kw.value:
+                    case ast.Name(id=id) if id in ctxt.exotic_parameters:
+                        kwarg_loc = SourceLocation(ctxt.loc_file, kw.value.lineno,
+                                                   kw.value.col_offset, ctxt.loc_name)
+                        ffi_kwargs_parsed[kw.arg] = ELit(value=id, loc=kwarg_loc, static=True)
+                    case _:
+                        ffi_kwargs_parsed[kw.arg] = parse_expr(kw.value, ctxt)
             all_static = (
                 all(arg.static for arg in ffi_args_parsed) and
                 all(kwarg.static for kwarg in ffi_kwargs_parsed.values())

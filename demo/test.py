@@ -200,6 +200,16 @@ def ffi_scalar0():
 def ffi_scalar1():
     return returns_nonscalar1(1.0)
 
+mod.install('''
+@jax.jit
+def returns_nonscalar_kwarg(x, scale=1.0):
+    return np.array([0, 1]) * scale
+''')
+
+@memo_test(mod, expect='ce')
+def ffi_scalar_kwarg():
+    return returns_nonscalar_kwarg(1.0, scale=2.0)
+
 @memo_test(mod)
 def observes_const():
     alice: thinks[ bob: chooses(x in X, wpp=1) ]
@@ -375,6 +385,10 @@ mod.install('''
 from jax.scipy.stats.norm import pdf as norm_pdf
 N = np.arange(11)
 norm_pdf_kwargs = dict(scale=1, loc=5)
+
+@jax.jit
+def kw_only_func(a, b):
+    return a + b
 ''')
 
 @memo_test(mod, item=5.0)
@@ -386,6 +400,11 @@ def ffi_kwargs():
 def ffi_kwargs_expansion():
     agent: chooses(n in N, wpp=norm_pdf(n, **norm_pdf_kwargs))
     return E[agent.n]
+
+@memo_test(mod, item=2.0)
+def ffi_kwargs_only():
+    alice: chooses(x in X, wpp=1)
+    return E[kw_only_func(a=alice.x, b=1.0)]
 
 @memo_test(mod, expect='ce')
 def param_name_conflict(x):
@@ -411,6 +430,31 @@ def exotic_param_4(x = X):
 @memo_test(mod)
 def exotic_param_5(x: ... = X):
     return g(x) + array_index(x, 0)
+
+mod.install('''
+@jax.jit
+def exotic_kwarg_func(x, arr, scale=1.0):
+    return arr[x] * scale
+
+@jax.jit
+def exotic_both_func(x, arr, weights):
+    return arr[x] * weights[x]
+''')
+
+@memo_test(mod, item=1.0)
+def exotic_param_kwarg_item(arr: ... = np.ones_like(X)):
+    alice: chooses(x in X, wpp=exotic_kwarg_func(x, arr=arr, scale=2.0))
+    return E[alice.x]
+
+@memo_test(mod, item=1.0)
+def exotic_param_arg_with_kwarg_item(arr: ... = np.ones_like(X)):
+    alice: chooses(x in X, wpp=exotic_kwarg_func(x, arr, scale=2.0))
+    return E[alice.x]
+
+@memo_test(mod, item=1.0)
+def exotic_param_both_item(arr: ... = np.ones_like(X), weights: ... = np.ones_like(X)):
+    alice: chooses(x in X, wpp=exotic_both_func(x, arr, weights=weights))
+    return E[alice.x]
 
 @memo_test(mod)
 def multi_return_1[x: X]():

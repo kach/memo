@@ -41,13 +41,36 @@ def check_exotic_param(x, name):
             loc=None
         )
 
+def construct_vmap(f, args, statics, kwargs, kwarg_statics, target_shape):
+    # JAX's vmap does not support in_axes for kwargs, so we convert kwargs
+    # to positional args before vmapping and reconstruct the dict internally
+    args = tuple(
+        arg if static else jax.numpy.broadcast_to(arg, target_shape).reshape(-1)
+        for arg, static in zip(args, statics)
+    )
+    kwargs = {
+        k: (v if kwarg_statics[k] else jax.numpy.broadcast_to(v, target_shape).reshape(-1))
+        for k, v in kwargs.items()
+    }
+    kwarg_keys = list(kwargs.keys())
+    kwarg_vals = [kwargs[k] for k in kwarg_keys]
+    in_axes_args = [None if static else 0 for static in statics]
+    in_axes_kwargs = [None if kwarg_statics[k] else 0 for k in kwarg_keys]
+
+    def wrapper(*all_args):
+        pos_args = all_args[:len(args)]
+        kw_vals = all_args[len(args):]
+        return f(*pos_args, **dict(zip(kwarg_keys, kw_vals)))
+
+    return jax.vmap(wrapper, in_axes=in_axes_args + in_axes_kwargs)(*args, *kwarg_vals).reshape(target_shape)
+
 def ffi(f, statics, kwarg_statics, *args, **kwargs):
     shape_check_args = [
         (z if static else jax.ShapeDtypeStruct((), jnp.int32))
         for z, static in zip(args, statics)
     ]
     shape_check_kwargs = {
-        k: (v if kwarg_statics.get(k, True) else jax.ShapeDtypeStruct((), jnp.int32))
+        k: (v if kwarg_statics[k] else jax.ShapeDtypeStruct((), jnp.int32))
         for k, v in kwargs.items()
     }
     if jax.eval_shape(f, *shape_check_args, **shape_check_kwargs).shape != ():
@@ -67,30 +90,12 @@ def ffi(f, statics, kwarg_statics, *args, **kwargs):
     #         loc=None
     #     )
     nonstatic_args = [arg for arg, static in zip(args, statics) if not static]
-    nonstatic_kwargs = [v for k, v in kwargs.items() if not kwarg_statics.get(k, True)]
+    nonstatic_kwargs = [v for k, v in kwargs.items() if not kwarg_statics[k]]
     if len(nonstatic_args) == 0 and len(nonstatic_kwargs) == 0:
         return f(*args, **kwargs)
     all_nonstatic = nonstatic_args + nonstatic_kwargs
     target_shape = jax.numpy.broadcast_shapes(*[arg.shape for arg in all_nonstatic])
-    args = tuple(
-        arg if static else jax.numpy.broadcast_to(arg, target_shape).reshape(-1)
-        for arg, static in zip(args, statics)
-    )
-    kwargs = {
-        k: (v if kwarg_statics.get(k, True) else jax.numpy.broadcast_to(v, target_shape).reshape(-1))
-        for k, v in kwargs.items()
-    }
-    # since vmap does not natively support in_axes for kwargs, create a wrapper
-    # that takes kwargs as positional args and reconstruct the dict internally
-    kwarg_keys = list(kwargs.keys())
-    kwarg_vals = [kwargs[k] for k in kwarg_keys]
-    in_axes_args = [None if static else 0 for static in statics]
-    in_axes_kwargs = [None if kwarg_statics.get(k, True) else 0 for k in kwarg_keys]
-    def wrapper(*all_args):
-        pos_args = all_args[:len(args)]
-        kw_vals = all_args[len(args):]
-        return f(*pos_args, **dict(zip(kwarg_keys, kw_vals)))
-    return jax.vmap(wrapper, in_axes=in_axes_args + in_axes_kwargs)(*args, *kwarg_vals).reshape(target_shape)
+    return construct_vmap(f, args, statics, kwargs, kwarg_statics, target_shape)
 
 def check_which_retval(num_retvals, which_retval):
     if num_retvals == 1:
