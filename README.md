@@ -17,7 +17,7 @@ memo stands for: mental modeling, memoized matrix operations, model-expressed-mo
 
 There are many resources available for learning memo.
 1. You can watch a [live tutorial given at COSMOS 2025](https://www.youtube.com/watch?v=6nZ60Luy7Ac). You can also check out a [talk given at LAFI 2025](https://www.youtube.com/live/RLEFVgx2UWk?t=12500s) that offers a bigger-picture overview of memo.
-2. The [Handbook](./Handbook.pdf) is a complete reference for memo's syntax.
+2. The [Handbook](./Handbook.md) is a complete reference for memo's syntax.
 3. This repository includes over a dozen classic examples of recursive reasoning models implemented in memo, which you can find in the [demo directory](./demo/).
 4. I am happy to give a short hands-on tutorial on memo in your lab. Just email me to ask!
 
