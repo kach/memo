@@ -87,6 +87,34 @@ def memo_call_ellipsis(t=0):
     alice: chooses(x in X, wpp=test_[x](...))
     return E[alice.x]
 
+@memo(install_module=mod.install)
+def recursive_kwarg[x: X](a, b=0):
+    return recursive_kwarg[x](a=a-1, b=b+1) if a > 0 else b
+
+@memo_test(mod, item=3.0)
+def kwarg():
+    alice: chooses(x in X, wpp=1)
+    return E[recursive_kwarg[alice.x](a=3)]
+
+@memo_test(mod, item=13.0)
+def kwarg_mixed():
+    alice: chooses(x in X, wpp=1)
+    return E[recursive_kwarg[alice.x](3, b=10)]
+
+@memo_test(mod, expect='ce')
+def kwargs_unpacking_err():
+    alice: chooses(x in X, wpp=test_[alice.x](**{1: 2}))
+    return 1
+
+@memo_test(mod)
+def cost_kwarg():
+    alice: chooses(x in X, wpp=1)
+    return cost @ recursive_kwarg(a=2)
+
+@memo_test(mod, expect='ce')
+def cost_kwargs_unpacking_err():
+    return cost @ recursive_kwarg(**{})
+
 @memo_test(mod)
 def imagine_ok():
     return alice[
@@ -455,6 +483,26 @@ def exotic_param_arg_with_kwarg_item(arr: ... = np.ones_like(X)):
 def exotic_param_both_item(arr: ... = np.ones_like(X), weights: ... = np.ones_like(X)):
     alice: chooses(x in X, wpp=exotic_both_func(x, arr, weights=weights))
     return E[alice.x]
+
+@memo(install_module=mod.install)
+def exotic_kwarg_recursive[x: X](k, arr: ...):
+    alice: chooses(x in X, wpp=exotic_kwarg_func(x, arr, scale=1.0))
+    return exotic_kwarg_recursive[x](k=k-1, arr=arr) if k > 0 else 1
+
+@memo_test(mod, item=1.0)
+def exotic_kwarg(arr: ... = np.ones_like(X)):
+    alice: chooses(x in X, wpp=1)
+    return E[exotic_kwarg_recursive[alice.x](k=2, arr=arr)]
+
+@memo(install_module=mod.install)
+def exotic_with_regular_recursive[x: X](k, arr: ..., scale):
+    alice: chooses(x in X, wpp=exotic_kwarg_func(x, arr, scale=scale))
+    return exotic_with_regular_recursive[x](k=k-1, arr=arr, scale=scale) if k > 0 else 1
+
+@memo_test(mod, item=1.0)
+def exotic_with_regular_kwarg(arr: ... = np.ones_like(X)):
+    alice: chooses(x in X, wpp=1)
+    return E[exotic_with_regular_recursive[alice.x](k=2, arr=arr, scale=2.0)]
 
 @memo_test(mod)
 def multi_return_1[x: X]():
