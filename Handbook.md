@@ -461,9 +461,13 @@ class Action(IntEnum): WAIT = 0; …
 You can also write arbitrary Python expressions inside the braces, including references to model parameters:
 
 ```python
-@memo def f[…](x):
-    return {x[0] << 4}
+@memo
+def f[…](x):
+    return {x << 4}
 ```
+
+This is meant to be an "escape hatch" in exceptional situations. Most memo
+models should never need to do this.
 
 **Important:** You cannot reference memo constructs (agents or their choices) inside curly braces.
 
