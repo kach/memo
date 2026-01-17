@@ -87,6 +87,38 @@ def memo_call_ellipsis(t=0):
     alice: chooses(x in X, wpp=test_[x](...))
     return E[alice.x]
 
+@memo(install_module=mod.install)
+def kwarg_helper[x: X](k):
+    return kwarg_helper[x](k=k-1) if k > 0 else k
+
+@memo(install_module=mod.install)
+def kwarg_helper2[x: X](a, b):
+    return kwarg_helper2[x](a=a-1, b=b-1) if a > 0 else a + b
+
+@memo_test(mod, item=0.0)
+def memo_call_kwarg_required():
+    alice: chooses(x in X, wpp=1)
+    return E[kwarg_helper[alice.x](k=2)]
+
+@memo_test(mod, item=-5.0)
+def memo_call_kwarg_value():
+    # k=10 -> k=9 -> ... -> k=0, returns 0
+    # Then subtract 5 to verify we got 0 (not some default)
+    alice: chooses(x in X, wpp=1)
+    return E[kwarg_helper[alice.x](k=10)] - 5
+
+@memo_test(mod, item=1.0)
+def memo_call_kwarg_mixed():
+    # a=1, b=2 -> a=0, b=1 -> returns 0+1=1
+    alice: chooses(x in X, wpp=1)
+    return E[kwarg_helper2[alice.x](1, b=2)]
+
+@memo_test(mod, expect='ce')
+def memo_call_kwargs_star_err():
+    '''**kwargs syntax not supported in memo calls'''
+    alice: chooses(x in X, wpp=test_[alice.x](**{1: 2}))
+    return 1
+
 @memo_test(mod)
 def imagine_ok():
     return alice[
@@ -455,6 +487,26 @@ def exotic_param_arg_with_kwarg_item(arr: ... = np.ones_like(X)):
 def exotic_param_both_item(arr: ... = np.ones_like(X), weights: ... = np.ones_like(X)):
     alice: chooses(x in X, wpp=exotic_both_func(x, arr, weights=weights))
     return E[alice.x]
+
+@memo(install_module=mod.install)
+def exotic_kwarg_recursive[x: X](k, arr: ...):
+    alice: chooses(x in X, wpp=exotic_kwarg_func(x, arr, scale=1.0))
+    return exotic_kwarg_recursive[x](k=k-1, arr=arr) if k > 0 else 1
+
+@memo_test(mod, item=1.0)
+def memo_call_exotic_kwarg(arr: ... = np.ones_like(X)):
+    alice: chooses(x in X, wpp=1)
+    return E[exotic_kwarg_recursive[alice.x](k=2, arr=arr)]
+
+@memo(install_module=mod.install)
+def exotic_mixed_recursive[x: X](k, arr: ..., scale):
+    alice: chooses(x in X, wpp=exotic_kwarg_func(x, arr, scale=scale))
+    return exotic_mixed_recursive[x](k=k-1, arr=arr, scale=scale) if k > 0 else 1
+
+@memo_test(mod, item=1.0)
+def memo_call_exotic_kwarg_mixed(arr: ... = np.ones_like(X)):
+    alice: chooses(x in X, wpp=1)
+    return E[exotic_mixed_recursive[alice.x](k=2, arr=arr, scale=2.0)]
 
 @memo_test(mod)
 def multi_return_1[x: X]():
