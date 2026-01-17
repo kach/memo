@@ -33,6 +33,27 @@ def parse_args_list(args: list[ast.expr], ctxt: ParsingContext, loc: SourceLocat
                         out.append(parse_expr(arg, ctxt))
             return out
 
+def parse_kwargs_list(keywords: list[ast.keyword], ctxt: ParsingContext) -> dict[str, Expr]:
+    kwargs: dict[str, Expr] = {}
+    for kw in keywords:
+        if kw.arg is None:
+            loc = SourceLocation(ctxt.loc_file, kw.value.lineno, kw.value.col_offset, ctxt.loc_name)
+            raise MemoError(
+                f"memo does not support **kwargs syntax",
+                hint="Use explicit keyword arguments instead of **kwargs",
+                user=True,
+                ctxt=None,
+                loc=loc
+            )
+        match kw.value:
+            case ast.Name(id=id) if id in ctxt.exotic_parameters:
+                kwarg_loc = SourceLocation(ctxt.loc_file, kw.value.lineno,
+                                           kw.value.col_offset, ctxt.loc_name)
+                kwargs[kw.arg] = ELit(value=id, loc=kwarg_loc, static=True)
+            case _:
+                kwargs[kw.arg] = parse_expr(kw.value, ctxt)
+    return kwargs
+
 def parse_ememo(expr: ast.expr, ctxt: ParsingContext, loc: SourceLocation) -> Expr | None:
     match expr:
         case ast.Call(
@@ -71,24 +92,6 @@ def parse_ememo(expr: ast.expr, ctxt: ParsingContext, loc: SourceLocation) -> Ex
             case _:
                 raise Exception()
 
-    kwargs: dict[str, Expr] = {}
-    for kw in keywords:
-        if kw.arg is None:
-            raise MemoError(
-                "**kwargs syntax not supported in memo calls",
-                hint="Use explicit keyword arguments instead of **kwargs",
-                user=True,
-                ctxt=None,
-                loc=loc
-            )
-        match kw.value:
-            case ast.Name(id=id) if id in ctxt.exotic_parameters:
-                kwarg_loc = SourceLocation(ctxt.loc_file, kw.value.lineno,
-                                           kw.value.col_offset, ctxt.loc_name)
-                kwargs[kw.arg] = ELit(value=id, loc=kwarg_loc, static=True)
-            case _:
-                kwargs[kw.arg] = parse_expr(kw.value, ctxt)
-
     return EMemo(
         name=f_name,
         which_retval=which_retval,
@@ -96,7 +99,7 @@ def parse_ememo(expr: ast.expr, ctxt: ParsingContext, loc: SourceLocation) -> Ex
         ids=ids,
         loc=loc,
         static=False,
-        kwargs=kwargs
+        kwargs=parse_kwargs_list(keywords, ctxt)
     )
 
 def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
@@ -118,51 +121,17 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             op=ast.MatMult(),
             right=ast.Call(func=ast.Name(id=f_name), args=args, keywords=keywords)
         ):
-            cost_kwargs: dict[str, Expr] = {}
-            for kw in keywords:
-                if kw.arg is None:
-                    raise MemoError(
-                        "**kwargs syntax not supported in cost calls",
-                        hint="Use explicit keyword arguments instead of **kwargs",
-                        user=True,
-                        ctxt=None,
-                        loc=loc
-                    )
-                match kw.value:
-                    case ast.Name(id=id) if id in ctxt.exotic_parameters:
-                        kwarg_loc = SourceLocation(ctxt.loc_file, kw.value.lineno,
-                                                   kw.value.col_offset, ctxt.loc_name)
-                        cost_kwargs[kw.arg] = ELit(value=id, loc=kwarg_loc, static=True)
-                    case _:
-                        cost_kwargs[kw.arg] = parse_expr(kw.value, ctxt)
             return ECost(
                 name=f_name,
-                args=[parse_expr(arg, ctxt) for arg in args],
-                kwargs=cost_kwargs,
+                args=parse_args_list(args, ctxt, loc),
+                kwargs=parse_kwargs_list(keywords, ctxt),
                 loc=loc,
                 static=False
             )
 
         case ast.Call(func=ast.Name(id=ffi_name), args=ffi_args, keywords=ffi_keywords):
             ffi_args_parsed = parse_args_list(ffi_args, ctxt, loc)
-            ffi_kwargs_parsed: dict[str, Expr] = {}
-            for kw in ffi_keywords:
-                if kw.arg is None:
-                    raise MemoError(
-                        "FFI calls do not support **kwargs expansion",
-                        hint="Pass keyword arguments explicitly: f(x=1, y=2)",
-                        user=True,
-                        ctxt=None,
-                        loc=SourceLocation(ctxt.loc_file, kw.value.lineno,
-                                           kw.value.col_offset, ctxt.loc_name)
-                    )
-                match kw.value:
-                    case ast.Name(id=id) if id in ctxt.exotic_parameters:
-                        kwarg_loc = SourceLocation(ctxt.loc_file, kw.value.lineno,
-                                                   kw.value.col_offset, ctxt.loc_name)
-                        ffi_kwargs_parsed[kw.arg] = ELit(value=id, loc=kwarg_loc, static=True)
-                    case _:
-                        ffi_kwargs_parsed[kw.arg] = parse_expr(kw.value, ctxt)
+            ffi_kwargs_parsed = parse_kwargs_list(ffi_keywords, ctxt)
             all_static = (
                 all(arg.static for arg in ffi_args_parsed) and
                 all(kwarg.static for kwarg in ffi_kwargs_parsed.values())
