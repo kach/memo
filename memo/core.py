@@ -162,6 +162,7 @@ class EMemo(ExprSyntaxNode):
     which_retval: int | None
     args: list[Expr]
     ids: list[Tuple[Id, Name, Id]]
+    kwargs: dict[str, Expr] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -203,6 +204,7 @@ class EImagine(ExprSyntaxNode):
 class ECost(ExprSyntaxNode):
     name: str
     args: list[Expr]
+    kwargs: dict[str, Expr] = field(default_factory=dict)
 
 @dataclass(frozen=True)
 class EInline(ExprSyntaxNode):
@@ -486,7 +488,7 @@ def _(e: EFFI, ctxt: Context) -> Value:
 
 @eval_expr.register
 def _(e: ECost, ctxt: Context) -> Value:
-    name, args = e.name, e.args
+    name, args, kwargs = e.name, e.args, e.kwargs
     args_out = []
     with ctxt.hoist():
         for arg in args:
@@ -499,10 +501,23 @@ def _(e: ECost, ctxt: Context) -> Value:
                     ctxt=ctxt,
                     loc=arg.loc,
                 )
+
+    kwargs_out: dict[str, Value] = {}
+    with ctxt.hoist():
+        for key, kwarg in kwargs.items():
+            kwargs_out[key] = eval_expr(kwarg, ctxt)
+            if not kwarg.static:
+                raise MemoError(
+                    "keyword argument not statically known",
+                    hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=kwarg.loc,
+                )
         res = ctxt.sym(f"result_cost_{name}")
         ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
         ctxt.indent()
-        ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], return_cost=True)})')
+        ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], return_cost=True, **{k: v.tag for k, v in kwargs_out.items()})})')
         ctxt.emit(f'{res} = {res}.cost')
         ctxt.dedent()
         ctxt.emit('else:')
@@ -513,7 +528,7 @@ def _(e: ECost, ctxt: Context) -> Value:
 
 @eval_expr.register
 def _(e: EMemo, ctxt: Context) -> Value:
-    name, args, ids, which_retval = e.name, e.args, e.ids, e.which_retval
+    name, args, ids, which_retval, kwargs = e.name, e.args, e.ids, e.which_retval, e.kwargs
     args_out = []
     with ctxt.hoist():
         for arg in args:
@@ -525,6 +540,19 @@ def _(e: EMemo, ctxt: Context) -> Value:
                     user=True,
                     ctxt=ctxt,
                     loc=arg.loc,
+                )
+
+    kwargs_out: dict[str, Value] = {}
+    with ctxt.hoist():
+        for key, kwarg in kwargs.items():
+            kwargs_out[key] = eval_expr(kwarg, ctxt)
+            if not kwarg.static:
+                raise MemoError(
+                    "keyword argument not statically known",
+                    hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
+                    user=True,
+                    ctxt=ctxt,
+                    loc=kwarg.loc,
                 )
 
     for _, source_name, source_id in ids:
@@ -544,7 +572,7 @@ def _(e: EMemo, ctxt: Context) -> Value:
         ctxt.emit(f"""check_domains({name}._doms, {repr(tuple(str(d) for d in doms))})""")
         ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
         ctxt.indent()
-        ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, return_cost='return_cost')})')
+        ctxt.emit(f'{res}, res_aux = {name}({assemble_tags([arg.tag for arg in args_out], return_aux=True, return_cost='return_cost', **{k: v.tag for k, v in kwargs_out.items()})})')
         if which_retval is not None:
             ctxt.emit(f'{res} = {res}[{which_retval}]')
         ctxt.emit(f"if return_cost: aux.cost += res_aux.cost")

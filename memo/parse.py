@@ -40,7 +40,8 @@ def parse_ememo(expr: ast.expr, ctxt: ParsingContext, loc: SourceLocation) -> Ex
                 value=f,
                 slice=axes
             ),
-            args=args
+            args=args,
+            keywords=keywords
         ):
             pass
         case _:
@@ -70,13 +71,32 @@ def parse_ememo(expr: ast.expr, ctxt: ParsingContext, loc: SourceLocation) -> Ex
             case _:
                 raise Exception()
 
+    kwargs: dict[str, Expr] = {}
+    for kw in keywords:
+        if kw.arg is None:
+            raise MemoError(
+                "**kwargs syntax not supported in memo calls",
+                hint="Use explicit keyword arguments instead of **kwargs",
+                user=True,
+                ctxt=None,
+                loc=loc
+            )
+        match kw.value:
+            case ast.Name(id=id) if id in ctxt.exotic_parameters:
+                kwarg_loc = SourceLocation(ctxt.loc_file, kw.value.lineno,
+                                           kw.value.col_offset, ctxt.loc_name)
+                kwargs[kw.arg] = ELit(value=id, loc=kwarg_loc, static=True)
+            case _:
+                kwargs[kw.arg] = parse_expr(kw.value, ctxt)
+
     return EMemo(
         name=f_name,
         which_retval=which_retval,
         args=parse_args_list(args, ctxt, loc),
         ids=ids,
         loc=loc,
-        static=False
+        static=False,
+        kwargs=kwargs
     )
 
 def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
@@ -96,11 +116,29 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
         case ast.BinOp(
             left=ast.Name(id="cost"),
             op=ast.MatMult(),
-            right=ast.Call(func=ast.Name(id=f_name), args=args)
+            right=ast.Call(func=ast.Name(id=f_name), args=args, keywords=keywords)
         ):
+            cost_kwargs: dict[str, Expr] = {}
+            for kw in keywords:
+                if kw.arg is None:
+                    raise MemoError(
+                        "**kwargs syntax not supported in cost calls",
+                        hint="Use explicit keyword arguments instead of **kwargs",
+                        user=True,
+                        ctxt=None,
+                        loc=loc
+                    )
+                match kw.value:
+                    case ast.Name(id=id) if id in ctxt.exotic_parameters:
+                        kwarg_loc = SourceLocation(ctxt.loc_file, kw.value.lineno,
+                                                   kw.value.col_offset, ctxt.loc_name)
+                        cost_kwargs[kw.arg] = ELit(value=id, loc=kwarg_loc, static=True)
+                    case _:
+                        cost_kwargs[kw.arg] = parse_expr(kw.value, ctxt)
             return ECost(
                 name=f_name,
                 args=[parse_expr(arg, ctxt) for arg in args],
+                kwargs=cost_kwargs,
                 loc=loc,
                 static=False
             )
