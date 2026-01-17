@@ -508,7 +508,7 @@ def _(e: ECost, ctxt: Context) -> Value:
             kwargs_out[key] = eval_expr(kwarg, ctxt)
             if not kwarg.static:
                 raise MemoError(
-                    "keyword argument not statically known",
+                    f"keyword argument {key} not statically known",
                     hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
                     user=True,
                     ctxt=ctxt,
@@ -548,7 +548,7 @@ def _(e: EMemo, ctxt: Context) -> Value:
             kwargs_out[key] = eval_expr(kwarg, ctxt)
             if not kwarg.static:
                 raise MemoError(
-                    "keyword argument not statically known",
+                    f"keyword argument {key} not statically known",
                     hint="""When calling a memo, you can only pass in parameters that are fixed ("static") values that memo can compute without reasoning about agents. Such values cannot depend on any agents' choices -- only on literal numeric values and other parameters. This constraint is what enables memo to help you fit/optimize parameters fast by gradient descent.""",
                     user=True,
                     ctxt=ctxt,
