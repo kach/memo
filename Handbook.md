@@ -12,7 +12,7 @@ The handbook is divided into four main sections:
 
 3. **[Expressions](#expressions)** — How to compute values within a memo. Expressions include literals, operators, probabilistic queries (`E`, `Pr`, `Var`), information-theoretic measures (`H`, `KL`), and hypotheticals (`imagine`).
 
-4. **[Running and Configuring Memos](#running-and-configuring-memos)** — How to execute memo models, configure options like caching and tracing, and use automatic differentiation for model fitting.
+4. **[Running and Configuring memos](#running-and-configuring-memos)** — How to execute memo models, configure options like caching and tracing, and use automatic differentiation for model fitting.
 
 ---
 
@@ -408,7 +408,7 @@ imagine[
 
 The statements inside `imagine` modify the world, and the final line is the expression to evaluate in that hypothetical world.
 
-## Calling Other Memos
+## Calling Other memos
 
 One memo can reference another. Be sure to pass all required parameters:
 
@@ -469,9 +469,9 @@ You can also write arbitrary Python expressions inside the braces, including ref
 
 ---
 
-# Running and Configuring Memos
+# Running and Configuring memos
 
-## Executing a Memo
+## Executing a memo
 
 Call a memo like a regular Python function with its parameters. It returns an array with the prescribed axes:
 
