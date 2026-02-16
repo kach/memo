@@ -2,11 +2,6 @@ import jax
 import jax.numpy as jnp
 import time
 from functools import cache
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import pandas as pd
-    import xarray as xr
 
 from .core import MemoError, AuxInfo, memo_result
 
@@ -166,7 +161,7 @@ def pprint_table(f, z):
     hr()
 
 
-def make_pandas_data(f, z) -> pd.DataFrame:
+def make_pandas_data(f, z):# -> pd.DataFrame:
     import itertools
     def pprint(val):
         if isinstance(val, jnp.ndarray):
@@ -204,7 +199,7 @@ def make_pandas_data(f, z) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def make_xarray_data(f, z) -> xr.DataArray | xr.Dataset:
+def make_xarray_data(f, z):# -> xr.DataArray | xr.Dataset:
     def parse(val):
         if isinstance(val, jnp.ndarray):
             return val.item()

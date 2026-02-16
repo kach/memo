@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from .core import *
-from .parse import *
+from .core import memo_result, AuxInfo, Stmt, Expr, Context, Frame, ROOT_FRAME_NAME, eval_expr, eval_stmt, Name, MemoError
+from .parse import parse_memo, ParsingContext
 from .version import __version__
 
 import textwrap
@@ -138,17 +138,17 @@ class MemoCompiled(Protocol):
     ) -> jax.Array:
         ...
 
-    def __call__(
-        self,
-        *args: jax.typing.ArrayLike,
-        return_aux: bool = False,
-        return_pandas: bool = False,
-        return_xarray: bool = False,
-        return_cost: bool = False,
-        print_table: bool = False,
-        **kwargs: jax.typing.ArrayLike
-    ) -> jax.Array | memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
-        ...
+    # def __call__(
+    #     self,
+    #     *args: jax.typing.ArrayLike,
+    #     return_aux: bool = ...,
+    #     return_pandas: bool = ...,
+    #     return_xarray: bool = ...,
+    #     return_cost: bool = ...,
+    #     print_table: bool = False,
+    #     **kwargs: jax.typing.ArrayLike
+    # ) -> jax.Array | memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
+    #     ...
 
 def make_static_parameter_list(pctxt: ParsingContext) -> str:
     out = ''
