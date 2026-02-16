@@ -138,17 +138,19 @@ class MemoCompiled(Protocol):
     ) -> jax.Array:
         ...
 
-    # def __call__(
-    #     self,
-    #     *args: jax.typing.ArrayLike,
-    #     return_aux: bool = ...,
-    #     return_pandas: bool = ...,
-    #     return_xarray: bool = ...,
-    #     return_cost: bool = ...,
-    #     print_table: bool = False,
-    #     **kwargs: jax.typing.ArrayLike
-    # ) -> jax.Array | memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
-    #     ...
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_aux: bool = False,
+        return_pandas: bool = False,
+        return_xarray: bool = False,
+        return_cost: bool = False,
+        print_table: bool = False,
+        **kwargs: jax.typing.ArrayLike
+    ) -> jax.Array | memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
+        ...
+
 
 def make_static_parameter_list(pctxt: ParsingContext) -> str:
     out = ''
