@@ -2,6 +2,11 @@ import jax
 import jax.numpy as jnp
 import time
 from functools import cache
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import xarray as xr
 
 from .core import MemoError, AuxInfo, memo_result
 
@@ -161,7 +166,7 @@ def pprint_table(f, z):
     hr()
 
 
-def make_pandas_data(f, z):
+def make_pandas_data(f, z) -> pd.DataFrame:
     import itertools
     def pprint(val):
         if isinstance(val, jnp.ndarray):
@@ -174,13 +179,23 @@ def make_pandas_data(f, z):
     data = dict()
     for ax, dom in zip(f._axes, f._doms):
         data[f"{ax}"] = list()
-    data[f"{f.__name__[5:]}"] = list()
 
+    # Handle single vs multiple returns (matches pprint_table pattern)
+    base_name = f.__name__
+    if f._num_retvals == 1:
+        data[base_name] = list()
+    else:
+        for k in range(f._num_retvals):
+            data[f"{base_name}[{k}]"] = list()
 
     for row in itertools.product(*[enumerate(v) for v in f._vals]):
         idx = tuple([r[0] for r in row])
-        lead = tuple([pprint(r[1]) for r in row])
-        row_data = lead + (pprint(z[idx]),)
+        lead = [pprint(r[1]) for r in row]
+
+        if f._num_retvals == 1:
+            row_data = lead + [pprint(z[idx])]
+        else:
+            row_data = lead + [pprint(z[(k,) + idx]) for k in range(f._num_retvals)]
 
         for (dom, val) in zip(data.keys(), row_data):
             data[dom].append(val)
@@ -189,7 +204,7 @@ def make_pandas_data(f, z):
     return pd.DataFrame(data)
 
 
-def make_xarray_data(f, z):
+def make_xarray_data(f, z) -> xr.DataArray | xr.Dataset:
     def parse(val):
         if isinstance(val, jnp.ndarray):
             return val.item()
@@ -199,11 +214,28 @@ def make_xarray_data(f, z):
         return val
 
     coords = {}
+    dims = []
     for (ax, dom, vals) in zip(f._axes, f._doms, f._vals):
         coords[f"{ax}"] = [parse(v) for v in vals]
+        dims.append(f"{ax}")
+
+    base_name = f.__name__
 
     import xarray as xr
-    return xr.DataArray(name=f"{f.__name__[5:]}", data=z, coords=coords)
+    if f._num_retvals == 1:
+        z = jnp.broadcast_to(z, f._shape)
+        return xr.DataArray(name=base_name, data=z, coords=coords, dims=dims)
+    else:
+        # Return Dataset with one DataArray per return value
+        data_vars = {}
+        for k in range(f._num_retvals):
+            zk = jnp.broadcast_to(z[k], f._shape)
+            data_vars[f"{base_name}[{k}]"] = xr.DataArray(
+                data=zk,
+                coords=coords,
+                dims=dims
+            )
+        return xr.Dataset(data_vars)
 
 def collapse_diagonal(A, i, j):
     # Check that the specified axes have the same size

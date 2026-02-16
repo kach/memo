@@ -14,6 +14,8 @@ import linecache
 
 if TYPE_CHECKING:
     import jax
+    import pandas as pd
+    import xarray as xr
 
 from . import lib
 lib_dir = ', '.join([key for key in dir(lib) if not key.startswith('_')])
@@ -23,26 +25,117 @@ class MemoCompiled(Protocol):
     def __call__(
         self,
         *args: jax.typing.ArrayLike,
-        return_aux: Literal[False] = ...,
-        return_pandas: bool = ...,
-        return_xarray: bool = ...,
-        return_cost: bool = ...,
+        return_pandas: Literal[True],
+        return_xarray: Literal[True],
+        return_cost: Literal[True],
+        return_aux: bool = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> jax.Array:
+    ) -> memo_result[AuxInfo[float, pd.DataFrame, xr.DataArray]]:
         ...
 
     @overload
     def __call__(
         self,
         *args: jax.typing.ArrayLike,
-        return_aux: Literal[True] = ...,
-        return_pandas: bool = ...,
-        return_xarray: bool = ...,
-        return_cost: bool = ...,
+        return_pandas: Literal[True],
+        return_xarray: Literal[True],
+        return_aux: bool = ...,
+        return_cost: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result:
+    ) -> memo_result[AuxInfo[float | None, pd.DataFrame, xr.DataArray]]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_xarray: Literal[True],
+        return_cost: Literal[True],
+        return_aux: bool = ...,
+        return_pandas: Literal[False] = ...,
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
+    ) -> memo_result[AuxInfo[float, pd.DataFrame | None, xr.DataArray]]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_pandas: Literal[True],
+        return_cost: Literal[True],
+        return_aux: bool = ...,
+        return_xarray: Literal[False] = ...,
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
+    ) -> memo_result[AuxInfo[float, pd.DataFrame, xr.DataArray | None]]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_pandas: Literal[True],
+        return_aux: bool = ...,
+        return_xarray: Literal[False] = ...,
+        return_cost: Literal[False] = ...,
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
+    ) -> memo_result[AuxInfo[float | None, pd.DataFrame, xr.DataArray | None]]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_xarray: Literal[True],
+        return_aux: bool = ...,
+        return_pandas: Literal[False] = ...,
+        return_cost: Literal[False] = ...,
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
+    ) -> memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray]]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_cost: Literal[True],
+        return_aux: bool = ...,
+        return_pandas: Literal[False] = ...,
+        return_xarray: Literal[False] = ...,
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
+    ) -> memo_result[AuxInfo[float, pd.DataFrame | None, xr.DataArray | None]]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_aux: Literal[True],
+        return_pandas: Literal[False] = ...,
+        return_xarray: Literal[False] = ...,
+        return_cost: Literal[False] = ...,
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
+    ) -> memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        *args: jax.typing.ArrayLike,
+        return_aux: Literal[False] = ...,
+        return_pandas: Literal[False] = ...,
+        return_xarray: Literal[False] = ...,
+        return_cost: Literal[False] = ...,
+        print_table: bool = ...,
+        **kwargs: jax.typing.ArrayLike
+    ) -> jax.Array:
         ...
 
     def __call__(
@@ -54,7 +147,7 @@ class MemoCompiled(Protocol):
         return_cost: bool = False,
         print_table: bool = False,
         **kwargs: jax.typing.ArrayLike
-    ) -> jax.Array | memo_result:
+    ) -> jax.Array | memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
         ...
 
 def make_static_parameter_list(pctxt: ParsingContext) -> str:
