@@ -39,7 +39,8 @@ exclude = [
   "demo/.*",
   "utils\\.py",
   "comic\\.py",
-  "lib\\.py"
+  "lib\\.py",
+  "sandbox/.*"
 ]
 
 [[tool.mypy.overrides]]

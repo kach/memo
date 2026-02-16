@@ -208,8 +208,8 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 )
             the_op = {ast.And: Op.AND, ast.Or: Op.OR}[op.__class__]
             out = parse_expr(values[-1], ctxt)
-            for val in reversed(values[:-1]):
-                val_ = parse_expr(val, ctxt)
+            for val_operand in reversed(values[:-1]):
+                val_ = parse_expr(val_operand, ctxt)
                 out = EOp(
                     op=the_op,
                     args=[val_, out],
