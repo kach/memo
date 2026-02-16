@@ -28,14 +28,19 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 @dataclass
-class AuxInfo:
-    cost: float | None = None
-    pandas: pd.DataFrame | None = None
-    xarray: xr.DataArray | None = None
+class AuxInfo[
+    CostT = float | None,
+    PandasT = pd.DataFrame | None,
+    XArrayT = xr.DataArray | xr.Dataset | None,
+]:
+    cost: CostT = None  # type: ignore[assignment]
+    pandas: PandasT = None  # type: ignore[assignment]
+    xarray: XArrayT = None  # type: ignore[assignment]
 
-class memo_result(NamedTuple):
+
+class memo_result[AuxT = AuxInfo](NamedTuple):
     data: jax.Array
-    aux: AuxInfo
+    aux: AuxT
 
 
 @dataclass(frozen=True)
