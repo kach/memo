@@ -7,6 +7,7 @@
 - [7-segment displays](./demo-7segment.ipynb) (discussed in paper)  
   (we show how memo can interface with deep learning and computer vision)
 - [Polite speech](./demo-politeness.ipynb)
+- [Noisy channel pragmatics and prosody](./demo-noisy.ipynb)
 
 ## Economic games
 
