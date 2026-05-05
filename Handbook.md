@@ -135,11 +135,13 @@ bob: observes [alice.x] is y
 
 This mechanism can be used to create false beliefs by setting the observed value to something different from the actual value.
 
-The observed value can also be another agent's choice:
+The observed value can also be the name of another agent's choice:
 
 ```python
 bob: observes [alice.x] is charlie.y
 ```
+
+The observed value *cannot* be an arbitrary value, e.g. you cannot write `bob: observes [alice.x] is 7`. For this type of observation, use `observes_that` or `observes_event` (see below).
 
 ### Advanced observation constructs
 

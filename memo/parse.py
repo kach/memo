@@ -173,6 +173,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ast.UAdd: Op.UADD,
                     ast.USub: Op.NEG,
                     ast.Invert: Op.INV,
+                    ast.Not: Op.INV
                 }[op.__class__],
                 args=[o_expr],
                 loc=loc,
