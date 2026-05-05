@@ -191,7 +191,9 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ast.Div: Op.DIV,
                     ast.Pow: Op.POW,
                     ast.Mod: Op.MOD,
-                    ast.BitXor: Op.XOR
+                    ast.BitXor: Op.XOR,
+                    ast.BitAnd: Op.AND,
+                    ast.BitOr: Op.OR
                 }[op.__class__],
                 args=[e1_, e2_],
                 loc=loc,
