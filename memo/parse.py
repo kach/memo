@@ -90,7 +90,13 @@ def parse_ememo(expr: ast.expr, ctxt: ParsingContext, loc: SourceLocation) -> Ex
             case ast.Name(id=source_id):
                 ids.append((Id("..."), Name("self"), Id(source_id)))
             case _:
-                raise Exception()
+                raise MemoError(
+                    f"Invalid axis specification in memo call",
+                    hint="Each axis passed to the memo model you are calling must be either the name of a choice (e.g. x) or another agent's choice (e.g. alice.y). Nothing else is allowed.",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
 
     return EMemo(
         name=f_name,
@@ -243,7 +249,13 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         case ast.Subscript(value=ast.Name(id="Predict"), slice=f_expr):
             if isinstance(f_expr, ast.Slice) or isinstance(f_expr, ast.Tuple):
-                raise Exception()
+                raise MemoError(
+                    "Predict[] takes a single expression in the square brackets.",
+                    hint="Use Predict[expr] with one expression, e.g. Predict[alice.x + 7], not Predict[alice.x + 7, bob.y].",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             return EPredict(expr=parse_expr(f_expr, ctxt), loc=loc, static=False)
 
         case ast.Subscript(value=ast.Name(id="EU"), slice=ast.Name(id=gid)):
@@ -609,7 +621,13 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     ) if expr_ is not None:
                         stmts.extend(parse_stmt(expr_, who_, ctxt))
                     case _:
-                        raise Exception()
+                        raise MemoError(
+                            "Invalid syntax inside thinks[...]",
+                            hint="Each entry in thinks[...] must be of the form who: stmt, e.g. thinks[bob: chooses(...), alice: chooses(...)]",
+                            user=True,
+                            ctxt=None,
+                            loc=loc,
+                        )
             return [SWith(who=Name(who), stmt=s, loc=s.loc) for s in stmts]
         case _:
             raise MemoError(
