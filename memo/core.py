@@ -1413,6 +1413,14 @@ def _(s: SWants, ctxt: Context) -> None:
 @eval_stmt.register
 def _(s: SGuess, ctxt: Context) -> None:
     who, id, target_id, target_who = s.who, s.id, s.target_id, s.target_who
+    if (target_who, target_id) not in ctxt.frame.children[who].choices:
+        raise MemoError(
+            "Observing unknown choice",
+            hint=f"{who} does not model {target_who}'s choice of {target_id}.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
     dom = ctxt.frame.children[who].choices[target_who, target_id].domain
     eval_stmt(
         SChoose(
