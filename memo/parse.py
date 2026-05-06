@@ -156,7 +156,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         # operators
         case ast.Compare(left=e1, ops=[op], comparators=[e2]):
-            if isinstance(op, ast.In):
+            if isinstance(op, (ast.In, ast.NotIn)):
                 raise MemoError(
                     "The `in` operator is not supported in memo expressions.",
                     hint="Usually `in` tests if an item is a member of a collection, but memo only supports scalar datatypes. (Did this error get caused by a `chooses` statement gone awry?)",
