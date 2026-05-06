@@ -824,6 +824,14 @@ Redundant expectation, not marginalizing...
 def _(e: EEntropy, ctxt: Context) -> Value:
     rvs = e.rvs
     for rv in rvs:
+        if rv not in ctxt.frame.choices:
+            raise MemoError(
+                "Taking entropy of unknown variable",
+                hint=f"{ctxt.frame.name} is not tracking choice {rv[0]}.{rv[1]}.",
+                user=True,
+                ctxt=ctxt,
+                loc=e.loc
+            )
         if ctxt.frame.choices[rv].known:
             raise MemoError(
                 "Taking entropy of known variable",
