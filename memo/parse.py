@@ -303,7 +303,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         # entropy
         case ast.Subscript(value=ast.Name(id="H"), slice=rv_expr):
-            assert not isinstance(rv_expr, ast.Slice)
+            if isinstance(rv_expr, ast.Slice):
+                raise MemoError(
+                    "Invalid entropy expression",
+                    hint="Did you accidentally have a comma in the square brackets?",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             match rv_expr:
                 case ast.Attribute(value=ast.Name(id=who_), attr=choice):
                     return EEntropy(rvs=[(Name(who_), Id(choice))], loc=loc, static=False)
@@ -333,7 +340,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         # variance
         case ast.Subscript(value=ast.Name(id="Var"), slice=rv_expr):
-            assert not isinstance(rv_expr, (ast.Slice, ast.Tuple))
+            if isinstance(rv_expr, (ast.Slice, ast.Tuple)):
+                raise MemoError(
+                    "Invalid slice in variance expression",
+                    hint="Did you accidentally have a comma in the square brackets?",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             return EExpect(expr=parse_expr(rv_expr, ctxt), reduction="variance", loc=loc, static=False)
 
         # KL divergence
@@ -356,7 +370,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                         lower=ast.Name(id=who_), upper=expr_, step=None
                     ) if expr_ is not None:
                         stmts.extend(parse_stmt(expr_, who_, ctxt))
-            assert not isinstance(elts[-1], ast.Slice)
+            if isinstance(elts[-1], ast.Slice):
+                raise MemoError(
+                    "Invalid slice at end of imagine expression",
+                    hint="The final item in an `imagine` expression should be an expression to be evaluated, not a statement. (There should be no colon.)",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             return EImagine(do=stmts, then=parse_expr(elts[-1], ctxt), loc=loc, static=False)
 
         case ast.Subscript(value=ast.Name("imagine"), slice=elt):
@@ -372,7 +393,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ctxt=None,
                     loc=loc,
                 )
-            assert not isinstance(slice, (ast.Slice, ast.Tuple))
+            if isinstance(slice, (ast.Slice, ast.Tuple)):
+                raise MemoError(
+                    f"Invalid subscript in agent query",
+                    hint="When querying an agent, you can only have a single value in the square brackets, not multiple comma-separated ones (e.g. alice[1, 2] is not allowed). This error sometimes happens when you forget parens after a memo call, and memo interprets your expression as an agent query instead.",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt), loc=loc, static=False)
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
             if ctxt.cast is not None and who_id not in ctxt.cast and who_id != "self":
@@ -534,7 +562,14 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             args=[],
             keywords=[ast.keyword(arg=what, value=how)]
         ):
-            assert what is not None
+            if what is None:
+                raise MemoError(
+                    "Missing keyword argument name in wants statement",
+                    hint=None,
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             return [SWants(who=Name(who), what=Id(what), how=parse_expr(how, ctxt), loc=loc)]
 
         case ast.Call(
@@ -664,13 +699,27 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], list
             loc=None
         )
     src_file = inspect.getsourcefile(ff)
-    assert src_file is not None
+    if src_file is None:
+        raise MemoError(
+            "Could not determine source file for memo function",
+            hint="This sometimes happens if you are trying to run memo via `eval`. Contact us for help with this.",
+            user=False,
+            ctxt=None,
+            loc=None,
+        )
     lines, lineno = inspect.getsourcelines(ff)
 
     src = textwrap.dedent(rawsrc)  # borrowed from Exo's parser!
     lead_raw = re.match("^(.*)", rawsrc)
     lead_src = re.match("^(.*)", src)
-    assert lead_raw is not None and lead_src is not None
+    if lead_raw is None or lead_src is None:
+        raise MemoError(
+            "Could not determine indentation of memo function source",
+            hint=None,
+            user=False,
+            ctxt=None,
+            loc=None,
+        )
     n_dedent = len(lead_raw.group()) - len(lead_src.group())
     tree = ast.parse(src, filename=src_file).body[0]
     ast.increment_lineno(tree, n=lineno - 1)
@@ -701,7 +750,14 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], list
                             ctxt=None,
                             loc=None
                         )
-                assert arg.type_comment is None
+                if arg.type_comment is not None:
+                    raise MemoError(
+                        "Type comments on parameters are not supported",
+                        hint=None,
+                        user=False,
+                        ctxt=None,
+                        loc=None,
+                    )
                 static_parameters.append(arg.arg)
                 if arg_i < num_required_args:
                     static_defaults.append(None)
@@ -716,7 +772,14 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], list
                 ):
                     cast = []
                     for elt in elts:
-                        assert isinstance(elt, ast.Name)
+                        if not isinstance(elt, ast.Name):
+                            raise MemoError(
+                                "Cast list entries must be plain names",
+                                hint=None,
+                                user=True,
+                                ctxt=None,
+                                loc=None,
+                            )
                         cast.append(elt.id)
                     rest_stmts = f.body[1:]
                 case _:
@@ -744,7 +807,14 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], list
     retvals = []
 
     for tp in f.type_params:
-        assert isinstance(tp, ast.TypeVar)
+        if not isinstance(tp, ast.TypeVar):
+            raise MemoError(
+                "Unexpected type parameter kind",
+                hint=None,
+                user=False,
+                ctxt=None,
+                loc=None,
+            )
         if tp.bound is None:
             raise MemoError(
                 f"Missing domain for {tp.name}",
@@ -753,7 +823,14 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], list
                 ctxt=None,
                 loc=SourceLocation(pctxt.loc_file, tp.lineno, tp.col_offset, pctxt.loc_name)
             )
-        assert isinstance(tp.bound, ast.Name)
+        if not isinstance(tp.bound, ast.Name):
+            raise MemoError(
+                f"The domain for {tp.name} must be a simple name, not a more complex expression.",
+                hint=None,
+                user=True,
+                ctxt=None,
+                loc=SourceLocation(pctxt.loc_file, tp.lineno, tp.col_offset, pctxt.loc_name),
+            )
         stmts.append(
             SForAll(
                 id=Id(tp.name),
@@ -775,7 +852,14 @@ def parse_memo(ff: Callable[..., Any]) -> tuple[ParsingContext, list[Stmt], list
                 ),
                 value=None,
             ):
-                assert choice_id not in static_parameters
+                if choice_id in static_parameters:
+                    raise MemoError(
+                        f"The name `{choice_id}` is already used for a static parameter and cannot be used as a query variable.",
+                        hint=None,
+                        user=True,
+                        ctxt=None,
+                        loc=loc,
+                    )
                 stmts.append(
                     SForAll(
                         id=Id(choice_id),
