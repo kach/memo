@@ -1347,6 +1347,7 @@ def _(s: SKnows, ctxt: Context) -> None:
 @eval_stmt.register
 def _(s: SSnapshot, ctxt: Context) -> None:
     who, alias = s.who, s.alias
+    ctxt.frame.ensure_child(who)
     current_frame = ctxt.frame.children[who]
     future_frame = copy.deepcopy(current_frame)
     fresh_lls(ctxt, future_frame)
