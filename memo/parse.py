@@ -112,7 +112,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
     loc = SourceLocation(ctxt.loc_file, expr.lineno, expr.col_offset, ctxt.loc_name)
     match expr:
         case ast.Constant(value=val):
-            assert isinstance(val, float) or isinstance(val, int)
+            if not isinstance(val, (float, int)):
+                raise MemoError(
+                    f"Unsupported literal type: {type(val).__name__}",
+                    hint="memo only supports scalars (ints and floats) as data types.",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             return ELit(value=val, loc=loc, static=True)
 
         case ast.Call(func=ast.Name(id="exp"), args=[e1]):
@@ -326,8 +333,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
 
         # variance
         case ast.Subscript(value=ast.Name(id="Var"), slice=rv_expr):
-            assert not isinstance(rv_expr, ast.Slice)
-            assert not isinstance(rv_expr, ast.Tuple)
+            assert not isinstance(rv_expr, (ast.Slice, ast.Tuple))
             return EExpect(expr=parse_expr(rv_expr, ctxt), reduction="variance", loc=loc, static=False)
 
         # KL divergence
@@ -366,8 +372,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ctxt=None,
                     loc=loc,
                 )
-            assert not isinstance(slice, ast.Slice)
-            assert not isinstance(slice, ast.Tuple)
+            assert not isinstance(slice, (ast.Slice, ast.Tuple))
             return EWith(who=Name(who_id), expr=parse_expr(slice, ctxt), loc=loc, static=False)
         case ast.Attribute(value=ast.Name(id=who_id), attr=attr):
             if ctxt.cast is not None and who_id not in ctxt.cast and who_id != "self":
