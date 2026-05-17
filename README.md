@@ -74,7 +74,7 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 1. Action understanding with presentational goals (Btesh, Wu, & Gerstenberg, CogSci '26)
 1. Toward a Formalization of Human Intuitive Theories of Bodily Pain (Berke, Collins, Tenenbaum & Saxe, CogSci '26)
 1. Sycophantic chatbots cause delusional spiraling, even in ideal bayesians (Chandra, Kleiman-Weiner, Ragan-Kelley & Tenenbaum, CogSci '26)
-1. Computational Models of Wishful Thinking in Procrastination (Friedman & Tenenbaun, CogSci '26)
+1. Computational Models of Wishful Thinking in Procrastination (Friedman, Okoroafor, Hung, Mishra & Tenenbaun, CogSci '26)
 1. Assembly Instructions for the Modular Mind (Chandra, Ragan-Kelley, Tenenbaum & Saxe, CogSci '26)
 
 _(Email me to have your work listed here!)_
