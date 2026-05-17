@@ -63,14 +63,19 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 ## As seen on…
 
 **Papers/projects using memo**  
-- People use theory of mind to craft lies exploiting audience desires (Sterling, Berke, Chandra & Jara-Ettinger, CogSci '25, SPP '25)
-- Solving strategic social coordination via Bayesian learning (Lamba, Houlihan & Saxe, CogSci '25)
-- Empathy in Explanation (Collins, Chandra, Weller, Ragan-Kelley, & Tenenbaum, CogSci '25, SPP '25)
-- Minding the Politeness Gap in Cross-cultural Communication (Machino, Siegel & Hawkins, CogSci '25)
-- Preparing a learner for an independent future (Sundar, Chandra & Kleiman-Weiner, CogSci '25)
-- A Computational Theory of Dignity (Chandra, Tenenbaum & Saxe, SPP '25)
-- Theories of Mind as Languages of Thought for Thought about Thought (Chandra, Ragan-Kelley & Tenenbaum, CogSci '25)
-- Signaling social identity in referential communication (Chen, Hawkins & Saxe, CogSci '25)
+1. People use theory of mind to craft lies exploiting audience desires (Sterling, Berke, Chandra & Jara-Ettinger, CogSci '25, SPP '25)
+1. Solving strategic social coordination via Bayesian learning (Lamba, Houlihan & Saxe, CogSci '25)
+1. Empathy in Explanation (Collins, Chandra, Weller, Ragan-Kelley, & Tenenbaum, CogSci '25, SPP '25)
+1. Minding the Politeness Gap in Cross-cultural Communication (Machino, Siegel & Hawkins, CogSci '25)
+1. Preparing a learner for an independent future (Sundar, Chandra & Kleiman-Weiner, CogSci '25)
+1. A Computational Theory of Dignity (Chandra, Tenenbaum & Saxe, SPP '25, CogSci '26)
+1. Theories of Mind as Languages of Thought for Thought about Thought (Chandra, Ragan-Kelley & Tenenbaum, CogSci '25)
+1. Signaling social identity in referential communication (Chen, Hawkins & Saxe, CogSci '25)
+1. Action understanding with presentational goals (Btesh, Wu, & Gerstenberg, CogSci '26)
+1. Toward a Formalization of Human Intuitive Theories of Bodily Pain (Berke, Collins, Tenenbaum & Saxe, CogSci '26)
+1. Sycophantic chatbots cause delusional spiraling, even in ideal bayesians (Chandra, Kleiman-Weiner, Ragan-Kelley & Tenenbaum, CogSci '26)
+1. Computational Models of Wishful Thinking in Procrastination (Friedman & Tenenbaun, CogSci '26)
+1. Assembly Instructions for the Modular Mind (Chandra, Ragan-Kelley, Tenenbaum & Saxe, CogSci '26)
 
 _(Email me to have your work listed here!)_
 
