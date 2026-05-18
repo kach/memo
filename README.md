@@ -62,7 +62,8 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 
 ## As seen on…
 
-**Papers/projects using memo**  
+<details>
+<summary>Papers/projects using memo</summary>
 1. People use theory of mind to craft lies exploiting audience desires (Sterling, Berke, Chandra & Jara-Ettinger, CogSci '25, SPP '25)
 1. Solving strategic social coordination via Bayesian learning (Lamba, Houlihan & Saxe, CogSci '25)
 1. Empathy in Explanation (Collins, Chandra, Weller, Ragan-Kelley, & Tenenbaum, CogSci '25, SPP '25)
@@ -78,18 +79,21 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 1. Pact: A Choreographic Language for Agentic Ecosystems (Gopinathan, Feser, Naim, Tavares & Bingham, CP '26)
 1. Assembly Instructions for the Modular Mind (Chandra, Ragan-Kelley, Tenenbaum & Saxe, CogSci '26)
 
-_(Email me to have your work listed here!)_
+_(This list is incomplete and kept up-to-date on a best-effort basis. Please email me to have your work listed here!)_
+</details>
 
-**Talks on memo**  
+<details><summary>Talks on memo</summary>
 - New England PL/Systems Summit (NEPLS) (2024)
 - Languages For Inference (LAFI @ POPL) (2025)
+</details>
 
-**Courses using memo**  
+<details><summary>Courses using memo</summary>
 - Semester-long course at Dartmouth College (winter 2025, 2026)
 - Semester-long course at MIT (fall 2025)
 - Summer seminar at Stanford University (2025)
 - Tutorial at CogSci conference in San Francisco (2025)
 - Tutorial at COSMOS summer school in Tokyo (2025)
+</details>
 
 ## FAQ
 
