@@ -1,4 +1,4 @@
-# The memo Handbook (v1.2.9)
+# The memo Handbook
 
 This handbook provides a complete reference for the memo programming language syntax and semantics.
 
