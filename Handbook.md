@@ -104,9 +104,15 @@ bob: assigned(r in Roles, wpp=1)
 bob: guesses(r in Roles, wpp=1)
 ```
 
+For distributions that uniformly pick out a subset of choices, you can write `such_that=` instead of `wpp=`:
+
+```python
+bob: chooses(s in Stores, such_that=is_open(s))
+```
+
 ## `thinks`
 
-The `thinks` statement defines what an agent believes about other agents. This creates nested reasoning—an agent reasoning about the reasoning of others.
+The `thinks` statement defines what an agent believes about other agents. This creates nested reasoning—an agent reasoning recursively about the reasoning of others.
 
 ```python
 bob: thinks[

@@ -478,13 +478,15 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 case _:
                     raise MemoError(
                         f"wrong number of keyword arguments to chooses",
-                        hint="expected exactly one of: wpp, to_maximize, to_minimize",
+                        hint="expected exactly one of: wpp, such_that, to_maximize, to_minimize",
                         user=True,
                         ctxt=None,
                         loc=loc
                     )
 
             if reduction_name == 'wpp':
+                reduction = 'normalize'
+            elif reduction_name == 'such_that':
                 reduction = 'normalize'
             elif reduction_name == 'to_maximize':
                 reduction = 'maximize'

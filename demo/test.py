@@ -524,3 +524,8 @@ def multi_return_4[x: X]():
 @memo_test(mod, expect='re')
 def multi_return_5[x: X]():
     return test_[0][x]()
+
+@memo_test(mod, item=1.0)
+def such_that():
+    alice: chooses(n in N, such_that=n < 3)
+    return E[alice.n]
