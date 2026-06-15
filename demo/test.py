@@ -529,3 +529,23 @@ def multi_return_5[x: X]():
 def such_that():
     alice: chooses(n in N, such_that=n < 3)
     return E[alice.n]
+
+@memo_test(mod, item=5.0)
+def uniformly_1():
+    alice: chooses(n in N, uniformly)
+    return E[alice.n]
+
+@memo_test(mod, item=0.0)
+def uniformly_2():
+    alice: chooses(n in N, m in N, uniformly)
+    return E[alice.n - alice.m]
+
+@memo_test(mod, expect='ce')
+def uniformly_3():
+    alice: chooses(n in N, m in N, uniformly, wpp=1)
+    return E[alice.n - alice.m]
+
+@memo_test(mod, expect='ce')
+def uniformly_4():
+    alice: chooses(uniformly)
+    return 1

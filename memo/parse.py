@@ -445,6 +445,21 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             args=args,
             keywords=kw
         ):
+            if args and isinstance(args[-1], ast.Name) and args[-1].id == "uniformly":
+                if kw:
+                    raise MemoError(
+                        "Cannot use `uniformly` together with a keyword argument",
+                        hint="Use either `uniformly` or one of: wpp, such_that, to_maximize, or to_minimize",
+                        user=True,
+                        ctxt=None,
+                        loc=loc
+                    )
+                wpp_kw = ast.keyword(arg='wpp', value=ast.Constant(value=1))
+                ast.copy_location(wpp_kw, args[-1])
+                ast.copy_location(wpp_kw.value, args[-1])
+                kw = [wpp_kw]
+                args = args[:-1]
+
             choices: list[tuple[Id, Dom]] = []
             if len(args) == 0:
                 raise MemoError(
@@ -478,7 +493,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 case _:
                     raise MemoError(
                         f"wrong number of keyword arguments to chooses",
-                        hint="expected exactly one of: wpp, such_that, to_maximize, to_minimize",
+                        hint="expected exactly one of: wpp, such_that, to_maximize, to_minimize (or uniformly)",
                         user=True,
                         ctxt=None,
                         loc=loc

@@ -110,6 +110,12 @@ For distributions that uniformly pick out a subset of choices, you can write `su
 bob: chooses(s in Stores, such_that=is_open(s))
 ```
 
+For making uniform choices (`wpp=1`), you can also write `uniformly`:
+
+```python
+bob: chooses(s in Stores, uniformly)
+```
+
 ## `thinks`
 
 The `thinks` statement defines what an agent believes about other agents. This creates nested reasoning—an agent reasoning recursively about the reasoning of others.
