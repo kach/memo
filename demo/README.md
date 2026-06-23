@@ -38,6 +38,7 @@
 
 ## Developmental and comparative psychology
 - [Sally-Anne (false belief test)](./demo-sally-anne.ipynb)
+- [Broccoli and Goldfish (diverse desires)](./demo-broccoli.ipynb)
 - [Integrating intuitive psychology and intuitive physics](./demo-physics.ipynb)
 - [Rational belief revision in chimpanzees](./demo-chimp-belief-revision.ipynb)
 - [Toddlers favor utterances in common ground](./demo-mouths-of-babes.ipynb)
