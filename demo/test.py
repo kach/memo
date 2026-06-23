@@ -1,4 +1,4 @@
-from memo import memo, memo_test, make_module
+from memo import memo, memo_test, make_module, Variant
 import jax.numpy as np
 X = np.arange(3)
 
@@ -549,3 +549,31 @@ def uniformly_3():
 def uniformly_4():
     alice: chooses(uniformly)
     return 1
+
+@memo_test(mod, expect='ce')
+def has_theory_child_1():
+    child: has_theory(CHILD)
+    child: thinks[
+        adult: thinks[ mom: INSPECT() ]
+    ]
+    return 0
+
+@memo_test(mod)
+def has_theory_child_2():
+    child: has_theory(CHILD)
+    child: thinks[
+        adult: chooses(x in X, wpp=1)
+    ]
+    return 0
+
+@memo_test(mod, variant=Variant.CHILD, expect='ce')
+def has_theory_child_3():
+    child: thinks[
+        adult: chooses(x in X, wpp=1)
+    ]
+    return 0
+
+@memo_test(mod, variant=Variant.CHILD)
+def has_theory_child_4():
+    child: chooses(x in X, uniformly)
+    return 0

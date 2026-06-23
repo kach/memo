@@ -612,6 +612,27 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                     )
                 )
             return stmts
+        
+        case ast.Call(
+            func=ast.Name(id="has_theory"),
+            args=[ast.Name(id=variant_id)],
+            keywords=[]
+        ):
+            if variant_id not in Variant.__members__:
+                raise MemoError(
+                    "Unknown variant",
+                    hint=f"`{variant_id}` is not a recognized memo variant. The available variants are: {', '.join([v.name for v in Variant])}",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
+            return [
+                SVariant(
+                    who=Name(who),
+                    variant=Variant.__members__[variant_id],
+                    loc=loc
+                )
+            ]
 
         # observes with/without self
         case ast.Compare(

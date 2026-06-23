@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .core import memo_result, AuxInfo, Stmt, Expr, Context, Frame, ROOT_FRAME_NAME, eval_expr, eval_stmt, Name, MemoError
+from .core import memo_result, AuxInfo, Stmt, Expr, Context, Frame, ROOT_FRAME_NAME, eval_expr, eval_stmt, Name, MemoError, Variant
 from .parse import parse_memo, ParsingContext
 from .version import __version__
 
@@ -170,10 +170,11 @@ def codegen(
     debug_trace: bool=False,
     save_comic: Optional[str]=None,
     install_module: Optional[Callable[[str], Any]] = None,
+    variant: Variant = Variant.ADULT,
     cache: bool = False
 ) -> MemoCompiled:
     f_name = pctxt.loc_name
-    ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME), pctxt=pctxt)
+    ctxt = Context(frame=Frame(name=ROOT_FRAME_NAME, variant=variant), pctxt=pctxt)
     ctxt.hoisted_syms.extend(pctxt.static_parameters)
     with ctxt.hoist():
         for param in pctxt.static_parameters:
@@ -390,7 +391,7 @@ def memo_test(mod, expect='pass', item=None, *args, **kwargs):  # type: ignore
     def helper(f):  # type: ignore
         name = f.__name__
         outcome = None
-        err: BaseException
+        err: Optional[BaseException] = None
         try:
             memo(f, install_module=mod.install, **kwargs)
             f = mod.__getattribute__(name)
@@ -411,5 +412,6 @@ def memo_test(mod, expect='pass', item=None, *args, **kwargs):  # type: ignore
             return f
         else:
             print(f'[!fail {name}, {outcome} != {expect} ]')
-            raise err
+            if err is not None:
+                raise err
     return helper

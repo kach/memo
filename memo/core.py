@@ -83,9 +83,15 @@ class Choice:
     domain: Dom
 
 
+class Variant(Enum):
+    ADULT = 0
+    CHILD = 1
+
+
 @dataclass
 class Frame:
     name: Name
+    variant: Variant
     choices: dict[tuple[Name, Id], Choice] = field(default_factory=dict)
     children: dict[Name, Frame] = field(default_factory=dict)
     conditions: dict[tuple[Name, Id], tuple[Name, Id]] = field(default_factory=dict)
@@ -97,7 +103,9 @@ class Frame:
 
     def ensure_child(self, who: Name) -> None:
         if who not in self.children:
-            self.children[who] = Frame(name=who, parent=self)
+            self.children[who] = Frame(
+                name=who, variant=self.variant, parent=self
+            )
 
 
 ROOT_FRAME_NAME = Name("observer")
@@ -300,6 +308,11 @@ class SSnapshot(SyntaxNode):
     alias: Name
 
 @dataclass(frozen=True)
+class SVariant(SyntaxNode):
+    who: Name
+    variant: Variant
+
+@dataclass(frozen=True)
 class STrace(SyntaxNode):
     who: Name
 
@@ -326,6 +339,7 @@ Stmt = (
     | SForAll
     | SKnows
     | SSnapshot
+    | SVariant
     | STrace
     | SWants
     | SGuess
@@ -1267,6 +1281,14 @@ def _(s: SObserves, ctxt: Context) -> None:
 
 @eval_stmt.register
 def _(s: SWith, ctxt: Context) -> None:
+    if ctxt.frame.variant == Variant.CHILD:
+        raise MemoError(
+            "Using `thinks` with variant CHILD",
+            hint=f"{ctxt.frame.name} has variant CHILD, which does not have a `thinks` statement. Hence, {ctxt.frame.name} cannot model `{s.who}: thinks[...]`.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
     who = s.who
     ctxt.frame.ensure_child(who)
     who, stmt = s.who, s.stmt
@@ -1391,6 +1413,8 @@ def _(s: STrace, ctxt: Context) -> None:
         return
 
     f = ctxt.frame.children[who]
+    if f.variant != Variant.ADULT:
+        print(f"-> {who} is using the variant {f.variant.name}")
     print(f"-> {who} is tracking the following choices:")
     for key, val in f.choices.items():
         if key[0] == Name("self"):
@@ -1410,6 +1434,11 @@ def _(s: STrace, ctxt: Context) -> None:
         print(f"-> {f.name} is being modeled by {f.parent.name}.")
         f = f.parent
     print()
+
+@eval_stmt.register
+def _(s: SVariant, ctxt: Context) -> None:
+    ctxt.frame.ensure_child(s.who)
+    ctxt.frame.children[s.who].variant = s.variant
 
 @eval_stmt.register
 def _(s: SWants, ctxt: Context) -> None:

@@ -231,6 +231,23 @@ alice: given(score in N, wpp=…)
 
 Even though `score` is defined after the `wants` statement, this code is valid. Conceptually, the `EU` expression is evaluated at the point where all referenced variables are defined.
 
+## `has_theory`
+
+Sometimes you are modeling an agent who has an alternate theory of mind, e.g. a child who cannot represent false beliefs. In memo, you can assign an alternate theory to an agent using `has_theory(...)`. Then, when you are expressing that agent's mental model (via `thinks`), you will be using a memo variant that represents that alternate theory.
+
+Currently, the only alternate theory supported is `CHILD`. This theory disallows models where the agent uses the `thinks` statement, and hence prevents the agent from creating representations of false or accidentally-true beliefs. For example:
+
+```python
+child: has_theory(CHILD)
+child: thinks[
+    sally: thinks[ ... ]  # raises an error
+]
+```
+
+Notice that it is okay to write `child: thinks` at the top level, because it is okay for the _observer_ to use `thinks`. What is disallowed is the child writing `sally: thinks`.
+
+You can force a model to use a theory at the top-level by writing `@memo(variant=Variant.CHILD)` (be sure to import `Variant` from the top-level package `memo`).
+
 ## `INSPECT`
 
 The `INSPECT` statement prints the current state of an agent at compile time. This is helpful for debugging complex models.
