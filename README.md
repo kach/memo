@@ -98,6 +98,11 @@ _(This list is incomplete and kept up-to-date on a best-effort basis. Please ema
 - Tutorial at COSMOS summer school in Tokyo (2025)
 </details>
 
+<details><summary>News articles about memo</summary>
+- [SQI: memo Helps Researchers Model How Minds Think About Other Minds](https://sqi.mit.edu/news/memo)
+   
+</details>
+
 ## FAQ
 
 <details><summary>How do I capitalize memo? Is it Memo? MEMO? MeMo?</summary>
