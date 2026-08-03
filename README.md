@@ -79,6 +79,7 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 1. Computational Models of Wishful Thinking in Procrastination (Friedman, Okoroafor, Hung, Mishra & Tenenbaun, CogSci '26)
 1. Pact: A Choreographic Language for Agentic Ecosystems (Gopinathan, Feser, Naim, Tavares & Bingham, CP '26)
 1. Assembly Instructions for the Modular Mind (Chandra, Ragan-Kelley, Tenenbaum & Saxe, CogSci '26)
+1. Pragmatic Explanation of Causal Inference from Correlational Statements (Zur, Goodwin, Shain & Hawkins, CogSci '26)
 
 _(This list is incomplete and kept up-to-date on a best-effort basis. Please email me to have your work listed here!)_
 </details>
