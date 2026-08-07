@@ -81,6 +81,7 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 1. Assembly Instructions for the Modular Mind (Chandra, Ragan-Kelley, Tenenbaum & Saxe, CogSci '26)
 1. Conniving With Continuations: Representing Goals in a Domain‐Specific Language of Thought (Chandra, Saxe, Ragan‐Kelley & Tenenbaum, TopiCS 2026)
 1. Pragmatic Explanation of Causal Inference from Correlational Statements (Zur, Goodwin, Shain & Hawkins, CogSci '26)
+1. A social inverse-planning model captures how relationship intimacy constrains action planning and interpretation (Chen, Thomas, Tenenbaum & Saxe, CogSci 2026)
 
 _(This list is incomplete and kept up-to-date on a best-effort basis. Please email me to have your work listed here!)_
 </details>
