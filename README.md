@@ -86,12 +86,6 @@ I would love to hear about any research using memo. Please don't hesitate to sha
 _(This list is incomplete and kept up-to-date on a best-effort basis. Please email me to have your work listed here!)_
 </details>
 
-<details><summary>Talks on memo</summary>
-
-- New England PL/Systems Summit (NEPLS) (2024)
-- Languages For Inference (LAFI @ POPL) (2025)
-</details>
-
 <details><summary>Courses using memo</summary>
 
 - Semester-long course at Dartmouth College (winter 2025, 2026)
