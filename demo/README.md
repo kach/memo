@@ -26,6 +26,7 @@
   (from "The Princess Bride")
 - [I-POMDP (investment game)](./demo-i-pomdp.ipynb)  
   (agents reason about their uncertainty about each other)
+- [Penelope's Commitment Issues](./demo-penelope.ipynb)
 
 ## Planning and inverse planning
 
