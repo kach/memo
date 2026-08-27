@@ -577,3 +577,23 @@ def has_theory_child_3():
 def has_theory_child_4():
     child: chooses(x in X, uniformly)
     return 0
+
+@memo_test(mod, item=2)
+def to_be_1():
+    alice: chooses(x in X, to_be=2)
+    return E[alice.x]
+
+@memo_test(mod, item=4)
+def to_be_2():
+    alice: chooses(x in X, y in X, to_be=2)
+    return E[alice.x + alice.y]
+
+@memo_test(mod, item=1.0)
+def to_be_3():
+    alice: chooses(x in X, to_be=x)
+    return E[alice.x]
+
+@memo_test(mod, item=0.0)
+def to_be_4():
+    alice: chooses(x in X, y in Y, to_be=x + y)
+    return E[alice.x + alice.y]

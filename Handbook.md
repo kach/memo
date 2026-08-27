@@ -93,6 +93,21 @@ bob: chooses(a in Actions, to_maximize=utility(a))
 
 Similarly, for argmin behavior, use `to_minimize`.
 
+## Deterministic value with `to_be`
+
+For deterministically choosing to be a fixed value, use `to_be`:
+
+```python
+bob: chooses(a in Actions, to_be={Action.JUMP})
+```
+
+You can choose many values this way, as long as they are chosen to be the same value.
+
+```python
+# Bob jumps twice
+bob: chooses(a1 in Actions, a2 in Actions, to_be={Action.JUMP})
+```
+
 ### Aliases for `chooses`
 
 Several aliases exist for `chooses` that have identical behavior but don't imply agency or goal-orientation. These can make your models easier to read:
@@ -110,7 +125,7 @@ For distributions that uniformly pick out a subset of choices, you can write `su
 bob: chooses(s in Stores, such_that=is_open(s))
 ```
 
-For making uniform choices (`wpp=1`), you can also write `uniformly`:
+For making uniform choices over the entire domain (`wpp=1`), you can also write `uniformly`:
 
 ```python
 bob: chooses(s in Stores, uniformly)

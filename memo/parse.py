@@ -449,7 +449,7 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 if kw:
                     raise MemoError(
                         "Cannot use `uniformly` together with a keyword argument",
-                        hint="Use either `uniformly` or one of: wpp, such_that, to_maximize, or to_minimize",
+                        hint="Use either `uniformly` or one of: wpp, such_that, to_be, to_maximize, or to_minimize",
                         user=True,
                         ctxt=None,
                         loc=loc
@@ -503,6 +503,20 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
                 reduction = 'normalize'
             elif reduction_name == 'such_that':
                 reduction = 'normalize'
+            elif reduction_name == 'to_be':
+                reduction = 'normalize'
+                eqs: list[Expr] = []
+                for choice in choices:
+                    eqs.append(EOp(
+                        op=Op.EQ,
+                        args=[wpp_expr_, EChoice(id=choice[0], static=False, loc=wpp_expr_.loc)],
+                        static=False,
+                        loc=wpp_expr_.loc
+                    ))
+                from functools import reduce
+                def make_and_tree(a, b):
+                    return EOp(op=Op.AND, args=[a, b], static=False, loc=wpp_expr_.loc)
+                wpp_expr_ = reduce(make_and_tree, eqs, ELit(1, static=True, loc=wpp_expr_.loc))
             elif reduction_name == 'to_maximize':
                 reduction = 'maximize'
             elif reduction_name == 'to_minimize':
