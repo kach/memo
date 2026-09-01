@@ -86,6 +86,9 @@ class Choice:
 class Variant(Enum):
     ADULT = 0
     CHILD = 1
+    NO_THINKS = 2
+    NO_KNOWS = 3
+    NO_WANTS = 4
 
 
 @dataclass
@@ -1289,6 +1292,14 @@ def _(s: SWith, ctxt: Context) -> None:
             ctxt=ctxt,
             loc=s.loc
         )
+    if ctxt.frame.variant == Variant.NO_THINKS:
+        raise MemoError(
+            "Unknown syntactic construct `thinks`",
+            hint="There is no such construct.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
     who = s.who
     ctxt.frame.ensure_child(who)
     who, stmt = s.who, s.stmt
@@ -1350,6 +1361,15 @@ def _(s: SShow, ctxt: Context) -> None:
 
 @eval_stmt.register
 def _(s: SKnows, ctxt: Context) -> None:
+    if ctxt.frame.variant == Variant.NO_KNOWS:
+        raise MemoError(
+            "Unknown syntactic construct `knows`",
+            hint="There is no such construct.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
+
     who, source_who, source_id = s.who, s.source_who, s.source_id
     source_addr = (source_who, source_id)
     # out_addr = (ctxt.frame.name if source_who == "self" else source_who, source_id)
@@ -1442,6 +1462,14 @@ def _(s: SVariant, ctxt: Context) -> None:
 
 @eval_stmt.register
 def _(s: SWants, ctxt: Context) -> None:
+    if ctxt.frame.variant == Variant.NO_WANTS:
+        raise MemoError(
+            "Unknown syntactic construct `wants`",
+            hint="There is no such construct.",
+            user=True,
+            ctxt=ctxt,
+            loc=s.loc
+        )
     who, what, how = s.who, s.what, s.how
     ctxt.frame.ensure_child(who)
     assert what not in ctxt.frame.children[who].goals
