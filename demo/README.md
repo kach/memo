@@ -55,3 +55,4 @@
 - [Dining cryptographers](./demo-dining-cryptographers.ipynb)
 - [Newcomb's problem](./demo-newcomb.ipynb)
 - [Monty Hall](./demo-monty.ipynb)
+- [Mr. Smith's Puzzle / The Boy or Girl Paradox](./demo-smith.ipynb)
