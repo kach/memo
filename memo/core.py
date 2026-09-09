@@ -28,6 +28,24 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 @dataclass
+class Cost:
+    flops: int = 0
+    bytes: int = 0
+    program_size: int = 0
+
+    def __add__(self: Cost, other: Cost):
+        return Cost(
+            self.flops + other.flops,
+            self.bytes + other.bytes,
+            self.program_size
+        )
+
+    def __iadd__(self: Cost, other: Cost):
+        self.flops += other.flops
+        self.bytes += other.bytes
+        return self
+
+@dataclass
 class AuxInfo[CostT, PandasT, XArrayT]:
     cost: CostT = None  # type: ignore[assignment]
     pandas: PandasT = None  # type: ignore[assignment]
@@ -536,7 +554,7 @@ def _(e: ECost, ctxt: Context) -> Value:
         ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
         ctxt.indent()
         ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], return_cost=True, **{k: v.tag for k, v in kwargs_out.items()})})')
-        ctxt.emit(f'{res} = {res}.cost')
+        ctxt.emit(f'{res} = {res}.cost.flops')
         ctxt.dedent()
         ctxt.emit('else:')
         ctxt.indent()

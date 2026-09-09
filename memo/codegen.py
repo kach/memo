@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .core import memo_result, AuxInfo, Stmt, Expr, Context, Frame, ROOT_FRAME_NAME, eval_expr, eval_stmt, Name, MemoError, Variant
+from .core import memo_result, AuxInfo, Cost, Stmt, Expr, Context, Frame, ROOT_FRAME_NAME, eval_expr, eval_stmt, Name, MemoError, Variant
 from .parse import parse_memo, ParsingContext
 from .version import __version__
 
@@ -31,7 +31,7 @@ class MemoCompiled(Protocol):
         return_aux: bool = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float, pd.DataFrame, xr.DataArray]]:
+    ) -> memo_result[AuxInfo[Cost, pd.DataFrame, xr.DataArray]]:
         ...
 
     @overload
@@ -44,7 +44,7 @@ class MemoCompiled(Protocol):
         return_cost: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float | None, pd.DataFrame, xr.DataArray]]:
+    ) -> memo_result[AuxInfo[Cost | None, pd.DataFrame, xr.DataArray]]:
         ...
 
     @overload
@@ -57,7 +57,7 @@ class MemoCompiled(Protocol):
         return_pandas: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float, pd.DataFrame | None, xr.DataArray]]:
+    ) -> memo_result[AuxInfo[Cost, pd.DataFrame | None, xr.DataArray]]:
         ...
 
     @overload
@@ -70,7 +70,7 @@ class MemoCompiled(Protocol):
         return_xarray: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float, pd.DataFrame, xr.DataArray | None]]:
+    ) -> memo_result[AuxInfo[Cost, pd.DataFrame, xr.DataArray | None]]:
         ...
 
     @overload
@@ -83,7 +83,7 @@ class MemoCompiled(Protocol):
         return_cost: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float | None, pd.DataFrame, xr.DataArray | None]]:
+    ) -> memo_result[AuxInfo[Cost | None, pd.DataFrame, xr.DataArray | None]]:
         ...
 
     @overload
@@ -96,7 +96,7 @@ class MemoCompiled(Protocol):
         return_cost: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray]]:
+    ) -> memo_result[AuxInfo[Cost | None, pd.DataFrame | None, xr.DataArray]]:
         ...
 
     @overload
@@ -109,7 +109,7 @@ class MemoCompiled(Protocol):
         return_xarray: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float, pd.DataFrame | None, xr.DataArray | None]]:
+    ) -> memo_result[AuxInfo[Cost, pd.DataFrame | None, xr.DataArray | None]]:
         ...
 
     @overload
@@ -122,7 +122,7 @@ class MemoCompiled(Protocol):
         return_cost: Literal[False] = ...,
         print_table: bool = ...,
         **kwargs: jax.typing.ArrayLike
-    ) -> memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
+    ) -> memo_result[AuxInfo[Cost | None, pd.DataFrame | None, xr.DataArray | None]]:
         ...
 
     @overload
@@ -148,7 +148,7 @@ class MemoCompiled(Protocol):
         return_cost: bool = False,
         print_table: bool = False,
         **kwargs: jax.typing.ArrayLike
-    ) -> jax.Array | memo_result[AuxInfo[float | None, pd.DataFrame | None, xr.DataArray | None]]:
+    ) -> jax.Array | memo_result[AuxInfo[Cost | None, pd.DataFrame | None, xr.DataArray | None]]:
         ...
 
 
@@ -161,6 +161,24 @@ def make_static_parameter_list(pctxt: ParsingContext) -> str:
             out += f'{sp}={sd}'
         out += ', '
     return out
+
+import dataclasses
+def weigh(obj) -> int:
+    if not dataclasses.is_dataclass(obj):
+        return 1
+    count = 1
+    for field in dataclasses.fields(obj):
+        value = getattr(obj, field.name)
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                count += weigh(item)
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                count += weigh(k)
+                count += weigh(v)
+        else:
+            count += weigh(value)
+    return count
 
 def codegen(
     pctxt: ParsingContext,
@@ -182,7 +200,7 @@ def codegen(
                 ctxt.emit(f'check_scalar_param({param}, "{param}")')
             else:
                 ctxt.emit(f'check_exotic_param({param}, "{param}")')
-        ctxt.emit(f"cost_ = 0")
+        ctxt.emit(f"cost_ = Cost()")
         if debug_trace:
             ctxt.emit(f"""_time_ = time.time()""")
             ctxt.emit(f"""print(f' --> {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }})')""")
@@ -224,14 +242,13 @@ _out_ = _jit_{f_name}({", ".join(ctxt.hoisted_syms)})
         ctxt.emit(f"""\
 if return_cost:
     #  https://jax.readthedocs.io/en/latest/aot.html
-    _lowered_ = _jit_{f_name}.lower({", ".join(ctxt.hoisted_syms)})
+    _lowered_ = _jit_{f_name}.lower({", ".join(ctxt.hoisted_syms)}).compile()
     _cost_ = _lowered_.cost_analysis()
-    _cost_ = dict(
-        flops=_cost_.get('flops', 0),
-        transcendentals=_cost_.get('transcendentals', 0),
-        bytes=_cost_.get('bytes accessed', 0)
+    _mem_ = _lowered_.memory_analysis()
+    aux.cost += Cost(
+        flops=_cost_.get('flops', 0) + _cost_.get('transcendentals', 0),
+        bytes=_mem_.temp_size_in_bytes
     )
-    aux.cost += _cost_['flops'] + _cost_['transcendentals']
 """)
         if debug_trace:
             ctxt.emit(f"""print(f'<--  {pctxt.loc_name}({{ {", ".join(pctxt.static_parameters) if len(pctxt.static_parameters) > 0 else '""'} }}) has shape {{ _out_.shape }}')""")
@@ -271,7 +288,7 @@ def _make_{f_name}():
             return_aux = True
         if return_cost:
             return_aux = True
-            aux.cost = 0.
+            aux.cost = Cost(program_size={sum(weigh(node) for node in stmts + retvals)})
 {textwrap.indent(ctxt.hoisted_buf.getvalue(), "    " * 2)}
 
     _out_{f_name}._shape = tuple([{", ".join(f"len({p[1]})" for p in pctxt.axes)}])

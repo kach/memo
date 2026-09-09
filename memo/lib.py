@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import time
 from functools import cache
 
-from .core import MemoError, AuxInfo, memo_result
+from .core import MemoError, AuxInfo, Cost, memo_result
 
 def marg(t, dims):
     if dims == ():

@@ -106,6 +106,10 @@ def kwargs_unpacking_err():
     alice: chooses(x in X, wpp=test_[alice.x](**{1: 2}))
     return 1
 
+@memo_test(mod, item=0.0)
+def cost_1():
+    return cost @ inline()
+
 @memo_test(mod)
 def cost_kwarg():
     alice: chooses(x in X, wpp=1)
