@@ -350,6 +350,11 @@ class SGuess(SyntaxNode):
     target_who: Name
     target_id: Id
 
+@dataclass(frozen=True)
+class SForgetsAbout(SyntaxNode):
+    who: Name
+    ids: list[Id]
+
 Stmt = (
     SPass
     | SChoose
@@ -364,6 +369,7 @@ Stmt = (
     | STrace
     | SWants
     | SGuess
+    | SForgetsAbout
 )
 
 
@@ -1411,6 +1417,46 @@ def _(s: SKnows, ctxt: Context) -> None:
         ctxt.frame.children[who].children[source_who].choices[(Name("self"), source_id)] = dataclasses.replace(ctxt.frame.choices[source_addr], known=True)
         ctxt.frame.children[who].children[source_who].conditions[(Name("self"), source_id)] = (source_who, source_id)
     ctxt.emit(f"pass  # {who} knows {source_who}.{source_id}")
+
+@eval_stmt.register
+def _(s: SForgetsAbout, ctxt: Context) -> None:
+    who, ids = s.who, s.ids
+    ctxt.frame.ensure_child(who)
+    child = ctxt.frame.children[who]
+
+    idxs = []
+    for id in ids:
+        self_addr = (Name("self"), id)
+        parent_addr = (who, id)
+        if self_addr not in child.choices or self_addr in child.conditions:
+            raise MemoError(
+                f"{who} has no such choice {id} to forget",
+                hint=f"forgets_about only applies to {who}'s own choices made via chooses(...)/given(...)/etc. {id} is either unknown to {who}, or was learned via knows/observes rather than chosen.",
+                user=True,
+                ctxt=ctxt,
+                loc=s.loc
+            )
+        if parent_addr not in ctxt.frame.choices:
+            raise MemoError(
+                f"{ctxt.frame.name} is not aware that {who} has chosen {id}.",
+                hint=f"Is there a typo in {id}?",
+                user=True,
+                ctxt=ctxt,
+                loc=s.loc
+            )
+        idxs.append(ctxt.frame.choices[parent_addr].idx)
+
+    # dynamic: eagerly marginalize the parent's ll along these axes
+    if ctxt.frame.ll is not None:
+        ctxt.emit(f"# {ctxt.frame.name} forgets about {who}.{{{', '.join(ids)}}}")
+        ctxt.emit(f"{ctxt.frame.ll} = marg({ctxt.frame.ll}, {tuple(idxs)})")
+
+    # static: drop from scope in both who's own frame and the parent frame
+    for id in ids:
+        del child.choices[(Name("self"), id)]
+        del ctxt.frame.choices[(who, id)]
+        child.conditions.pop((Name("self"), id), None)
+        ctxt.frame.conditions.pop((who, id), None)
 
 @eval_stmt.register
 def _(s: SSnapshot, ctxt: Context) -> None:

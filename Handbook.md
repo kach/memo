@@ -93,7 +93,7 @@ bob: chooses(a in Actions, to_maximize=utility(a))
 
 Similarly, for argmin behavior, use `to_minimize`.
 
-## Deterministic value with `to_be`
+### Deterministic value with `to_be`
 
 For deterministically choosing to be a fixed value, use `to_be`:
 
@@ -245,6 +245,35 @@ alice: given(score in N, wpp=…)
 - **Evaluating expected utility:** `EU[win]` computes the expected value of the goal
 
 Even though `score` is defined after the `wants` statement, this code is valid. Conceptually, the `EU` expression is evaluated at the point where all referenced variables are defined.
+
+## `forgets_about`
+
+Sometimes, an agent's earlier choice is no longer referenced directly by any downstream computation. For example:
+
+```
+alice: chooses(x in Bool, uniformly)
+alice: chooses(y in Bool, to_be=x)
+# At this point, x is never referenced directly again.
+return E[alice.y] + Var[alice.y]
+```
+
+In these cases, downstream computations redundantly marginalize over every possible value of these choices. For example, the computations of `E[alice.y]` and `Var[alice.y]` redundantly marginalize over each possible value of `x`. We can make this model run faster by eagerly marginalizing out `x`, just once, when we determine that it will never again be referenced directly. The `forgets_about` construct does this.
+
+```
+alice: chooses(x in Bool, uniformly)
+alice: chooses(y in Bool, to_be=x)
+alice: forgets_about(x)
+# At this point, referencing alice.x is an error.
+# But computations over alice.y will run faster.
+return E[alice.y] + Var[alice.y]
+```
+
+You can think of `forgets_about` as analogous to using Python's `del` to free up memory for variables that are no longer needed.
+
+You can forget about multiple choices at once, e.g. `alice: forgets_about(x, y, z)`.
+
+_This optimization was inspired by the work of Li, Guo, Wang, Wang, & Zhang (2026, under review)._
+
 
 ## `has_theory`
 

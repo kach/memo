@@ -589,6 +589,34 @@ def parse_stmt(expr: ast.expr, who: str, ctxt: ParsingContext) -> list[Stmt]:
             return stmts
 
         case ast.Call(
+            func=ast.Name(id="forgets_about"),
+            args=args,
+            keywords=[],
+        ):
+            ids: list[Id] = []
+            for arg in args:
+                match arg:
+                    case ast.Name(id=choice_id):
+                        ids.append(Id(choice_id))
+                    case _:
+                        raise MemoError(
+                            "Invalid input to forgets_about(...)",
+                            hint="You can only supply the names of your own choices (e.g. x), not another agent's choice (e.g. alice.x).",
+                            user=True,
+                            ctxt=None,
+                            loc=loc
+                        )
+            if not ids:
+                raise MemoError(
+                    "`forgets_about` needs at least one choice, but none provided",
+                    hint="Specify the choice(s) to forget, e.g. forgets_about(x, y)",
+                    user=True,
+                    ctxt=None,
+                    loc=loc
+                )
+            return [SForgetsAbout(who=Name(who), ids=ids, loc=loc)]
+
+        case ast.Call(
             func=ast.Name(id="wants"),
             args=[],
             keywords=[ast.keyword(arg=what, value=how)]

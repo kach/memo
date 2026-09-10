@@ -601,3 +601,37 @@ def to_be_3():
 def to_be_4():
     alice: chooses(x in X, y in Y, to_be=x + y)
     return E[alice.x + alice.y]
+
+@memo_test(mod, item=38 / 27)
+def forgets_about_1():
+    alice: chooses(x in X, wpp=1)
+    alice: chooses(y in Y, wpp=x + y)
+    alice: forgets_about(x)
+    return E[alice.y]
+
+@memo_test(mod, expect='ce')
+def forgets_about_scope_parent():
+    alice: chooses(x in X, wpp=1)
+    alice: forgets_about(x)
+    return E[alice.x]
+
+@memo_test(mod, expect='ce')
+def forgets_about_scope_self():
+    alice: chooses(x in X, wpp=1)
+    alice: forgets_about(x)
+    alice: chooses(y in Y, wpp=x)
+    return 0
+
+@memo_test(mod, expect='ce')
+def forgets_about_not_own_choice[x: X]():
+    alice: knows(x)
+    alice: forgets_about(x)
+    return 0
+
+@memo_test(mod, item=0.5)
+def forgets_about_multiple():
+    alice: chooses(x in X, uniformly)
+    alice: chooses(y in Y, uniformly)
+    alice: forgets_about(x, y)
+    alice: chooses(z in Bool, uniformly)
+    return E[alice.z]
