@@ -43,6 +43,7 @@
 - [Integrating intuitive psychology and intuitive physics](./demo-physics.ipynb)
 - [Rational belief revision in chimpanzees](./demo-chimp-belief-revision.ipynb)
 - [Toddlers favor utterances in common ground](./demo-mouths-of-babes.ipynb)
+- [The value of goals](./demo-liu.ipynb)
 
 ## Information theoretic calculations
 
