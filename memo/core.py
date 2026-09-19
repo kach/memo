@@ -983,7 +983,7 @@ def _(e: EWith, ctxt: Context) -> Value:
     if not val_.known:
         raise MemoError(
             "Asking an agent for an unknown value",
-            hint=f"{who} has uncertainty about the value of the expression that {ctxt.frame.name} is imagining {who} computing. Did you perhaps mean to take {who}'s *expected* value of that expression, using E[...]?",
+            hint=f"{who} has uncertainty about the value of the expression that {ctxt.frame.name} is imagining {who} computing. Did you perhaps mean to take {who}'s *expected* value of that expression, using {who}[E[...]]?",
             user=True,
             ctxt=ctxt,
             loc=e.loc
