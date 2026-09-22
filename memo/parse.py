@@ -171,6 +171,14 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                     ctxt=None,
                     loc=loc,
                 )
+            if isinstance(op, (ast.Is,)):
+                raise MemoError(
+                    "The `is` operator is not supported in memo expressions.",
+                    hint="Did you mean to use `==`?",
+                    user=True,
+                    ctxt=None,
+                    loc=loc,
+                )
             e1_ = parse_expr(e1, ctxt)
             e2_ = parse_expr(e2, ctxt)
             return EOp(
