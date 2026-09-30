@@ -80,6 +80,12 @@ class MemoError(Exception):
         self.ctxt = ctxt
         self.loc = loc
 
+    def _render_traceback_(self) -> list[str]:
+        # IPython (Jupyter, VS Code, Colab) calls this to display the error:
+        # show the message and notes, but not the internal stack trace.
+        import traceback
+        return "".join(traceback.format_exception(self, limit=0)).splitlines()
+
 
 Name = NewType("Name", str)
 Id = NewType("Id", str)

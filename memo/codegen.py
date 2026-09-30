@@ -379,18 +379,6 @@ sys.excepthook = new_excepthook
 
 warnings.showwarning = lambda msg, *args: print('Warning:', msg, file=sys.stderr)
 
-try:
-    ipython = get_ipython()  # type: ignore
-    old_showtraceback = ipython.showtraceback
-    def new_showtraceback(*args, **kwargs):  # type: ignore
-        info = sys.exc_info()
-        if info[0] is MemoError:
-            return traceback.print_exception(info[1], limit=0)
-        old_showtraceback(sys.exc_info(), **kwargs)
-    ipython.showtraceback = new_showtraceback
-except NameError:
-    pass
-
 @overload
 def memo(f: None=None, **kwargs: Any) -> Callable[[Callable[..., Any]], MemoCompiled]:
     ...
