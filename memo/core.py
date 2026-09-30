@@ -829,12 +829,16 @@ def _(e: EExpect, ctxt: Context) -> Value:
     if all(ctxt.frame.choices[c].known for c in sorted(val_.deps)):
         if e.warn:
             warnings.warn(f"""\
-Redundant expectation, not marginalizing...
+Redundant {reduction}, not marginalizing...
 | {linecache.getline(e.loc.file, e.loc.line)[:-1] if e.loc is not None else ''}
 | {' ' * e.loc.offset if e.loc is not None else ''}^
     """)
         if reduction == "expectation":
             return val_
+        elif reduction == "variance":
+            out = ctxt.sym("var")
+            ctxt.emit(f"{out} = jnp.zeros_like({val_.tag})")
+            return Value(tag=out, known=True, deps=val_.deps)
     idxs_to_marginalize = tuple(set(
         # TODO: ideally, dedup by looking at frame.conditions
         c.idx for _, c in ctxt.frame.choices.items() if not c.known

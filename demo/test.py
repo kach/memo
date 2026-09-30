@@ -635,3 +635,9 @@ def forgets_about_multiple():
     alice: forgets_about(x, y)
     alice: chooses(z in Bool, uniformly)
     return E[alice.z]
+
+@memo_test(mod, item=0.0)
+def var_redundant_known():
+    alice: chooses(coffee in Bool, uniformly)
+    bob: knows(alice.coffee)
+    return E[bob[Var[alice.coffee == 1]]]
