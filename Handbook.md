@@ -514,13 +514,21 @@ g[0][x, y](3.14)
 
 ## Cost Reflection
 
-You can query the computational cost (in FLOPs) needed to evaluate a memo. Note that you only pass parameters, not axes:
+You can query the computational cost needed to evaluate a memo. Note that you only pass parameters, not axes:
 
 ```python
 @memo def f[…](a, b, c): …
 
 cost @ f(3, 4, 5)
 ```
+
+You can in fact query for three different measures of computational cost:
+
+1. `time @ f(…)`: Number of FLOPs needed to compute `f(…)`; alias for `cost @`.
+2. `space @ f(…)`: Number of bytes of temporary/scratch memory needed to compute `f(…)`.
+3. `size @ f(…)`: Number of syntax tree nodes in the memo program representation of `f`.
+
+Note that these values are _not_ guaranteed to be stable across versions of memo or JAX, because they depend on compiler internals.
 
 ## Referencing Python Variables
 

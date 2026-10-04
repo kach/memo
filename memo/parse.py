@@ -130,7 +130,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
             return EOp(op=Op.LOG, args=[parse_expr(e1, ctxt)], loc=loc, static=False)
 
         case ast.BinOp(
-            left=ast.Name(id="cost"),
+            left=ast.Name(id="cost" | "time" | "space" | "size" as cost_kw),
             op=ast.MatMult(),
             right=ast.Call(func=ast.Name(id=f_name), args=args, keywords=keywords)
         ):
@@ -138,6 +138,7 @@ def parse_expr(expr: ast.expr, ctxt: ParsingContext) -> Expr:
                 name=f_name,
                 args=parse_args_list(args, ctxt, loc),
                 kwargs=parse_kwargs_list(keywords, ctxt),
+                metric="time" if cost_kw == "cost" else cost_kw,
                 loc=loc,
                 static=False
             )

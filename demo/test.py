@@ -119,6 +119,28 @@ def cost_kwarg():
 def cost_kwargs_unpacking_err():
     return cost @ recursive_kwarg(**{})
 
+@memo_test(mod, item=0.0)
+def cost_time():
+    return time @ inline()
+
+@memo_test(mod, item=1)
+def cost_time_matches_cost():
+    return (time @ recursive_kwarg(a=2)) == (cost @ recursive_kwarg(a=2))
+
+@memo_test(mod)
+def cost_space():
+    alice: chooses(x in X, wpp=1)
+    return space @ recursive_kwarg(a=2)
+
+@memo_test(mod)
+def cost_size():
+    return size @ inline()
+
+@memo_test(mod)
+def cost_size_kwarg():
+    alice: chooses(x in X, wpp=1)
+    return size @ recursive_kwarg(a=2)
+
 @memo_test(mod)
 def imagine_ok():
     return alice[

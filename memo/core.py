@@ -236,11 +236,14 @@ class EImagine(ExprSyntaxNode):
     then: Expr
 
 
+CostMetric = Literal['time', 'space', 'size']
+
 @dataclass(frozen=True)
 class ECost(ExprSyntaxNode):
     name: str
     args: list[Expr]
     kwargs: dict[str, Expr] = field(default_factory=dict)
+    metric: CostMetric = 'time'
 
 @dataclass(frozen=True)
 class EInline(ExprSyntaxNode):
@@ -566,7 +569,8 @@ def _(e: ECost, ctxt: Context) -> Value:
         ctxt.emit(f'if {" and ".join(ctxt.path_condition) if len(ctxt.path_condition) > 0 else "True"}:')
         ctxt.indent()
         ctxt.emit(f'_, {res} = {name}({assemble_tags([arg.tag for arg in args_out], return_cost=True, **{k: v.tag for k, v in kwargs_out.items()})})')
-        ctxt.emit(f'{res} = {res}.cost.flops')
+        cost_field = {'time': 'flops', 'space': 'bytes', 'size': 'program_size'}[e.metric]
+        ctxt.emit(f'{res} = {res}.cost.{cost_field}')
         ctxt.dedent()
         ctxt.emit('else:')
         ctxt.indent()
