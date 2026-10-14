@@ -218,7 +218,7 @@ def codegen(
         if not val.known:
             raise MemoError(
                 "Returning a value that the observer has uncertainty over",
-                hint="Did you mean to use E[...] after your return statement?",
+                hint="Did you mean to wrap this return value in an E[...] expression or a Pr[...] expression?",
                 ctxt=ctxt,
                 user=True,
                 loc=retval.loc
