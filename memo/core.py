@@ -496,7 +496,7 @@ def _(e: EChoice, ctxt: Context) -> Value:
             hint=f"Did you perhaps misspell {id}?" + (
                 f" Or, did you forget to include {id} as an axis in the definition of this memo?"
                 if ctxt.frame.parent is None else
-                f" {ctxt.frame.name} is not yet aware of any choice called {id}. Or, did you forget to call {ctxt.frame.name}.chooses({id} ...) or {ctxt.frame.name}.knows({id}) earlier in the memo?"
+                f" {ctxt.frame.name} is not yet aware of any choice called {id}. Or, did you forget to call {ctxt.frame.name}.chooses({id} ...) or {ctxt.frame.name}.knows({id}) earlier in the memo? (Or, were you trying to reference a Python variable called {{{ctxt.frame.name}.{id}}}, in which case you need the curly braces?)"
             ),
             user=True,
             ctxt=ctxt,
