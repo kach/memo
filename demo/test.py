@@ -663,3 +663,54 @@ def var_redundant_known():
     alice: chooses(coffee in Bool, uniformly)
     bob: knows(alice.coffee)
     return E[bob[Var[alice.coffee == 1]]]
+
+# https://github.com/kach/memo/issues/126
+@memo_test(mod, item=1.0)
+def snapshot_unaffected_by_later_observe():
+    alice: thinks[ bob: chooses(x in X, wpp=1) ]
+    charlie: chooses(x in X, wpp=(x == 2))
+    alice: snapshots_self_as(past_alice)
+    alice: observes [bob.x] is charlie.x
+    return alice[ past_alice[ E[bob.x] ] ]
+
+@memo_test(mod, item=2.0)
+def snapshot_unaffected_by_later_observe_two_vars():
+    alice: thinks[ bob: chooses(x in X, wpp=1), bob: chooses(y in X, wpp=(y == x)) ]
+    charlie: chooses(x in X, wpp=(x == 2))
+    alice: snapshots_self_as(past_alice)
+    alice: observes [bob.x] is charlie.x
+    return alice[ past_alice[ E[bob.x + bob.y] ] ]
+
+# the original examples from the issue
+@memo_test(mod, item=1.0)
+def snapshot_unaffected_by_later_observe_issue[x: X]():
+    alice: thinks[ bob: chooses(x in X, wpp=1) ]
+    alice: snapshots_self_as(past_alice)
+    alice: observes [bob.x] is x
+    return alice[ past_alice[ E[bob.x] ] ]
+
+@memo_test(mod, item=2.0)
+def snapshot_unaffected_by_later_observe_two_vars_issue[x: X]():
+    alice: thinks[ bob: chooses(x in X, wpp=1), bob: chooses(y in X, wpp=(y == x)) ]
+    alice: snapshots_self_as(past_alice)
+    alice: observes [bob.x] is x
+    return alice[ past_alice[ E[bob.x + bob.y] ] ]
+
+@memo_test(mod, item=4.0)
+def snapshot_observing_self_unaffected():
+    alice: thinks[ bob: chooses(x in X, wpp=1) ]
+    charlie: chooses(x in X, wpp=(x == 2))
+    alice: snapshots_self_as(past_alice)
+    alice: observes [bob.x] is charlie.x
+    return E[alice[ past_alice[ E[bob.x] ] + bob.x + 1 ]]
+
+@memo_test(mod, item=3.0)
+def imagine_observe_unaffected_outside():
+    alice: chooses(z in X, wpp=(z == 2))
+    alice: thinks[ carol: thinks[ bob: chooses(x in X, wpp=1) ] ]
+    return E[alice[
+        imagine[
+            carol: observes [bob.x] is z,
+            carol[bob.x]
+        ] + carol[E[bob.x]]
+    ]]

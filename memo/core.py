@@ -134,6 +134,29 @@ class Frame:
                 name=who, variant=self.variant, parent=self
             )
 
+    def copy(self, ctxt: Context) -> Frame:
+        # deep-copy this frame, giving the copy its own lls and choice tags, so
+        # that later rebinding of the original's (e.g. by observes) does not
+        # leak into the copy; tags shared within the original stay shared
+        # within the copy
+        new = copy.deepcopy(self)
+        renames: dict[str, str] = {}
+        def detach(f: Frame) -> None:
+            if f.ll is not None:
+                ll = ctxt.sym(f"{f.name}_ll")
+                ctxt.emit(f"{ll} = {f.ll}")
+                f.ll = ll
+            for choice in f.choices.values():
+                if choice.tag not in renames:
+                    tag = ctxt.sym(f"{f.name}_tag")
+                    ctxt.emit(f"{tag} = {choice.tag}")
+                    renames[choice.tag] = tag
+                choice.tag = renames[choice.tag]
+            for child in f.children.values():
+                detach(child)
+        detach(new)
+        return new
+
 
 ROOT_FRAME_NAME = Name("observer")
 
@@ -1039,9 +1062,8 @@ def _(e: EImagine, ctxt: Context) -> Value:
         # ctxt.frame = ctxt.frame.children[who]
 
     old_frame = ctxt.frame
-    current_frame_copy = copy.deepcopy(ctxt.frame)
+    current_frame_copy = ctxt.frame.copy(ctxt)
     current_frame_copy.name = Name(f'imagined_{who}')
-    fresh_lls(ctxt, current_frame_copy)
 
     ctxt.frame = current_frame_copy
     cont_saved = ctxt.continuation
@@ -1157,14 +1179,6 @@ def _(e: EUtil, ctxt: Context) -> Value:
             loc=e.loc
         )
     return eval_expr(EPredict(ctxt.frame.goals[id], loc=e.loc, static=False), ctxt)
-
-def fresh_lls(ctxt: Context, f: Frame) -> None:
-    if f.ll is not None:
-        ll = ctxt.sym(f"{f.name}_ll")
-        ctxt.emit(f"{ll} = {f.ll}")
-        f.ll = ll
-    for c in f.children.keys():
-        fresh_lls(ctxt, f.children[c])
 
 @singledispatch
 def eval_stmt(s: Stmt, ctxt: Context) -> None:
@@ -1477,8 +1491,7 @@ def _(s: SSnapshot, ctxt: Context) -> None:
     who, alias = s.who, s.alias
     ctxt.frame.ensure_child(who)
     current_frame = ctxt.frame.children[who]
-    future_frame = copy.deepcopy(current_frame)
-    fresh_lls(ctxt, future_frame)
+    future_frame = current_frame.copy(ctxt)
     future_frame.name = alias
     future_frame.parent = current_frame
     current_frame.children[alias] = future_frame
