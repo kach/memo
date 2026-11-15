@@ -8,6 +8,7 @@
   (we show how memo can interface with deep learning and computer vision)
 - [Polite speech](./demo-politeness.ipynb)
 - [Noisy channel pragmatics and prosody](./demo-noisy.ipynb)
+- [Cheap talk](./demo-cheap-talk.py) (costless messages from a biased sender)
 
 ## Economic games
 
